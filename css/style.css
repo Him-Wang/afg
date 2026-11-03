@@ -164,7 +164,7 @@ html, body {
   box-shadow: var(--shadow);
   position: relative;
 }
-.chart-stage .chart-canvas { position: relative; width: 100%; height: 560px; }
+.chart-stage .chart-canvas { position: relative; width: 100%; height: 440px; }
 
 /* KPI 卡片版式 */
 .kpi-grid {

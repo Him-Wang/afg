@@ -69,7 +69,7 @@
     annotateMode: false,
     tableView: false,
     transposed: false,
-    labelMode: 'off',
+    extremeLabels: false,
     annotations: {},
     customTitles: {},
     viewKey: 'tpl:macro-gdp-area',
@@ -137,7 +137,7 @@
     if (zr._annotBound) return;
     zr._annotBound = true;
     zr.on('click', function (e) {
-      if (!state.annotateMode && state.labelMode !== 'one') return;
+      if (!state.annotateMode) return;
       var px = e.offsetX, py = e.offsetY;
       var opt = inst.getOption();
       var xAxis = opt.xAxis && opt.xAxis[0];
@@ -155,15 +155,6 @@
         cat = xAxis.data[idx];
       } else { cat = pt[0]; }
       if (cat === undefined || cat === null || isNaN(val)) { toast('请点击图表绘图区域内'); return; }
-      if (state.labelMode === 'one') {
-        var t = Themes.active().chart;
-        inst.setOption({ series: [{ markPoint: {
-          symbolSize: 6, itemStyle: { color: t.accent },
-          label: { show: true, position: 'top', distance: 4, formatter: fmtNum(val), color: t.text, fontSize: 10, fontWeight: 600, backgroundColor: t.panel, borderColor: t.accent, borderWidth: 1, borderRadius: 4, padding: [3, 7] },
-          data: [{ xAxis: cat, yAxis: val }]
-        } }] });
-        return;
-      }
       showAnnotationInput(px, py, function (text) {
         var list = state.annotations[state.viewKey] || (state.annotations[state.viewKey] = []);
         list.push({ cat: cat, val: val, text: text });
@@ -171,6 +162,52 @@
         toast('已添加说明');
       });
     });
+  }
+
+  /* 极值标注：标注可视区间内最高 / 最低 / 最新，随缩放更新 */
+  function applyExtremeLabels(inst) {
+    if (!inst) return;
+    var opt = inst.getOption();
+    var series = opt.series && opt.series[0];
+    if (!series || (series.type !== 'line' && series.type !== 'bar')) return;
+    if (!series.data || !series.data.length) return;
+    var dz = opt.dataZoom && opt.dataZoom[0];
+    var start = dz ? (dz.start || 0) : 0, end = dz ? (dz.end || 100) : 100;
+    var n = series.data.length;
+    var s = Math.floor(n * start / 100), e = Math.ceil(n * end / 100);
+    if (e <= s) e = Math.min(n, s + 1);
+    function valAt(i) { var v = series.data[i]; if (v === null || v === undefined) return null; return (typeof v === 'object') ? v.value : v; }
+    var maxI = -1, minI = -1;
+    for (var i = s; i < e; i++) {
+      var v = valAt(i);
+      if (v === null || isNaN(v)) continue;
+      if (maxI < 0 || v > valAt(maxI)) maxI = i;
+      if (minI < 0 || v < valAt(minI)) minI = i;
+    }
+    var lastI = e - 1;
+    while (lastI >= s && (valAt(lastI) === null || isNaN(valAt(lastI)))) lastI--;
+    if (maxI < 0 || minI < 0) return;
+    var xAxis = opt.xAxis && opt.xAxis[0];
+    function catOf(i) { return (xAxis && xAxis.data) ? xAxis.data[i] : i; }
+    var t = Themes.active().chart;
+    var marks = [];
+    function add(i, label, color) {
+      marks.push({ xAxis: catOf(i), yAxis: valAt(i), value: valAt(i), symbolSize: 7, itemStyle: { color: color },
+        label: { show: true, position: 'top', distance: 4, formatter: label, color: '#0E0F12', fontSize: 10, fontWeight: 700, backgroundColor: color, borderRadius: 4, padding: [3, 7] } });
+    }
+    if (maxI !== minI) { add(maxI, '最高 ' + fmtNum(valAt(maxI)), t.up); add(minI, '最低 ' + fmtNum(valAt(minI)), t.down); }
+    else add(maxI, '最新 ' + fmtNum(valAt(maxI)), t.accent);
+    if (lastI >= s && lastI !== maxI && lastI !== minI) add(lastI, '最新 ' + fmtNum(valAt(lastI)), t.accent);
+    inst.setOption({ series: [{ markPoint: { data: marks } }] });
+  }
+
+  function attachExtremeLabels(inst) {
+    if (!inst) return;
+    var apply = function () { if (state.extremeLabels) applyExtremeLabels(inst); else inst.setOption({ series: [{ markPoint: { data: [] } }] }); };
+    apply();
+    if (inst._extBound) return;
+    inst._extBound = true;
+    inst.on('datazoom', apply);
   }
 
   function attachPriceAnnotationHandler(inst, container) {
@@ -339,6 +376,7 @@
       var c = document.createElement('div'); c.className = 'chart-canvas'; stage.appendChild(c);
       var ci = ChartFactory.render(c, sample.type, sample.data, theme);
       attachAnnotationHandler(ci);
+      attachExtremeLabels(ci);
       state.echartsEl = c;
       renderPerfMetrics(sample.data, ci);
     } else if (sample.type === 'worldMap' && state.tableView) {
@@ -347,6 +385,7 @@
       var c2 = document.createElement('div'); c2.className = 'chart-canvas'; stage.appendChild(c2);
       var ci2 = ChartFactory.render(c2, sample.type, sample.data, theme);
       attachAnnotationHandler(ci2);
+      attachExtremeLabels(ci2);
       state.echartsEl = c2;
     }
     var tableBtn = el('btn-table');
@@ -660,18 +699,15 @@
     else hint.textContent = '点击选择一列或多列作为数值系列';
   }
 
-  function syncLabelsBtn() {
+  function syncExtremeBtn() {
     var b = el('btn-labels');
-    if (!b) return;
-    var labels = { off: '标签', all: '标签:全部', one: '标签:单点' };
-    b.textContent = labels[state.labelMode] || '标签';
-    b.classList.toggle('active', state.labelMode !== 'off');
+    if (b) b.classList.toggle('active', state.extremeLabels);
   }
 
   function syncToolbar() {
     var tb = el('chart-toolbar');
     if (tb) tb.style.display = (state.mode === 'home') ? 'none' : '';
-    syncLabelsBtn();
+    syncExtremeBtn();
     var sel = el('toolbar-chart-type');
     if (!sel) return;
     var isData = (state.mode === 'imported' || state.mode === 'dataset');
@@ -834,12 +870,12 @@
         })};
       }
       data.annotations = echartsAnnotations(state.viewKey);
-      data.showAllLabels = (state.labelMode === 'all');
       renderAnalysis(labels, yCols.map(function (col) { return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) }; }));
       clearStage();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
       var uinst = ChartFactory.render(c, type, data, theme);
       attachAnnotationHandler(uinst);
+      attachExtremeLabels(uinst);
       state.echartsEl = c;
       setHead({ title: '用户数据 · ' + (TYPE_LABELS[type] || type), subtitle: '', unit: '', source: '' });
     }
@@ -877,10 +913,11 @@
       toast('已清除当前图表的说明');
     });
     el('btn-labels').addEventListener('click', function () {
-      state.labelMode = state.labelMode === 'off' ? 'all' : (state.labelMode === 'all' ? 'one' : 'off');
-      syncLabelsBtn();
-      if (state.mode === 'imported' || state.mode === 'dataset') rerender();
-      else if (state.labelMode !== 'off') toast('数据标注适用于导入的数据');
+      state.extremeLabels = !state.extremeLabels;
+      el('btn-labels').classList.toggle('active', state.extremeLabels);
+      if (state.mode === 'imported' || state.mode === 'dataset' || state.mode === 'template') {
+        rerender();
+      }
     });
     el('btn-watermark').addEventListener('click', function () {
       state.showWatermark = !state.showWatermark;
@@ -1111,10 +1148,10 @@
       state.priceEl = pc;
     } else {
       chart.data.annotations = echartsAnnotations(state.viewKey);
-      chart.data.showAllLabels = (state.labelMode === 'all');
       var c = document.createElement('div'); c.className = 'chart-canvas'; stage.appendChild(c);
       var dsi = ChartFactory.render(c, chart.type, chart.data, theme);
       attachAnnotationHandler(dsi);
+      attachExtremeLabels(dsi);
       state.echartsEl = c;
       if (chart.data && chart.data.labels && chart.data.series) renderAnalysis(chart.data.labels, chart.data.series);
     }
@@ -1397,6 +1434,7 @@
     var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
     var ci = ChartFactory.render(c, type, data, theme);
     attachAnnotationHandler(ci);
+    attachExtremeLabels(ci);
     state.echartsEl = c;
     setHead({ title: cfg.title || '图表', subtitle: '', unit: cfg.unit || '', source: '' });
     el('hint').textContent = '已加载图表配置';
