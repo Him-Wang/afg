@@ -165,49 +165,121 @@
   }
 
   /* 极值标注：标注可视区间内最高 / 最低 / 最新，随缩放更新 */
+  /* 极值标注：标注可视区间内各指标的最高/最低/最新，可拖动、带箭头指向 */
   function applyExtremeLabels(inst) {
     if (!inst) return;
+    var container = inst.getDom && inst.getDom();
+    if (!container) return;
+    var old = container.querySelector('.ext-overlay');
+    if (old) old.remove();
+    if (!state.extremeLabels) return;
     var opt = inst.getOption();
-    var series = opt.series && opt.series[0];
-    if (!series || (series.type !== 'line' && series.type !== 'bar')) return;
-    if (!series.data || !series.data.length) return;
     var dz = opt.dataZoom && opt.dataZoom[0];
     var start = dz ? (dz.start || 0) : 0, end = dz ? (dz.end || 100) : 100;
-    var n = series.data.length;
-    var s = Math.floor(n * start / 100), e = Math.ceil(n * end / 100);
-    if (e <= s) e = Math.min(n, s + 1);
-    function valAt(i) { var v = series.data[i]; if (v === null || v === undefined) return null; return (typeof v === 'object') ? v.value : v; }
-    var maxI = -1, minI = -1;
-    for (var i = s; i < e; i++) {
-      var v = valAt(i);
-      if (v === null || isNaN(v)) continue;
-      if (maxI < 0 || v > valAt(maxI)) maxI = i;
-      if (minI < 0 || v < valAt(minI)) minI = i;
-    }
-    var lastI = e - 1;
-    while (lastI >= s && (valAt(lastI) === null || isNaN(valAt(lastI)))) lastI--;
-    if (maxI < 0 || minI < 0) return;
-    var xAxis = opt.xAxis && opt.xAxis[0];
-    function catOf(i) { return (xAxis && xAxis.data) ? xAxis.data[i] : i; }
     var t = Themes.active().chart;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ext-overlay';
+    overlay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:20;';
+    container.appendChild(overlay);
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%');
+    svg.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;';
+    overlay.appendChild(svg);
+    var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    svg.appendChild(defs);
+
     var marks = [];
-    function add(i, label, color) {
-      marks.push({ xAxis: catOf(i), yAxis: valAt(i), value: valAt(i), symbolSize: 7, itemStyle: { color: color },
-        label: { show: true, position: 'top', distance: 4, formatter: label, color: '#0E0F12', fontSize: 10, fontWeight: 700, backgroundColor: color, borderRadius: 4, padding: [3, 7] } });
-    }
-    if (maxI !== minI) { add(maxI, '最高 ' + fmtNum(valAt(maxI)), t.up); add(minI, '最低 ' + fmtNum(valAt(minI)), t.down); }
-    else add(maxI, '最新 ' + fmtNum(valAt(maxI)), t.accent);
-    if (lastI >= s && lastI !== maxI && lastI !== minI) add(lastI, '最新 ' + fmtNum(valAt(lastI)), t.accent);
-    inst.setOption({ series: [{ markPoint: { data: marks } }] });
+    (opt.series || []).forEach(function (series, si) {
+      if (series.type !== 'line' && series.type !== 'bar') return;
+      var data = series.data || [];
+      var n = data.length;
+      if (!n) return;
+      var s = Math.floor(n * start / 100), e = Math.ceil(n * end / 100);
+      if (e <= s) e = Math.min(n, s + 1);
+      function valAt(i) { var v = data[i]; if (v === null || v === undefined) return null; return (typeof v === 'object') ? v.value : v; }
+      var maxI = -1, minI = -1;
+      for (var i = s; i < e; i++) { var v = valAt(i); if (v === null || isNaN(v)) continue; if (maxI < 0 || v > valAt(maxI)) maxI = i; if (minI < 0 || v < valAt(minI)) minI = i; }
+      var lastI = e - 1;
+      while (lastI >= s && (valAt(lastI) === null || isNaN(valAt(lastI)))) lastI--;
+      if (maxI < 0 || minI < 0) return;
+      var xAxis = opt.xAxis && opt.xAxis[0];
+      function catOf(i) { return (xAxis && xAxis.data) ? xAxis.data[i] : i; }
+      function pxOf(i) {
+        try { return inst.convertToPixel({ seriesIndex: si }, [catOf(i), valAt(i)]); }
+        catch (err) { try { return inst.convertToPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [catOf(i), valAt(i)]); } catch (e2) { return null; } }
+      }
+      var name = series.name || ('指标' + (si + 1));
+      var items = [];
+      if (maxI !== minI) { items.push({ i: maxI, kind: '最高', color: t.up }); items.push({ i: minI, kind: '最低', color: t.down }); }
+      else items.push({ i: maxI, kind: '最新', color: t.accent });
+      if (lastI >= s && lastI !== maxI && lastI !== minI) items.push({ i: lastI, kind: '最新', color: t.accent });
+      items.forEach(function (it) {
+        var p = pxOf(it.i);
+        if (!p) return;
+        marks.push({ px: p[0], py: p[1], name: name, kind: it.kind, val: valAt(it.i), color: it.color, si: si });
+      });
+    });
+    if (!marks.length) return;
+
+    var colorIdx = {};
+    Object.keys(marks.reduce(function (a, m) { a[m.color] = 1; return a; }, {})).forEach(function (c, ci) {
+      colorIdx[c] = ci;
+      var mk = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+      mk.setAttribute('id', 'extArrow' + ci);
+      mk.setAttribute('markerWidth', '8'); mk.setAttribute('markerHeight', '8');
+      mk.setAttribute('refX', '6'); mk.setAttribute('refY', '3');
+      mk.setAttribute('orient', 'auto'); mk.setAttribute('markerUnits', 'userSpaceOnUse');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M0,0 L7,3 L0,6 z'); path.setAttribute('fill', c);
+      mk.appendChild(path);
+      defs.appendChild(mk);
+    });
+
+    marks.forEach(function (m) {
+      var lx = m.px + 6, ly = m.py - 30;
+      if (m.kind === '最低') { lx = m.px + 6; ly = m.py + 6; }
+      else if (m.kind === '最新') { lx = m.px + 14; ly = m.py - 10; }
+      ly -= m.si * 3;
+      var label = document.createElement('div');
+      label.className = 'ext-label';
+      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:#0E0F12;font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
+      label.textContent = m.name + ' ' + m.kind + ' ' + fmtNum(m.val);
+      overlay.appendChild(label);
+      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', m.px); line.setAttribute('y1', m.py);
+      line.setAttribute('x2', lx + 3); line.setAttribute('y2', ly + 10);
+      line.setAttribute('stroke', m.color); line.setAttribute('stroke-width', '1.2');
+      line.setAttribute('marker-end', 'url(#extArrow' + colorIdx[m.color] + ')');
+      svg.appendChild(line);
+      makeExtLabelDraggable(label, line);
+    });
+  }
+
+  function makeExtLabelDraggable(label, line) {
+    label.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      var sx = e.clientX, sy = e.clientY;
+      var ox = label.offsetLeft, oy = label.offsetTop;
+      function onMove(ev) {
+        var dx = ev.clientX - sx, dy = ev.clientY - sy;
+        label.style.left = (ox + dx) + 'px';
+        label.style.top = (oy + dy) + 'px';
+        line.setAttribute('x2', ox + dx + 3);
+        line.setAttribute('y2', oy + dy + 10);
+      }
+      function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
 
   function attachExtremeLabels(inst) {
     if (!inst) return;
-    var apply = function () { if (state.extremeLabels) applyExtremeLabels(inst); else inst.setOption({ series: [{ markPoint: { data: [] } }] }); };
-    apply();
+    applyExtremeLabels(inst);
     if (inst._extBound) return;
     inst._extBound = true;
-    inst.on('datazoom', apply);
+    inst.on('datazoom', function () { applyExtremeLabels(inst); });
   }
 
   function attachPriceAnnotationHandler(inst, container) {
@@ -1006,6 +1078,10 @@
 
     window.addEventListener('resize', function () {
       ChartFactory.resizeAll();
+      if (state.extremeLabels && state.echartsEl) {
+        var rinst = echarts.getInstanceByDom(state.echartsEl);
+        if (rinst) applyExtremeLabels(rinst);
+      }
     });
   }
 
