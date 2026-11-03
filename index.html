@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AFG · Advanced-Financial-Graph</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- 顶栏 -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo-mark">A</div>
+      <div>
+        <div class="logo-text">AFG</div>
+        <div class="logo-sub">Advanced-Financial-Graph</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn ghost" id="btn-import">＋ 导入数据</button>
+      <select id="theme-select" title="切换配色"></select>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <!-- 侧边导航 -->
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <!-- 主区 -->
+    <main class="main">
+      <div class="chart-head">
+        <div class="chart-title-block">
+          <h1 id="chart-title" contenteditable="true" spellcheck="false" title="点击编辑标题">—</h1>
+          <div class="meta">
+            <span id="chart-subtitle">—</span>
+            <span class="unit-chip" id="chart-unit" style="display:none"></span>
+            <span id="chart-source"></span>
+          </div>
+        </div>
+        <span class="meta" style="color:var(--muted);font-size:11px" id="hint"></span>
+      </div>
+      <div class="chart-toolbar">
+        <label class="tb-label">图表</label>
+        <select id="toolbar-chart-type">
+          <option value="line">折线图</option>
+          <option value="area">面积图</option>
+          <option value="bar">柱状图</option>
+          <option value="stacked">堆叠面积</option>
+          <option value="stackedBar">堆叠柱状</option>
+          <option value="radar">雷达图</option>
+          <option value="rank">横向排名</option>
+          <option value="candlestick">K 线</option>
+        </select>
+        <button class="btn sm" id="tb-swapxy" title="交换 X/Y 轴方向">⇅ X/Y</button>
+        <button class="btn sm" id="btn-transform">⚙ 数据变换</button>
+        <button class="btn sm" id="btn-events" style="display:none">◈ 事件</button>
+        <button class="btn sm" id="btn-annot">✎ 说明</button>
+        <button class="btn sm" id="btn-labels" title="数据标注：全部/单点">标签</button>
+        <button class="btn sm" id="btn-clear-annot" style="display:none">清除说明</button>
+        <button class="btn sm" id="btn-table" style="display:none">☰ 表格</button>
+        <button class="btn sm" id="btn-watermark">▦ 水印</button>
+        <span class="tb-spacer"></span>
+        <button class="btn sm" id="btn-export">⇩ 导出图片</button>
+        <button class="btn sm" id="btn-share-link">🔗 复制链接</button>
+        <div class="stat-badge" id="stat-badge"></div>
+      </div>
+      <div class="chart-stage" id="chart-stage">
+        <div class="empty-state">正在加载…</div>
+      </div>
+      <div class="event-notes" id="event-notes"></div>
+      <div class="analysis" id="analysis"></div>
+      <footer class="app-footer"><span id="footer-note">—</span></footer>
+    </main>
+  </div>
+
+  <!-- 数据变换弹层 -->
+  <div class="overlay" id="transform-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h2>数据变换</h2>
+          <div class="sub">变频 · 同比/环比/累计 · 指标运算与自定义公式</div>
+        </div>
+        <button class="modal-close" id="tf-close">×</button>
+      </div>
+      <div class="field-row">
+        <label>变频</label>
+        <select id="tf-agg">
+          <option value="avg">平均</option>
+          <option value="sum">求和</option>
+        </select>
+        <button class="btn" id="tf-q">月度 → 季度</button>
+        <button class="btn" id="tf-y">季度 → 年度</button>
+      </div>
+      <div class="field-row">
+        <label>计算</label>
+        <button class="btn" id="tf-yoy">同比</button>
+        <button class="btn" id="tf-mom">环比</button>
+        <button class="btn" id="tf-cum">年内累计</button>
+      </div>
+      <div class="field-row">
+        <label>指标运算</label>
+        <select id="tf-colA"></select>
+        <select id="tf-op">
+          <option value="+">＋ 加</option>
+          <option value="-">－ 减</option>
+          <option value="*">× 乘</option>
+          <option value="/">÷ 除</option>
+        </select>
+        <select id="tf-colB"></select>
+        <button class="btn primary" id="tf-formula-btn">生成新列</button>
+      </div>
+      <div class="preview-wrap"><table class="preview-table" id="tf-preview"></table></div>
+      <div class="field-row" style="margin-top:14px">
+        <button class="btn primary" id="tf-apply">应用并重绘图表</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入数据弹层 -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h2>导入数据</h2>
+          <div class="sub">数据仅在本地浏览器处理，不会上传到任何服务器。</div>
+        </div>
+        <button class="modal-close" id="modal-close">×</button>
+      </div>
+
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="file">上传文件</div>
+        <div class="tab" data-tab="paste">粘贴数据</div>
+        <div class="tab" data-tab="image">图片取数</div>
+        <div class="tab" data-tab="sample">示例数据</div>
+      </div>
+
+      <div class="tab-pane active" data-pane="file">
+        <div class="file-drop" id="file-drop">
+          <div class="big">点击选择或拖拽文件到此处</div>
+          <div>支持 Excel / CSV / JSON / 图片，自动识别文件类型</div>
+        </div>
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.json,.txt,image/*" style="display:none" />
+      </div>
+
+      <div class="tab-pane" data-pane="paste">
+        <textarea class="csv-area" id="csv-text" placeholder="粘贴 CSV 或 JSON 数据…&#10;CSV 示例：&#10;日期,GDP,CPI&#10;2024-01,5.2,0.4&#10;&#10;JSON 示例：&#10;[{&quot;日期&quot;:&quot;2024-01&quot;,&quot;GDP&quot;:5.2}]"></textarea>
+        <div class="field-row"><button class="btn primary" id="csv-parse">解析（自动识别 CSV / JSON）</button></div>
+      </div>
+
+      <div class="tab-pane" data-pane="image">
+        <div class="field-row"><input type="file" id="img-file" accept="image/*" /></div>
+        <div class="img-canvas-wrap" id="img-canvas-wrap"><canvas id="img-canvas"></canvas></div>
+        <div class="field-row">
+          <label>X 轴</label>
+          <input type="text" id="img-x1" placeholder="左端值" style="width:86px" />
+          <input type="text" id="img-x2" placeholder="右端值" style="width:86px" />
+          <button class="btn" id="img-calx">标定 X 轴两点</button>
+        </div>
+        <div class="field-row">
+          <label>Y 轴</label>
+          <input type="text" id="img-y1" placeholder="下端值" style="width:86px" />
+          <input type="text" id="img-y2" placeholder="上端值" style="width:86px" />
+          <button class="btn" id="img-caly">标定 Y 轴两点</button>
+        </div>
+        <div class="field-row">
+          <button class="btn primary" id="img-point-mode">开始取点</button>
+          <button class="btn" id="img-clear">清空</button>
+          <span class="hint" id="img-status"></span>
+        </div>
+        <div class="column-picker" id="img-points"></div>
+        <div class="field-row" style="margin-top:8px"><button class="btn primary" id="img-generate">生成数据表并绘图</button></div>
+      </div>
+
+      <div class="tab-pane" data-pane="sample">
+        <div class="column-picker" id="sample-list"></div>
+        <div class="hint">选择一个内置示例数据集，再在下方映射列后渲染。</div>
+      </div>
+
+      <!-- 解析结果 / 列映射 -->
+      <div id="mapping-area" style="display:none">
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0" />
+        <div style="font-size:12.5px;color:var(--muted)" id="detect-info"></div>
+        <div class="field-row">
+          <label>X / 时间列</label>
+          <select id="x-col"></select>
+          <label style="margin-left:12px">图表类型</label>
+          <select id="chart-type">
+            <option value="line">折线图</option>
+            <option value="area">面积图</option>
+            <option value="bar">柱状图</option>
+            <option value="stacked">堆叠面积</option>
+            <option value="stackedBar">堆叠柱状</option>
+            <option value="radar">雷达图</option>
+            <option value="rank">横向排名</option>
+            <option value="candlestick">K 线（需 OHLC）</option>
+          </select>
+          <button class="btn sm" id="btn-swapxy" title="交换 X/Y（转置方向）">⇅ 交换 X/Y</button>
+        </div>
+        <div class="field-row"><label>Y / 数值列</label><span class="hint" id="y-hint">点击选择一列或多列</span></div>
+        <div class="column-picker" id="y-cols"></div>
+        <div class="preview-wrap"><table class="preview-table" id="preview-table"></table></div>
+        <div class="field-row" style="margin-top:16px">
+          <button class="btn primary" id="render-btn">渲染图表</button>
+          <button class="btn" id="btn-split" style="display:none">拆分为多个图表（每个指标一张图）</button>
+        </div>
+      </div>
+
+      <!-- 多数据表自动解析结果 -->
+      <div id="dataset-picker" style="display:none">
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0" />
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px" id="dataset-summary"></div>
+        <div class="field-row">
+          <button class="btn primary" id="render-all-btn">一键渲染全部为仪表盘</button>
+        </div>
+        <div class="dataset-list" id="dataset-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 依赖库（本地化，双击离线可用） -->
+  <script src="vendor/echarts.min.js"></script>
+  <script src="vendor/world-map.js"></script>
+  <script src="vendor/lightweight-charts.standalone.production.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <!-- 业务模块 -->
+  <script src="js/themes.js"></script>
+  <script src="js/data-loader.js"></script>
+  <script src="js/ml.js"></script>
+  <script src="js/chart-factory.js"></script>
+  <script src="js/price-chart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
