@@ -667,7 +667,9 @@
   function toNum(v) {
     if (typeof v === 'number') return v;
     if (v === null || v === undefined) return NaN;
-    var s = String(v).replace(/[,%\s]/g, '');
+    var s = String(v).trim();
+    if (s === '' || s === '-' || s === '--' || s === '—' || s === 'N/A' || s === 'NA') return NaN;
+    s = s.replace(/[,%\s]/g, '');
     var n = Number(s);
     return isNaN(n) ? NaN : n;
   }

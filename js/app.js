@@ -86,6 +86,24 @@
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
 
+  /* 时间轴裁剪：按所有系列中有数据的范围 [最早, 最晚] 裁剪 */
+  function trimToDataRange(labels, series) {
+    var n = labels.length, first = n, last = -1;
+    series.forEach(function (s) {
+      s.values.forEach(function (v, i) {
+        if (v !== null && v !== undefined && !isNaN(v)) {
+          if (i < first) first = i;
+          if (i > last) last = i;
+        }
+      });
+    });
+    if (first > last || first === 0 && last === n - 1) return { labels: labels, series: series };
+    return {
+      labels: labels.slice(first, last + 1),
+      series: series.map(function (s) { return { name: s.name, values: s.values.slice(first, last + 1) }; })
+    };
+  }
+
   function fmtNum(v) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -1123,9 +1141,10 @@
             return { name: String(r[state.mapping.timeCol]), values: yCols.map(function (col) { return vnum(r[col]); }) };
           })};
         } else {
-          data = { labels: labels, series: yCols.map(function (col) {
+          var trimmed = trimToDataRange(labels, yCols.map(function (col) {
             return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) };
-          })};
+          }));
+          data = { labels: trimmed.labels, series: trimmed.series };
         }
       }
       data.annotations = echartsAnnotations(state.viewKey);
@@ -1359,6 +1378,8 @@
     var series = numericCols.map(function (col) {
       return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) };
     });
+    var trimmed = trimToDataRange(labels, series);
+    labels = trimmed.labels; series = trimmed.series;
     var type = det.isTimeSeries ? 'area' : 'bar';
     return { type: type, data: { labels: labels, series: series } };
   }
