@@ -687,7 +687,7 @@
           '<div class="mc-val">' + fmtNum(latest) + '</div>' +
           '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
           '<div class="mc-chart"></div>';
-        card.addEventListener('click', function () { openMacroItem(item); });
+        card.addEventListener('click', function () { openMacroItem(item, false); });
         grid.appendChild(card);
         renderMacroSpark(card.querySelector('.mc-chart'), item, theme);
       });
@@ -699,8 +699,9 @@
     syncToolbar();
   }
 
-  function openMacroItem(item) {
+  function openMacroItem(item, keep) {
     try {
+      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; }
       state.macroItem = item;
       var merged = mergeOverlaySeries(item.labels, item.series, state.overlaySeries);
       var type = state.macroTypeOverride || item.type;
@@ -1497,8 +1498,8 @@
     });
     el('toolbar-chart-type').addEventListener('change', function () {
       if (state.macroItem) {
-        var CART = { line: 1, area: 1, bar: 1, stacked: 1, stackedBar: 1, step: 1 };
-        if (CART[this.value]) { state.macroTypeOverride = this.value; openMacroItem(state.macroItem); }
+        var CART = { line: 1, area: 1, bar: 1, stacked: 1, stackedLine: 1, stackedBar: 1, step: 1 };
+        if (CART[this.value]) { state.macroTypeOverride = this.value; openMacroItem(state.macroItem, true); }
         else toast('该指标仅支持 折线/面积/柱状/堆叠');
         return;
       }
@@ -1537,7 +1538,7 @@
     el('btn-add-indicator').addEventListener('click', openIndicatorPanel);
     el('align-main').addEventListener('change', function () {
       state.alignToMain = this.checked;
-      if (state.macroItem) openMacroItem(state.macroItem);
+      if (state.macroItem) openMacroItem(state.macroItem, true);
       else if (state.mode === 'template') renderTemplate(state.currentTemplate);
       else rerender();
     });
@@ -1562,7 +1563,7 @@
         if (oi >= 0) state.overlaySeries.splice(oi, 1);
         else state.overlaySeries.push(opt);
         openIndicatorPanel();
-        if (state.macroItem) openMacroItem(state.macroItem);
+        if (state.macroItem) openMacroItem(state.macroItem, true);
         else if (state.mode === 'template') renderTemplate(state.currentTemplate);
         else rerender();
       }

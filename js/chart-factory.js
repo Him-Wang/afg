@@ -377,6 +377,18 @@
     return option;
   }
 
+  /* ---------- 堆叠折线（无填充，如社融分项堆叠） ---------- */
+  function stackedLine(el, data, theme) {
+    var option = lineOnly(el, data, theme);
+    option.series.forEach(function (s) {
+      s.stack = 'total';
+      s.symbol = 'circle';
+      s.symbolSize = 4;
+      s.lineStyle.width = 2;
+    });
+    return option;
+  }
+
   /* ---------- 瀑布图 ---------- */
   function waterfall(el, data, theme) {
     var values = data.values, labels = data.labels;
@@ -805,7 +817,7 @@
   var BUILDERS = {
     'area': lineArea, 'line': lineOnly, 'bar': barChart, 'step': stepLine,
     'dual': dual, 'heatmap': heatmap, 'rank': rank, 'bubble': bubble,
-    'treemap': treemap, 'stacked': stacked, 'waterfall': waterfall, 'donut': donut,
+    'treemap': treemap, 'stacked': stacked, 'stackedLine': stackedLine, 'waterfall': waterfall, 'donut': donut,
     'mlTrend': mlTrend, 'mlForecast': mlForecast, 'mlCluster': mlCluster,
     'mlCorr': mlCorr, 'mlDist': mlDist, 'stackedBar': stackedBar, 'radar': radar,
     'perf': perf, 'scatterMatrix': scatterMatrix, 'worldMap': worldMap
