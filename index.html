@@ -64,6 +64,7 @@
         <button class="btn sm" id="btn-watermark">▦ 水印</button>
         <span class="tb-spacer"></span>
         <button class="btn sm" id="btn-export">⇩ 导出图片</button>
+        <button class="btn sm" id="btn-export-svg">⇩ SVG</button>
         <button class="btn sm" id="btn-share-link">🔗 复制链接</button>
         <div class="stat-badge" id="stat-badge"></div>
       </div>
@@ -236,6 +237,10 @@
         <label>FRED</label>
         <input type="text" id="fred-series" placeholder="系列代码，如 GDP / CPI / UNRATE" style="flex:1" />
         <button class="btn primary" id="fred-load">加载</button>
+      </div>
+      <div class="field-row">
+        <label>API Key</label>
+        <input type="text" id="fred-key" placeholder="FRED API Key（可选，留空用默认）" style="flex:1" />
       </div>
       <div class="field-row">
         <label>自定义 API</label>

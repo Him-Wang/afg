@@ -172,7 +172,7 @@
   }
   function closeIndicatorPanel() { el('indicator-overlay').classList.remove('open'); }
   /* ---------- 真实数据接入（FRED / 自定义 API） ---------- */
-  var FRED_API_KEY = 'c8ac4c54758b0ccf120786aac6f92061';
+  var DEFAULT_FRED_KEY = '';
   function openDataPanel() { el('data-overlay').classList.add('open'); }
   function closeDataPanel() { el('data-overlay').classList.remove('open'); }
 
@@ -219,7 +219,11 @@
   function loadFred() {
     var sid = el('fred-series').value.trim();
     if (!sid) { toast('请输入 FRED 系列代码'); return; }
-    fetchRemote('https://api.stlouisfed.org/fred/series/observations?series_id=' + encodeURIComponent(sid) + '&api_key=' + FRED_API_KEY + '&file_type=json', 'fred');
+    var key = (el('fred-key').value || '').trim();
+    if (key) { try { localStorage.setItem('fredKey', key); } catch (e) {} }
+    else { try { key = localStorage.getItem('fredKey') || ''; } catch (e) { key = ''; } }
+    if (!key) key = DEFAULT_FRED_KEY;
+    fetchRemote('https://api.stlouisfed.org/fred/series/observations?series_id=' + encodeURIComponent(sid) + '&api_key=' + key + '&file_type=json', 'fred');
   }
   function loadCustomApi() {
     var u = el('custom-api').value.trim();
@@ -903,6 +907,18 @@
     } catch (e) { toast('导出失败'); }
   }
 
+  function exportSvg() {
+    try {
+      if (!state.echartsEl) { toast('当前模版暂不支持导出 SVG'); return; }
+      var inst = echarts.getInstanceByDom(state.echartsEl);
+      if (!inst) { toast('导出失败'); return; }
+      var url = inst.getDataURL({ type: 'svg', backgroundColor: 'transparent' });
+      var a = document.createElement('a');
+      a.href = url; a.download = 'chart.svg'; a.click();
+      toast('SVG 已导出');
+    } catch (e) { toast('导出失败'); }
+  }
+
   /* ---------- 数据导入弹层 ---------- */
   function openModal() { el('overlay').classList.add('open'); }
   function closeModal() { el('overlay').classList.remove('open'); }
@@ -1174,6 +1190,7 @@
     el('modal-close').addEventListener('click', closeModal);
     el('overlay').addEventListener('click', function (e) { if (e.target === el('overlay')) closeModal(); });
     el('btn-export').addEventListener('click', exportImage);
+    el('btn-export-svg').addEventListener('click', exportSvg);
     el('btn-share-link').addEventListener('click', copyShareLink);
     el('btn-events').addEventListener('click', function () {
       state.showEvents = !state.showEvents;

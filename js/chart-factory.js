@@ -35,6 +35,7 @@
   function tooltip(theme) {
     return {
       trigger: 'axis',
+      triggerOn: 'mousemove|click',
       backgroundColor: theme.panel,
       borderColor: theme.accent + '55',
       borderWidth: 1,
@@ -45,6 +46,7 @@
       extraCssText: 'box-shadow: 0 8px 24px rgba(0,0,0,.4); border-radius: 8px;',
       axisPointer: {
         type: 'cross',
+        snap: true,
         lineStyle: { color: theme.muted, opacity: 0.5 },
         crossStyle: { color: theme.muted, opacity: 0.5 },
         label: { backgroundColor: theme.accent, color: '#0E0F12', fontSize: 10 }
