@@ -53,7 +53,7 @@
         </select>
         <button class="btn sm" id="btn-series-color">🎨 单条颜色</button>
         <button class="btn sm" id="btn-add-indicator">＋ 指标</button>
-        <button class="btn sm" id="btn-data-source">🌐 真实数据</button>
+        <button class="btn sm" id="btn-data-source">📂 数据</button>
         <button class="btn sm" id="tb-swapxy" title="交换 X/Y 轴方向">⇅ X/Y</button>
         <button class="btn sm" id="btn-transform">⚙ 数据变换</button>
         <button class="btn sm" id="btn-events" style="display:none">◈ 事件</button>
@@ -226,28 +226,24 @@
     </div>
   </div>
 
-  <!-- 真实数据弹层 -->
+  <!-- 数据管理弹层 -->
   <div class="overlay" id="data-overlay">
     <div class="modal" style="width:min(560px,92vw)">
       <div class="modal-head">
-        <div><h2>真实数据接入</h2><div class="sub">FRED 宏观数据 / 自定义 API（需在线上部署环境使用）</div></div>
+        <div><h2>数据管理</h2><div class="sub">保存数据 · 导出 JSON · 从 URL 载入</div></div>
         <button class="modal-close" id="data-close">×</button>
       </div>
       <div class="field-row">
-        <label>FRED</label>
-        <input type="text" id="fred-series" placeholder="系列代码，如 GDP / CPI / UNRATE" style="flex:1" />
-        <button class="btn primary" id="fred-load">加载</button>
+        <button class="btn primary" id="save-local">💾 保存到浏览器</button>
+        <button class="btn" id="restore-local">📂 恢复已保存</button>
+        <button class="btn" id="export-json">⬇ 导出数据 JSON</button>
       </div>
-      <div class="field-row">
-        <label>API Key</label>
-        <input type="text" id="fred-key" placeholder="FRED API Key（可选，留空用默认）" style="flex:1" />
+      <div class="field-row" style="margin-top:10px">
+        <label>数据 URL</label>
+        <input type="text" id="data-url" placeholder="https://…/data.json（返回 JSON 数组或 {labels,series}）" style="flex:1" />
+        <button class="btn primary" id="url-load">载入</button>
       </div>
-      <div class="field-row">
-        <label>自定义 API</label>
-        <input type="text" id="custom-api" placeholder="https://…（返回 JSON 数组或 {labels,series}）" style="flex:1" />
-        <button class="btn primary" id="api-load">加载</button>
-      </div>
-      <div class="hint" style="margin-top:8px">提示：file:// 本地打开时浏览器会拦截跨域请求；部署到 GitHub Pages 后即可正常拉取。</div>
+      <div class="hint" style="margin-top:8px">把导出的 JSON 放到 GitHub 仓库里，把文件地址填进「数据 URL」，即可实现"上传一次、更新最新数据即可"。</div>
     </div>
   </div>
 

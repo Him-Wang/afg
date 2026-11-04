@@ -171,8 +171,7 @@
     el('indicator-overlay').classList.add('open');
   }
   function closeIndicatorPanel() { el('indicator-overlay').classList.remove('open'); }
-  /* ---------- 真实数据接入（FRED / 自定义 API） ---------- */
-  var DEFAULT_FRED_KEY = '';
+  /* ---------- 数据管理（保存/导出/URL 载入） ---------- */
   function openDataPanel() { el('data-overlay').classList.add('open'); }
   function closeDataPanel() { el('data-overlay').classList.remove('open'); }
 
@@ -192,7 +191,7 @@
     toast('已加载 ' + table.rows.length + ' 行数据');
   }
 
-  function fetchRemote(url, kind) {
+  function fetchRemote(url) {
     toast('正在拉取数据…');
     fetch(url)
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -201,10 +200,10 @@
           var obs = json.observations || [];
           var rows = obs.filter(function (o) { return o.value && o.value !== '.'; })
             .map(function (o) { var r = {}; r['日期'] = o.date; r['数值'] = Number(o.value); return r; });
-          applyRemoteTable({ columns: ['日期', '数值'], rows: rows }, (json.series && json.series.title) || 'FRED 数据');
+          applyRemoteTable({ columns: ['日期', '数值'], rows: rows }, (json.series && json.series.title) || '远程数据');
         } else if (Array.isArray(json)) {
           var cols = Object.keys(json[0] || {});
-          applyRemoteTable({ columns: cols, rows: json }, 'API 数据');
+          applyRemoteTable({ columns: cols, rows: json }, '远程数据');
         } else if (json && json.type && (json.labels !== undefined || json.series !== undefined || json.data)) {
           applyChartConfig(json); closeDataPanel();
         } else if (json && json.labels && json.series) {
@@ -216,19 +215,37 @@
       .catch(function (e) { toast('拉取失败：' + e.message + '（file:// 下可能被浏览器拦截，请用线上部署）'); });
   }
 
-  function loadFred() {
-    var sid = el('fred-series').value.trim();
-    if (!sid) { toast('请输入 FRED 系列代码'); return; }
-    var key = (el('fred-key').value || '').trim();
-    if (key) { try { localStorage.setItem('fredKey', key); } catch (e) {} }
-    else { try { key = localStorage.getItem('fredKey') || ''; } catch (e) { key = ''; } }
-    if (!key) key = DEFAULT_FRED_KEY;
-    fetchRemote('https://api.stlouisfed.org/fred/series/observations?series_id=' + encodeURIComponent(sid) + '&api_key=' + key + '&file_type=json', 'fred');
+  function loadDataUrl() {
+    var u = el('data-url').value.trim();
+    if (!u) { toast('请输入数据 URL'); return; }
+    fetchRemote(u);
   }
-  function loadCustomApi() {
-    var u = el('custom-api').value.trim();
-    if (!u) { toast('请输入 API 地址'); return; }
-    fetchRemote(u, 'auto');
+
+  function saveLocal() {
+    if (!state.table) { toast('当前没有可保存的数据'); return; }
+    try {
+      localStorage.setItem('afgData', JSON.stringify({ table: state.table, title: el('chart-title').textContent || '我的数据' }));
+      toast('已保存到浏览器');
+    } catch (e) { toast('保存失败：' + e.message); }
+  }
+
+  function restoreLocal() {
+    try {
+      var raw = localStorage.getItem('afgData');
+      if (!raw) { toast('浏览器中还没有保存的数据'); return; }
+      var obj = JSON.parse(raw);
+      applyRemoteTable(obj.table, obj.title || '我的数据');
+    } catch (e) { toast('恢复失败：' + e.message); }
+  }
+
+  function exportJson() {
+    if (!state.table) { toast('当前没有可导出的数据'); return; }
+    var blob = new Blob([JSON.stringify(state.table, null, 0)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'data.json';
+    a.click();
+    toast('数据 JSON 已导出（可放到 GitHub 仓库用 URL 载入）');
   }
 
   var TYPE_LABELS = { line: '折线图', area: '面积图', bar: '柱状图', stacked: '堆叠面积', rank: '横向排名', candlestick: 'K 线', radar: '雷达图', stackedBar: '堆叠柱状', perf: '业绩评估', worldMap: '世界地图', scatterMatrix: '散点矩阵' };
@@ -1278,8 +1295,10 @@
     });
     el('btn-data-source').addEventListener('click', openDataPanel);
     el('data-close').addEventListener('click', closeDataPanel);
-    el('fred-load').addEventListener('click', loadFred);
-    el('api-load').addEventListener('click', loadCustomApi);
+    el('save-local').addEventListener('click', saveLocal);
+    el('restore-local').addEventListener('click', restoreLocal);
+    el('export-json').addEventListener('click', exportJson);
+    el('url-load').addEventListener('click', loadDataUrl);
     el('btn-add-indicator').addEventListener('click', openIndicatorPanel);
     el('indicator-close').addEventListener('click', closeIndicatorPanel);
     el('indicator-list').addEventListener('click', function (e) {
