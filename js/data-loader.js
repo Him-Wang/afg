@@ -536,8 +536,12 @@
       columns.push(v || ('列' + (i + 1)));
     }
 
-    // 数据行：从 dataStart 起，保留含数值或日期的行
-    var dataAO = rows.slice(dataStart).filter(function (r) { return numCount(r) >= 1 || dateCount(r) >= 1; });
+    // 数据行：从 dataStart 起，保留含数值或日期的行（排除"单位/频度/来源/更新时间"等元数据行）
+    var META_KEYS = /^(指标名称|指标|频度|频率|单位|来源|数据来源|更新时间|更新日期|名称|统计口径|备注)$/;
+    var dataAO = rows.slice(dataStart).filter(function (r) {
+      if (META_KEYS.test(String(cellOf(r, 0)).trim())) return false;
+      return numCount(r) >= 1 || dateCount(r) >= 1;
+    });
     var objects = dataAO.map(function (r) {
       var o = {};
       for (var k = 0; k < ncols; k++) o[columns[k]] = cellOf(r, k);
@@ -670,6 +674,7 @@
     var s = String(v).trim();
     if (s === '' || s === '-' || s === '--' || s === '—' || s === 'N/A' || s === 'NA') return NaN;
     s = s.replace(/[,%\s]/g, '');
+    if (s === '') return NaN; // 去掉 %、逗号等后为空 → 不是数字
     var n = Number(s);
     return isNaN(n) ? NaN : n;
   }
@@ -683,7 +688,7 @@
   function isExcelSerial(v) {
     var n = toNum(v);
     if (isNaN(n) || n !== Math.floor(n)) return false;
-    return n >= 20000 && n <= 80000;
+    return n >= 10000 && n <= 80000;
   }
 
   function serialToDateStr(serial) {
