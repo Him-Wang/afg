@@ -1667,6 +1667,13 @@
   function applyChartConfig(cfg) {
     var type = cfg.type || 'area';
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
+    // 应用主题（链接可携带）
+    if (cfg.theme && Themes.getTheme(cfg.theme)) {
+      state.theme = cfg.theme;
+      Themes.applyTheme(cfg.theme);
+      var ts = el('theme-select');
+      if (ts) ts.value = cfg.theme;
+    }
     var data = {};
     if (cfg.labels !== undefined && cfg.series !== undefined) data = { labels: cfg.labels, series: cfg.series };
     else if (cfg.indicators !== undefined && cfg.series !== undefined) data = { indicators: cfg.indicators, series: cfg.series };
@@ -1710,10 +1717,17 @@
     return { type: type, title: title, labels: labels, series: series };
   }
 
+  function b64Encode(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function b64Decode(str) {
+    var s = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return decodeURIComponent(escape(atob(s)));
+  }
+
   function copyShareLink() {
     if (state.mode !== 'imported' || !state.table) { toast('复制链接仅适用于已导入的数据'); return; }
     var json = JSON.stringify(buildChartConfig());
-    var b64 = btoa(unescape(encodeURIComponent(json)));
+    var b64 = b64Encode(json);
     var url = location.href.split('?')[0] + '?chart=' + b64;
     function done() { toast('图表链接已复制（部署后可分享）'); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1742,7 +1756,7 @@
     el('footer-note').textContent = 'Advanced-Financial-Graph (AFG) · 数据仅本地处理 · 生成于 ' + new Date().toLocaleDateString('zh-CN');
     if (q.chart) {
       try {
-        var cfg = JSON.parse(decodeURIComponent(escape(atob(q.chart))));
+        var cfg = JSON.parse(b64Decode(q.chart));
         applyChartConfig(cfg);
         return;
       } catch (e) { toast('图表链接无效'); }

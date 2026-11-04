@@ -1,0 +1,14 @@
+{
+  "name": "afg-mcp-server",
+  "version": "1.0.0",
+  "description": "AFG (Advanced-Financial-Graph) MCP server — 让大模型直接生成高级金融图表链接",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "zod": "^3.23.8"
+  }
+}
