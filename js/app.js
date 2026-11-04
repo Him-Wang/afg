@@ -1508,7 +1508,7 @@
     });
     el('toolbar-chart-type').addEventListener('change', function () {
       if (state.macroItem) {
-        var CART = { line: 1, area: 1, bar: 1, stacked: 1, stackedLine: 1, stackedBar: 1, step: 1 };
+        var CART = { line: 1, area: 1, bar: 1, stacked: 1, stackedLine: 1, stackedBar: 1, step: 1, season: 1 };
         if (CART[this.value]) { state.macroTypeOverride = this.value; openMacroItem(state.macroItem, true); }
         else toast('该指标仅支持 折线/面积/柱状/堆叠');
         return;
@@ -1950,8 +1950,12 @@
     else if (cfg.data) data = cfg.data;
     else { toast('JSON 缺少 labels/series 或 indicators/series'); return; }
     if (data.labels !== undefined && data.series !== undefined) {
-      var ranged = applyTimeRange(data.labels, data.series);
-      data.labels = ranged.labels; data.series = ranged.series;
+      if (type === 'season') {
+        data.maxYears = ({ '1y': 1, '5y': 5, '10y': 10 })[state.timeRange] || undefined;
+      } else {
+        var ranged = applyTimeRange(data.labels, data.series);
+        data.labels = ranged.labels; data.series = ranged.series;
+      }
     }
     data.seriesColors = state.seriesColors;
     clearStage();

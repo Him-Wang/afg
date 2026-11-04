@@ -389,6 +389,42 @@
     return option;
   }
 
+  /* ---------- 季节性对比（每年一条线，1-12月为横轴，看多年趋势） ---------- */
+  function season(el, data, theme) {
+    var labels = data.labels || [];
+    var values = (data.series && data.series[0]) ? data.series[0].values : [];
+    var months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    var yearMap = {}, yearOrder = [];
+    labels.forEach(function (l, i) {
+      var m = String(l).match(/(\d{4})-(\d{2})/);
+      if (!m) return;
+      var y = m[1], mon = parseInt(m[2], 10);
+      if (mon < 1 || mon > 12) return;
+      if (!yearMap[y]) { yearMap[y] = new Array(12).fill(null); yearOrder.push(y); }
+      yearMap[y][mon - 1] = values[i];
+    });
+    yearOrder.sort();
+    var maxYears = data.maxYears;
+    if (maxYears && yearOrder.length > maxYears) yearOrder = yearOrder.slice(yearOrder.length - maxYears);
+    var series = yearOrder.map(function (y, idx) {
+      var c = theme.series[idx % theme.series.length];
+      return withFocus({
+        name: y + '年', type: 'line', smooth: true, symbol: 'circle', symbolSize: 5,
+        data: yearMap[y], color: c, lineStyle: { width: 2.4 }
+      });
+    });
+    return {
+      backgroundColor: theme.bg,
+      tooltip: tooltip(theme),
+      legend: legend(theme),
+      grid: gridZoom(),
+      dataZoom: dataZoomCfg(theme),
+      xAxis: [Object.assign({ type: 'category', data: months, boundaryGap: false }, axisCommon(theme))],
+      yAxis: [Object.assign({ type: 'value', scale: true }, axisCommon(theme))],
+      series: series
+    };
+  }
+
   /* ---------- 瀑布图 ---------- */
   function waterfall(el, data, theme) {
     var values = data.values, labels = data.labels;
@@ -817,7 +853,7 @@
   var BUILDERS = {
     'area': lineArea, 'line': lineOnly, 'bar': barChart, 'step': stepLine,
     'dual': dual, 'heatmap': heatmap, 'rank': rank, 'bubble': bubble,
-    'treemap': treemap, 'stacked': stacked, 'stackedLine': stackedLine, 'waterfall': waterfall, 'donut': donut,
+    'treemap': treemap, 'stacked': stacked, 'stackedLine': stackedLine, 'season': season, 'waterfall': waterfall, 'donut': donut,
     'mlTrend': mlTrend, 'mlForecast': mlForecast, 'mlCluster': mlCluster,
     'mlCorr': mlCorr, 'mlDist': mlDist, 'stackedBar': stackedBar, 'radar': radar,
     'perf': perf, 'scatterMatrix': scatterMatrix, 'worldMap': worldMap
