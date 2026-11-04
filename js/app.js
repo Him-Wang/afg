@@ -284,6 +284,8 @@
     ChartFactory.disposeAll();
     state.priceInsts.forEach(function (inst) { PriceChart.destroy(inst); });
     state.priceInsts = [];
+    (state.macroInsts || []).forEach(function (i) { try { i.dispose(); } catch (e) {} });
+    state.macroInsts = [];
     state.priceEl = null; state.echartsEl = null;
     el('chart-stage').innerHTML = '';
     clearAnalysis();
@@ -545,11 +547,95 @@
         '<div class="home-step"><span class="hs-num">3</span><div><b>自由定制</b><p>一键切换图表、5 套配色、时间缩放、标注、数据变换、业绩指标、世界地图、雷达图等。</p></div></div>' +
       '</div>' +
       '<button class="btn primary home-cta" id="home-import">＋ 上传数据开始</button>' +
-      '<div class="home-note">想看效果？左侧「示例图表库」任点一张即可预览。</div>';
+      '<div class="home-note">想看效果？左侧「中国宏观数据一览」看最新宏观；「参考模板」可预览各图表样式。</div>';
     el('chart-stage').appendChild(h);
     setHead({ title: 'AFG · 智能制图', subtitle: '上传数据 → 自动识别 → 推荐图表 → 自由定制', unit: '', source: '' });
     h.querySelector('#home-import').addEventListener('click', openModal);
     syncToolbar();
+  }
+
+  /* ---------- 中国宏观数据一览（真实数据看板） ---------- */
+  function renderChinaMacro() {
+    clearStage();
+    state.mode = 'macro';
+    state.viewKey = 'china-macro';
+    state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
+    state.table = null; state.det = null;
+    highlightNav('china-macro');
+    el('stat-badge').style.display = 'none';
+    el('btn-events').style.display = 'none';
+    el('btn-table').style.display = 'none';
+    el('hint').textContent = '';
+    var M = window.CHINA_MACRO || { categories: [] };
+    setHead({
+      title: '中国宏观数据一览',
+      subtitle: (M.updated ? '数据更新到 ' + M.updated : '暂无数据') + ' · 仅展示有数据的区间',
+      unit: '', source: 'Wind / 国家统计局 · 手工整理'
+    });
+
+    var wrap = document.createElement('div');
+    wrap.className = 'macro-dash';
+    var theme = getChartTheme();
+    state.macroInsts = [];
+
+    (M.categories || []).forEach(function (cat) {
+      var sec = document.createElement('div');
+      sec.className = 'macro-section';
+      var hd = document.createElement('div');
+      hd.className = 'macro-cat';
+      hd.textContent = cat.name;
+      sec.appendChild(hd);
+      var grid = document.createElement('div');
+      grid.className = 'macro-grid';
+      cat.indicators.forEach(function (ind) {
+        var s = ind.series;
+        if (!s || !s.length) return;
+        var latest = s[s.length - 1][1];
+        var prev = s.length > 1 ? s[s.length - 2][1] : null;
+        var delta = (prev === null || isNaN(prev)) ? null : (latest - prev);
+        var upCls = delta === null ? '' : (delta >= 0 ? 'up' : 'down');
+        var arrow = delta === null ? '' : (delta >= 0 ? '▲' : '▼');
+        var card = document.createElement('div');
+        card.className = 'macro-card';
+        card.innerHTML =
+          '<div class="mc-name">' + ind.short + '</div>' +
+          '<div class="mc-val">' + fmtNum(latest) + '</div>' +
+          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上月') + '</div>' +
+          '<div class="mc-chart"></div>';
+        grid.appendChild(card);
+        renderMacroSpark(card.querySelector('.mc-chart'), s, theme);
+      });
+      sec.appendChild(grid);
+      wrap.appendChild(sec);
+    });
+
+    el('chart-stage').appendChild(wrap);
+    syncToolbar();
+  }
+
+  function renderMacroSpark(el2, series, theme) {
+    try {
+      var inst = echarts.getInstanceByDom(el2) || echarts.init(el2);
+      state.macroInsts.push(inst);
+      var labels = series.map(function (p) { return p[0]; });
+      var values = series.map(function (p) { return p[1]; });
+      inst.setOption({
+        grid: { left: 2, right: 2, top: 6, bottom: 2 },
+        xAxis: { type: 'category', show: false, data: labels, boundaryGap: false },
+        yAxis: { type: 'value', show: false, scale: true },
+        series: [{
+          type: 'line', data: values, showSymbol: false, smooth: true, silent: true,
+          lineStyle: { color: theme.accent, width: 1.5 },
+          areaStyle: { color: ChartFactory.hexToRgba(theme.accent, 0.16) }
+        }],
+        tooltip: {
+          trigger: 'axis', confine: true,
+          backgroundColor: theme.panel, borderColor: theme.accent + '55', borderWidth: 1,
+          textStyle: { color: theme.text, fontSize: 11 },
+          valueFormatter: function (v) { return fmtNum(v); }
+        }
+      });
+    } catch (e) {}
   }
 
   /* ---------- 侧边导航 ---------- */
@@ -565,9 +651,15 @@
     home.innerHTML = '<span class="dot"></span><span>🏠 首页 · 使用说明</span>';
     home.addEventListener('click', function () { renderHome(); closeSidebar(); });
     sb.appendChild(home);
+    // 中国宏观数据一览（真实数据看板）
+    var macro = document.createElement('div');
+    macro.className = 'nav-item nav-macro'; macro.dataset.id = 'china-macro';
+    macro.innerHTML = '<span class="dot"></span><span>📊 中国宏观数据一览</span>';
+    macro.addEventListener('click', function () { renderChinaMacro(); closeSidebar(); });
+    sb.appendChild(macro);
     var libLabel = document.createElement('div');
     libLabel.className = 'nav-group-label';
-    libLabel.textContent = '示例图表库 · 点击预览';
+    libLabel.textContent = '参考模板 · 示例（点击预览）';
     sb.appendChild(libLabel);
     TEMPLATES.forEach(function (group) {
       var label = document.createElement('div');
@@ -1774,6 +1866,7 @@
       } catch (e) { toast('图表链接无效'); }
     }
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) renderTemplate(q.tpl);
+    else if (q.view === 'macro') renderChinaMacro();
     else renderHome();
   }
 

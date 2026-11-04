@@ -373,6 +373,26 @@ textarea.csv-area {
 .home-cta { align-self: flex-start; padding: 11px 24px; font-size: 14px; margin-top: 4px; }
 .home-note { font-size: 12.5px; color: var(--muted); }
 
+/* 中国宏观数据一览（看板） */
+.nav-macro { color: var(--accent); font-weight: 600; }
+.nav-macro .dot { background: var(--accent); }
+.macro-dash { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 18px; }
+.macro-section { display: flex; flex-direction: column; gap: 10px; }
+.macro-cat { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: var(--accent); text-transform: uppercase; padding-left: 2px; }
+.macro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.macro-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px 6px; display: flex; flex-direction: column; gap: 3px;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.macro-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.mc-name { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-val { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; }
+.mc-delta { font-size: 11.5px; color: var(--muted); }
+.mc-delta.up { color: var(--up); }
+.mc-delta.down { color: var(--down); }
+.mc-chart { height: 44px; margin: 4px 0 2px; }
+
 /* 图表功能栏 */
 .chart-toolbar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
