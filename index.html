@@ -52,6 +52,8 @@
           <option value="candlestick">K 线</option>
         </select>
         <button class="btn sm" id="btn-series-color">🎨 单条颜色</button>
+        <button class="btn sm" id="btn-add-indicator">＋ 指标</button>
+        <button class="btn sm" id="btn-data-source">🌐 真实数据</button>
         <button class="btn sm" id="tb-swapxy" title="交换 X/Y 轴方向">⇅ X/Y</button>
         <button class="btn sm" id="btn-transform">⚙ 数据变换</button>
         <button class="btn sm" id="btn-events" style="display:none">◈ 事件</button>
@@ -132,45 +134,20 @@
       <div class="tabs" id="tabs">
         <div class="tab active" data-tab="file">上传文件</div>
         <div class="tab" data-tab="paste">粘贴数据</div>
-        <div class="tab" data-tab="image">图片取数</div>
         <div class="tab" data-tab="sample">示例数据</div>
       </div>
 
       <div class="tab-pane active" data-pane="file">
         <div class="file-drop" id="file-drop">
           <div class="big">点击选择或拖拽文件到此处</div>
-          <div>支持 Excel / CSV / JSON / 图片，自动识别文件类型</div>
+          <div>支持 Excel / CSV / JSON，自动识别文件类型</div>
         </div>
-        <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.json,.txt,image/*" style="display:none" />
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.json,.txt" style="display:none" />
       </div>
 
       <div class="tab-pane" data-pane="paste">
         <textarea class="csv-area" id="csv-text" placeholder="粘贴 CSV 或 JSON 数据…&#10;CSV 示例：&#10;日期,GDP,CPI&#10;2024-01,5.2,0.4&#10;&#10;JSON 示例：&#10;[{&quot;日期&quot;:&quot;2024-01&quot;,&quot;GDP&quot;:5.2}]"></textarea>
         <div class="field-row"><button class="btn primary" id="csv-parse">解析（自动识别 CSV / JSON）</button></div>
-      </div>
-
-      <div class="tab-pane" data-pane="image">
-        <div class="field-row"><input type="file" id="img-file" accept="image/*" /></div>
-        <div class="img-canvas-wrap" id="img-canvas-wrap"><canvas id="img-canvas"></canvas></div>
-        <div class="field-row">
-          <label>X 轴</label>
-          <input type="text" id="img-x1" placeholder="左端值" style="width:86px" />
-          <input type="text" id="img-x2" placeholder="右端值" style="width:86px" />
-          <button class="btn" id="img-calx">标定 X 轴两点</button>
-        </div>
-        <div class="field-row">
-          <label>Y 轴</label>
-          <input type="text" id="img-y1" placeholder="下端值" style="width:86px" />
-          <input type="text" id="img-y2" placeholder="上端值" style="width:86px" />
-          <button class="btn" id="img-caly">标定 Y 轴两点</button>
-        </div>
-        <div class="field-row">
-          <button class="btn primary" id="img-point-mode">开始取点</button>
-          <button class="btn" id="img-clear">清空</button>
-          <span class="hint" id="img-status"></span>
-        </div>
-        <div class="column-picker" id="img-points"></div>
-        <div class="field-row" style="margin-top:8px"><button class="btn primary" id="img-generate">生成数据表并绘图</button></div>
       </div>
 
       <div class="tab-pane" data-pane="sample">
@@ -234,6 +211,38 @@
         <button class="modal-close" id="color-close">×</button>
       </div>
       <div id="color-list"></div>
+    </div>
+  </div>
+
+  <!-- 指标增删弹层 -->
+  <div class="overlay" id="indicator-overlay">
+    <div class="modal" style="width:min(520px,92vw)">
+      <div class="modal-head">
+        <div><h2>选择指标</h2><div class="sub">点击增删要绘制的指标（当前已选中的高亮显示）</div></div>
+        <button class="modal-close" id="indicator-close">×</button>
+      </div>
+      <div class="column-picker" id="indicator-list"></div>
+    </div>
+  </div>
+
+  <!-- 真实数据弹层 -->
+  <div class="overlay" id="data-overlay">
+    <div class="modal" style="width:min(560px,92vw)">
+      <div class="modal-head">
+        <div><h2>真实数据接入</h2><div class="sub">FRED 宏观数据 / 自定义 API（需在线上部署环境使用）</div></div>
+        <button class="modal-close" id="data-close">×</button>
+      </div>
+      <div class="field-row">
+        <label>FRED</label>
+        <input type="text" id="fred-series" placeholder="系列代码，如 GDP / CPI / UNRATE" style="flex:1" />
+        <button class="btn primary" id="fred-load">加载</button>
+      </div>
+      <div class="field-row">
+        <label>自定义 API</label>
+        <input type="text" id="custom-api" placeholder="https://…（返回 JSON 数组或 {labels,series}）" style="flex:1" />
+        <button class="btn primary" id="api-load">加载</button>
+      </div>
+      <div class="hint" style="margin-top:8px">提示：file:// 本地打开时浏览器会拦截跨域请求；部署到 GitHub Pages 后即可正常拉取。</div>
     </div>
   </div>
 

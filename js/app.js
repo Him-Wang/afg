@@ -84,6 +84,8 @@
     mapping: { timeCol: '', yCols: [], chartType: 'line' }
   };
 
+  function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
+
   function fmtNum(v) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -129,6 +131,83 @@
   }
 
   function closeColorPanel() { el('color-overlay').classList.remove('open'); }
+
+  /* 指标增删（从当前数据表里选择要绘制的指标） */
+  function openIndicatorPanel() {
+    if (state.mode !== 'imported' && state.mode !== 'dataset') { toast('请先导入数据'); return; }
+    var table = state.table || (state.dataset && state.dataset.table);
+    if (!table) { toast('请先导入数据'); return; }
+    var det = DataLoader.detectTable(table);
+    var cols = det.numericCols.filter(function (c) { return c !== state.mapping.timeCol; });
+    var list = el('indicator-list');
+    list.innerHTML = '';
+    if (!cols.length) { list.innerHTML = '<span class="hint">未检测到数值列</span>'; }
+    cols.forEach(function (col) {
+      var on = state.mapping.yCols.indexOf(col) >= 0;
+      var chip = document.createElement('div');
+      chip.className = 'col-chip' + (on ? ' on' : '');
+      chip.textContent = col;
+      chip.dataset.col = col;
+      list.appendChild(chip);
+    });
+    el('indicator-overlay').classList.add('open');
+  }
+  function closeIndicatorPanel() { el('indicator-overlay').classList.remove('open'); }
+  /* ---------- 真实数据接入（FRED / 自定义 API） ---------- */
+  var FRED_API_KEY = 'c8ac4c54758b0ccf120786aac6f92061';
+  function openDataPanel() { el('data-overlay').classList.add('open'); }
+  function closeDataPanel() { el('data-overlay').classList.remove('open'); }
+
+  function applyRemoteTable(table, title) {
+    table = DataLoader.maybeTranspose(table);
+    state.table = table;
+    var det = DataLoader.detectTable(table);
+    state.det = det;
+    state.mapping.timeCol = det.timeCol;
+    state.mapping.yCols = det.numericCols.filter(function (c) { return c !== det.timeCol; });
+    state.mapping.chartType = det.isTimeSeries ? 'area' : 'bar';
+    state.isImported = true; state.mode = 'imported'; state.viewKey = 'imported';
+    state.customTitles = state.customTitles || {};
+    state.customTitles['imported'] = title;
+    closeDataPanel();
+    renderUserChart(false);
+    toast('已加载 ' + table.rows.length + ' 行数据');
+  }
+
+  function fetchRemote(url, kind) {
+    toast('正在拉取数据…');
+    fetch(url)
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (json) {
+        if (json && json.observations) {
+          var obs = json.observations || [];
+          var rows = obs.filter(function (o) { return o.value && o.value !== '.'; })
+            .map(function (o) { var r = {}; r['日期'] = o.date; r['数值'] = Number(o.value); return r; });
+          applyRemoteTable({ columns: ['日期', '数值'], rows: rows }, (json.series && json.series.title) || 'FRED 数据');
+        } else if (Array.isArray(json)) {
+          var cols = Object.keys(json[0] || {});
+          applyRemoteTable({ columns: cols, rows: json }, 'API 数据');
+        } else if (json && json.type && (json.labels !== undefined || json.series !== undefined || json.data)) {
+          applyChartConfig(json); closeDataPanel();
+        } else if (json && json.labels && json.series) {
+          applyChartConfig(json); closeDataPanel();
+        } else {
+          toast('无法识别的数据格式');
+        }
+      })
+      .catch(function (e) { toast('拉取失败：' + e.message + '（file:// 下可能被浏览器拦截，请用线上部署）'); });
+  }
+
+  function loadFred() {
+    var sid = el('fred-series').value.trim();
+    if (!sid) { toast('请输入 FRED 系列代码'); return; }
+    fetchRemote('https://api.stlouisfed.org/fred/series/observations?series_id=' + encodeURIComponent(sid) + '&api_key=' + FRED_API_KEY + '&file_type=json', 'fred');
+  }
+  function loadCustomApi() {
+    var u = el('custom-api').value.trim();
+    if (!u) { toast('请输入 API 地址'); return; }
+    fetchRemote(u, 'auto');
+  }
 
   var TYPE_LABELS = { line: '折线图', area: '面积图', bar: '柱状图', stacked: '堆叠面积', rank: '横向排名', candlestick: 'K 线', radar: '雷达图', stackedBar: '堆叠柱状', perf: '业绩评估', worldMap: '世界地图', scatterMatrix: '散点矩阵' };
 
@@ -975,21 +1054,21 @@
       var labels = rows.map(function (r) { return String(r[timeCol]); });
       return {
         indicators: labels.map(function (lbl, i) {
-          var vals = yCols.map(function (col) { return toNum(rows[i][col]); }).filter(function (v) { return isFinite(v); });
+          var vals = yCols.map(function (col) { return toNum(rows[i][col]); }).filter(function (v) { return v !== null && v !== undefined && isFinite(v); });
           return { name: lbl, max: ceilMax(vals) };
         }),
         series: yCols.map(function (col) {
-          return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) };
+          return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) };
         })
       };
     }
     return {
       indicators: yCols.map(function (col) {
-        var vals = rows.map(function (r) { return toNum(r[col]); }).filter(function (v) { return isFinite(v); });
+        var vals = rows.map(function (r) { return vnum(r[col]); }).filter(function (v) { return v !== null && v !== undefined && isFinite(v); });
         return { name: col, max: ceilMax(vals) };
       }),
       series: rows.map(function (r) {
-        return { name: String(r[timeCol]), values: yCols.map(function (col) { return toNum(r[col]); }) };
+        return { name: String(r[timeCol]), values: yCols.map(function (col) { return vnum(r[col]); }) };
       })
     };
   }
@@ -1033,7 +1112,7 @@
       var data;
       if (type === 'rank') {
         var col = yCols[0];
-        data = { categories: labels, values: rows.map(function (r) { return toNum(r[col]); }) };
+        data = { categories: labels, values: rows.map(function (r) { return vnum(r[col]); }) };
       } else if (type === 'radar') {
         var wide = state.det && state.det.orientation === 'wide';
         if (state.transposed) wide = !wide;
@@ -1041,17 +1120,17 @@
       } else {
         if (state.transposed) {
           data = { labels: yCols, series: rows.map(function (r) {
-            return { name: String(r[state.mapping.timeCol]), values: yCols.map(function (col) { return toNum(r[col]); }) };
+            return { name: String(r[state.mapping.timeCol]), values: yCols.map(function (col) { return vnum(r[col]); }) };
           })};
         } else {
           data = { labels: labels, series: yCols.map(function (col) {
-            return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) };
+            return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) };
           })};
         }
       }
       data.annotations = echartsAnnotations(state.viewKey);
       data.seriesColors = state.seriesColors;
-      renderAnalysis(labels, yCols.map(function (col) { return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) }; }));
+      renderAnalysis(labels, yCols.map(function (col) { return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) }; }));
       clearStage();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
       var uinst = ChartFactory.render(c, type, data, theme);
@@ -1161,13 +1240,22 @@
         rerender();
       }
     });
-
-    // 图片数据识别（在导入弹层内）
-    el('img-calx').addEventListener('click', function () { dgSetMode('x1'); });
-    el('img-caly').addEventListener('click', function () { dgSetMode('y1'); });
-    el('img-point-mode').addEventListener('click', function () { dgSetMode('point'); });
-    el('img-clear').addEventListener('click', dgClear);
-    el('img-generate').addEventListener('click', dgGenerate);
+    el('btn-data-source').addEventListener('click', openDataPanel);
+    el('data-close').addEventListener('click', closeDataPanel);
+    el('fred-load').addEventListener('click', loadFred);
+    el('api-load').addEventListener('click', loadCustomApi);
+    el('btn-add-indicator').addEventListener('click', openIndicatorPanel);
+    el('indicator-close').addEventListener('click', closeIndicatorPanel);
+    el('indicator-list').addEventListener('click', function (e) {
+      var chip = e.target.closest('.col-chip');
+      if (!chip) return;
+      var col = chip.dataset.col;
+      var idx = state.mapping.yCols.indexOf(col);
+      if (idx >= 0) state.mapping.yCols.splice(idx, 1);
+      else state.mapping.yCols.push(col);
+      openIndicatorPanel();
+      rerender();
+    });
 
     el('csv-parse').addEventListener('click', function () {
       var txt = el('csv-text').value.trim();
@@ -1215,26 +1303,8 @@
     });
   }
 
-  function loadImageIntoDigitizer(file) {
-    var imgTab = document.querySelector('.tab[data-tab="image"]');
-    if (imgTab) imgTab.click();
-    var img = new Image();
-    img.onload = function () {
-      digitizer.img = img;
-      digitizer.calib = { x1: null, x2: null, y1: null, y2: null };
-      digitizer.points = [];
-      var canvas = el('img-canvas'), wrap = el('img-canvas-wrap');
-      canvas.width = wrap.clientWidth || 600; canvas.height = wrap.clientHeight || 320;
-      dgRedraw();
-      dgUpdateUI();
-    };
-    img.src = URL.createObjectURL(file);
-  }
-
   function handleFile(file) {
     var name = (file.name || '').toLowerCase();
-    var isImage = (file.type && file.type.indexOf('image/') === 0) || /\.(png|jpe?g|gif|webp|bmp)$/.test(name);
-    if (isImage) { loadImageIntoDigitizer(file); return; }
     var ext = name.split('.').pop() || '';
     var reader = new FileReader();
     reader.onload = function (e) {
@@ -1287,7 +1357,7 @@
     if (!numericCols.length) numericCols = det.numericCols.slice();
     var labels = rows.map(function (r) { return String(r[timeCol]); });
     var series = numericCols.map(function (col) {
-      return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) };
+      return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) };
     });
     var type = det.isTimeSeries ? 'area' : 'bar';
     return { type: type, data: { labels: labels, series: series } };
@@ -1436,7 +1506,7 @@
       panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + col + '</span></div><div class="dash-panel-body"></div>';
       grid.appendChild(panel);
       var body = panel.querySelector('.dash-panel-body');
-      var data = { labels: table.rows.map(function (r) { return String(r[timeCol]); }), series: [{ name: col, values: table.rows.map(function (r) { return toNum(r[col]); }) }], seriesColors: state.seriesColors };
+      var data = { labels: table.rows.map(function (r) { return String(r[timeCol]); }), series: [{ name: col, values: table.rows.map(function (r) { return vnum(r[col]); }) }], seriesColors: state.seriesColors };
       insts.push(ChartFactory.render(body, (state.det && state.det.isTimeSeries) ? 'area' : 'bar', data, theme));
     });
     stage.appendChild(grid);
@@ -1466,7 +1536,8 @@
     state.tfTable = src.table;
     state.tfTimeCol = src.timeCol;
     // 填充指标运算下拉
-    var cols = src.table.columns.filter(function (c) { return c !== src.timeCol && !isNaN(toNum(src.table.rows[0][c])); });
+    var cols = state.mapping.yCols.slice();
+    if (!cols.length) cols = src.table.columns.filter(function (c) { return c !== src.timeCol && !isNaN(toNum(src.table.rows[0][c])); });
     [el('tf-colA'), el('tf-colB')].forEach(function (sel, i) {
       if (!sel) return;
       sel.innerHTML = '';
@@ -1534,108 +1605,6 @@
   /* ============================================================
    * 图片数据识别（图表描点取数）
    * ============================================================ */
-  var digitizer = {
-    img: null, ctx: null, canvas: null,
-    calib: { x1: null, x2: null, y1: null, y2: null },
-    mode: null, points: []
-  };
-
-  function dgNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
-  function dgInterp(px, p1, p2, v1, v2) { return p2 === p1 ? v1 : v1 + (px - p1) * (v2 - v1) / (p2 - p1); }
-
-  function dgRedraw() {
-    var ctx = digitizer.ctx, canvas = digitizer.canvas;
-    if (!ctx || !digitizer.img) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var cw = canvas.width, ch = canvas.height;
-    var scale = Math.min(cw / digitizer.img.naturalWidth, ch / digitizer.img.naturalHeight);
-    var dw = digitizer.img.naturalWidth * scale, dh = digitizer.img.naturalHeight * scale;
-    var ox = (cw - dw) / 2, oy = (ch - dh) / 2;
-    ctx.drawImage(digitizer.img, ox, oy, dw, dh);
-    var names = { x1: 'X1', x2: 'X2', y1: 'Y1', y2: 'Y2' };
-    Object.keys(digitizer.calib).forEach(function (k) {
-      var c = digitizer.calib[k];
-      if (!c) return;
-      ctx.fillStyle = (k.indexOf('x') === 0) ? '#2962FF' : '#26A69A';
-      ctx.beginPath(); ctx.arc(c.px, c.py, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.font = '12px Inter, sans-serif';
-      ctx.fillText(names[k], c.px + 8, c.py - 6);
-    });
-    digitizer.points.forEach(function (p) {
-      ctx.fillStyle = '#C9A96A';
-      ctx.beginPath(); ctx.arc(p.px, p.py, 3.5, 0, Math.PI * 2); ctx.fill();
-    });
-  }
-
-  function dgClick(px, py) {
-    var m = digitizer.mode;
-    if (m === 'x1' || m === 'x2' || m === 'y1' || m === 'y2') {
-      digitizer.calib[m] = { px: px, py: py };
-      digitizer.mode = (m === 'x1') ? 'x2' : (m === 'x2') ? null : (m === 'y1') ? 'y2' : null;
-      dgRedraw();
-      dgUpdateUI();
-    } else if (m === 'point') {
-      if (!digitizer.calib.x1 || !digitizer.calib.x2 || !digitizer.calib.y1 || !digitizer.calib.y2) { toast('请先完成 X、Y 轴两点标定'); return; }
-      var xv = dgInterp(px, digitizer.calib.x1.px, digitizer.calib.x2.px, dgNum(el('img-x1').value), dgNum(el('img-x2').value));
-      var yv = dgInterp(py, digitizer.calib.y1.py, digitizer.calib.y2.py, dgNum(el('img-y1').value), dgNum(el('img-y2').value));
-      digitizer.points.push({ px: px, py: py, x: xv, y: yv });
-      dgRedraw();
-      dgUpdateUI();
-    }
-  }
-
-  function dgUpdateUI() {
-    var list = el('img-points');
-    list.innerHTML = '';
-    digitizer.points.slice().sort(function (a, b) { return a.x - b.x; }).forEach(function (p) {
-      list.innerHTML += '<div class="img-point">x=' + Math.round(p.x * 100) / 100 + '　y=' + Math.round(p.y * 1000) / 1000 + '</div>';
-    });
-    el('img-status').textContent = '已取 ' + digitizer.points.length + ' 个点';
-  }
-
-  function dgSetMode(m) { digitizer.mode = m; dgUpdateUI(); toast(m === 'point' ? '现在点击图表数据点取数' : '请依次点击两点'); }
-
-  function dgClear() { digitizer.points = []; digitizer.calib = { x1: null, x2: null, y1: null, y2: null }; dgRedraw(); dgUpdateUI(); }
-
-  function dgGenerate() {
-    if (digitizer.points.length < 2) { toast('至少取 2 个数据点'); return; }
-    var pts = digitizer.points.slice().sort(function (a, b) { return a.x - b.x; });
-    var table = { columns: ['x', 'y'], rows: pts.map(function (p) { var o = {}; o['x'] = Math.round(p.x * 100) / 100; o['y'] = Math.round(p.y * 1000) / 1000; return o; }) };
-    state.table = table;
-    state.det = DataLoader.detectTable(table);
-    state.mapping.timeCol = 'x';
-    state.mapping.yCols = ['y'];
-    state.mapping.chartType = 'area';
-    state.isImported = true; state.mode = 'imported'; state.viewKey = 'imported';
-    closeModal();
-    renderUserChart(false);
-    toast('已从图片提取 ' + pts.length + ' 个数据点');
-  }
-
-  function setupDigitizer() {
-    var canvas = el('img-canvas');
-    var wrap = el('img-canvas-wrap');
-    digitizer.canvas = canvas;
-    digitizer.ctx = canvas.getContext('2d');
-    el('img-file').addEventListener('change', function () {
-      var f = this.files[0]; if (!f) return;
-      var img = new Image();
-      img.onload = function () {
-        digitizer.img = img;
-        digitizer.calib = { x1: null, x2: null, y1: null, y2: null };
-        digitizer.points = [];
-        canvas.width = wrap.clientWidth; canvas.height = wrap.clientHeight;
-        dgRedraw();
-        dgUpdateUI();
-      };
-      img.src = URL.createObjectURL(f);
-    });
-    canvas.addEventListener('click', function (e) {
-      if (!digitizer.img) { toast('请先上传图片'); return; }
-      var rect = canvas.getBoundingClientRect();
-      dgClick(e.clientX - rect.left, e.clientY - rect.top);
-    });
-  }
 
   /* ---------- 图表配置 JSON（大模型输出 / 分享链接） ---------- */
   function applyChartConfig(cfg) {
@@ -1679,7 +1648,7 @@
   function buildChartConfig() {
     var type = state.mapping.chartType;
     var labels = state.table.rows.map(function (r) { return String(r[state.mapping.timeCol]); });
-    var series = state.mapping.yCols.map(function (col) { return { name: col, values: state.table.rows.map(function (r) { return toNum(r[col]); }) }; });
+    var series = state.mapping.yCols.map(function (col) { return { name: col, values: state.table.rows.map(function (r) { return vnum(r[col]); }) }; });
     var title = state.customTitles[state.viewKey] || (state.currentMeta && state.currentMeta.title) || '图表';
     return { type: type, title: title, labels: labels, series: series };
   }
@@ -1712,7 +1681,6 @@
     buildTabs();
     buildSampleTab();
     bindEvents();
-    setupDigitizer();
     if (el('btn-watermark')) el('btn-watermark').classList.add('active');
     el('footer-note').textContent = 'Advanced-Financial-Graph (AFG) · 数据仅本地处理 · 生成于 ' + new Date().toLocaleDateString('zh-CN');
     if (q.chart) {
