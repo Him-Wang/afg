@@ -566,10 +566,10 @@
     el('btn-events').style.display = 'none';
     el('btn-table').style.display = 'none';
     el('hint').textContent = '';
-    var M = window.CHINA_MACRO || { categories: [] };
+    var M = window.CHINA_MACRO || { sections: [] };
     setHead({
       title: '中国宏观数据一览',
-      subtitle: (M.updated ? '数据更新到 ' + M.updated : '暂无数据') + ' · 仅展示有数据的区间',
+      subtitle: (M.updated ? '数据更新到 ' + M.updated : '暂无数据') + ' · 点击任意卡片查看完整图表',
       unit: '', source: 'Wind / 国家统计局 · 手工整理'
     });
 
@@ -578,56 +578,67 @@
     var theme = getChartTheme();
     state.macroInsts = [];
 
-    (M.categories || []).forEach(function (cat) {
-      var sec = document.createElement('div');
-      sec.className = 'macro-section';
+    (M.sections || []).forEach(function (sec) {
+      var secEl = document.createElement('div');
+      secEl.className = 'macro-section';
       var hd = document.createElement('div');
       hd.className = 'macro-cat';
-      hd.textContent = cat.name;
-      sec.appendChild(hd);
+      hd.textContent = sec.name;
+      secEl.appendChild(hd);
       var grid = document.createElement('div');
       grid.className = 'macro-grid';
-      cat.indicators.forEach(function (ind) {
-        var s = ind.series;
-        if (!s || !s.length) return;
-        var latest = s[s.length - 1][1];
-        var prev = s.length > 1 ? s[s.length - 2][1] : null;
-        var delta = (prev === null || isNaN(prev)) ? null : (latest - prev);
+      sec.items.forEach(function (item) {
+        if (!item || !item.series || !item.series.length) return;
+        var first = item.series[0];
+        var latest = first.values[first.values.length - 1];
+        var prev = first.values.length > 1 ? first.values[first.values.length - 2] : null;
+        var delta = (prev === null || prev === undefined || isNaN(prev)) ? null : (latest - prev);
         var upCls = delta === null ? '' : (delta >= 0 ? 'up' : 'down');
         var arrow = delta === null ? '' : (delta >= 0 ? '▲' : '▼');
+        var multi = item.series.length > 1;
         var card = document.createElement('div');
         card.className = 'macro-card';
+        card.title = '点击查看完整图表';
         card.innerHTML =
-          '<div class="mc-name">' + ind.short + '</div>' +
+          '<div class="mc-name">' + item.title + (multi ? '（' + item.series.length + '条）' : '') + '</div>' +
           '<div class="mc-val">' + fmtNum(latest) + '</div>' +
-          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上月') + '</div>' +
+          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
           '<div class="mc-chart"></div>';
+        card.addEventListener('click', function () { openMacroItem(item); });
         grid.appendChild(card);
-        renderMacroSpark(card.querySelector('.mc-chart'), s, theme);
+        renderMacroSpark(card.querySelector('.mc-chart'), item, theme);
       });
-      sec.appendChild(grid);
-      wrap.appendChild(sec);
+      secEl.appendChild(grid);
+      wrap.appendChild(secEl);
     });
 
     el('chart-stage').appendChild(wrap);
     syncToolbar();
   }
 
-  function renderMacroSpark(el2, series, theme) {
+  function openMacroItem(item) {
+    try {
+      applyChartConfig({ type: item.type, title: item.title, unit: item.unit, labels: item.labels, series: item.series });
+    } catch (e) { toast('打开图表失败'); }
+  }
+
+  function renderMacroSpark(el2, item, theme) {
     try {
       var inst = echarts.getInstanceByDom(el2) || echarts.init(el2);
       state.macroInsts.push(inst);
-      var labels = series.map(function (p) { return p[0]; });
-      var values = series.map(function (p) { return p[1]; });
+      var series = item.series.map(function (s, i) {
+        var color = theme.series ? theme.series[i % theme.series.length] : theme.accent;
+        return {
+          type: 'line', name: s.name, data: s.values, showSymbol: false, smooth: true, silent: true,
+          lineStyle: { color: color, width: 1.5 },
+          areaStyle: item.series.length === 1 ? { color: ChartFactory.hexToRgba(color, 0.16) } : undefined
+        };
+      });
       inst.setOption({
         grid: { left: 2, right: 2, top: 6, bottom: 2 },
-        xAxis: { type: 'category', show: false, data: labels, boundaryGap: false },
+        xAxis: { type: 'category', show: false, data: item.labels, boundaryGap: false },
         yAxis: { type: 'value', show: false, scale: true },
-        series: [{
-          type: 'line', data: values, showSymbol: false, smooth: true, silent: true,
-          lineStyle: { color: theme.accent, width: 1.5 },
-          areaStyle: { color: ChartFactory.hexToRgba(theme.accent, 0.16) }
-        }],
+        series: series,
         tooltip: {
           trigger: 'axis', confine: true,
           backgroundColor: theme.panel, borderColor: theme.accent + '55', borderWidth: 1,
