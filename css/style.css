@@ -403,6 +403,19 @@ textarea.csv-area {
 .tb-spacer { flex: 1; }
 #tb-swapxy.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
+/* 「更多」下拉菜单 */
+.tb-more { position: relative; }
+.tb-menu {
+  position: absolute; right: 0; top: calc(100% + 6px);
+  display: none; flex-direction: column; gap: 2px;
+  min-width: 168px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.4); z-index: 60;
+}
+.tb-menu.open { display: flex; }
+.tb-menu .btn { justify-content: flex-start; text-align: left; width: 100%; }
+
+
 /* 分析板块 */
 .analysis { padding: 2px 22px 10px; font-size: 12px; }
 .an-title { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-weight: 600; }

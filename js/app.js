@@ -1428,6 +1428,16 @@
   /* ---------- 事件绑定 ---------- */
   function bindEvents() {
     el('btn-import').addEventListener('click', openModal);
+    el('btn-more').addEventListener('click', function (e) {
+      e.stopPropagation();
+      el('tb-menu').classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      var menu = el('tb-menu');
+      if (menu && menu.classList.contains('open') && !menu.contains(e.target) && e.target !== el('btn-more')) {
+        menu.classList.remove('open');
+      }
+    });
     el('btn-menu').addEventListener('click', toggleSidebar);
     el('sidebar-backdrop').addEventListener('click', closeSidebar);
     el('modal-close').addEventListener('click', closeModal);
