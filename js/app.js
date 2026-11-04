@@ -1546,6 +1546,8 @@
     el('export-json').addEventListener('click', exportJson);
     el('url-load').addEventListener('click', loadDataUrl);
     el('btn-add-indicator').addEventListener('click', openIndicatorPanel);
+    el('btn-add-indicator-m').addEventListener('click', openIndicatorPanel);
+    el('btn-transform-m').addEventListener('click', openTransform);
     el('align-main').addEventListener('change', function () {
       state.alignToMain = this.checked;
       if (state.macroItem) openMacroItem(state.macroItem, true);

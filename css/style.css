@@ -439,10 +439,12 @@ textarea.csv-area {
 
 /* 响应式（手机端） */
 .menu-btn { display: none; }
+.tb-mobile-only { display: none; }
 .sidebar-backdrop { display: none; }
 
 @media (max-width: 900px) {
   .menu-btn { display: inline-flex; }
+  .tb-mobile-only { display: inline-flex; }
   .logo-sub { display: none; }
 
   /* 侧边栏改为抽屉 */
