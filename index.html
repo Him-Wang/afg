@@ -41,7 +41,7 @@
         </div>
         <span class="meta" style="color:var(--muted);font-size:11px" id="hint"></span>
       </div>
-      <div class="chart-toolbar">
+      <div class="chart-toolbar" id="chart-toolbar">
         <label class="tb-label">图表</label>
         <select id="toolbar-chart-type">
           <option value="line">折线图</option>
@@ -52,6 +52,13 @@
           <option value="radar">雷达图</option>
           <option value="rank">横向排名</option>
           <option value="candlestick">K 线</option>
+        </select>
+        <label class="tb-label">区间</label>
+        <select id="toolbar-range">
+          <option value="all">全部</option>
+          <option value="1y">近1年</option>
+          <option value="5y">近5年</option>
+          <option value="10y">近10年</option>
         </select>
         <button class="btn sm" id="btn-series-color">🎨 单条颜色</button>
         <button class="btn sm" id="btn-add-indicator">＋ 指标</button>
