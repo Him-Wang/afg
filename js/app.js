@@ -81,7 +81,8 @@
     priceEl: null, echartsEl: null, priceInsts: [],
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
-    mapping: { timeCol: '', yCols: [], chartType: 'line' }
+    mapping: { timeCol: '', yCols: [], chartType: 'line' },
+    uploadedTable: null, overlayCols: [], macroItem: null, chartConfig: null
   };
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
@@ -152,16 +153,15 @@
 
   /* 指标增删（从当前数据表里选择要绘制的指标） */
   function openIndicatorPanel() {
-    if (state.mode !== 'imported' && state.mode !== 'dataset') { toast('请先导入数据'); return; }
-    var table = state.table || (state.dataset && state.dataset.table);
-    if (!table) { toast('请先导入数据'); return; }
+    var table = state.uploadedTable || state.table || (state.dataset && state.dataset.table);
+    if (!table) { toast('请先上传数据，再添加指标'); return; }
     var det = DataLoader.detectTable(table);
-    var cols = det.numericCols.filter(function (c) { return c !== state.mapping.timeCol; });
+    var cols = det.numericCols.filter(function (c) { return c !== det.timeCol; });
     var list = el('indicator-list');
     list.innerHTML = '';
     if (!cols.length) { list.innerHTML = '<span class="hint">未检测到数值列</span>'; }
     cols.forEach(function (col) {
-      var on = state.mapping.yCols.indexOf(col) >= 0;
+      var on = state.mapping.yCols.indexOf(col) >= 0 || state.overlayCols.indexOf(col) >= 0;
       var chip = document.createElement('div');
       chip.className = 'col-chip' + (on ? ' on' : '');
       chip.textContent = col;
@@ -171,6 +171,31 @@
     el('indicator-overlay').classList.add('open');
   }
   function closeIndicatorPanel() { el('indicator-overlay').classList.remove('open'); }
+
+  /* 把上传数据里的指标叠加到当前图（按日期对齐） */
+  function mergeOverlaySeries(baseLabels, baseSeries, table, overlayCols) {
+    if (!overlayCols || !overlayCols.length || !table) return { labels: baseLabels, series: baseSeries };
+    var det = DataLoader.detectTable(table);
+    var timeCol = det.timeCol;
+    var overlayMaps = overlayCols.map(function (col) {
+      var m = {};
+      table.rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v)) m[String(r[timeCol])] = v; });
+      return { name: col, map: m };
+    });
+    var labelSet = {};
+    baseLabels.forEach(function (l) { labelSet[l] = true; });
+    overlayMaps.forEach(function (o) { Object.keys(o.map).forEach(function (k) { labelSet[k] = true; }); });
+    var union = Object.keys(labelSet).sort();
+    var newSeries = baseSeries.map(function (s) {
+      var m = {};
+      baseLabels.forEach(function (l, i) { m[l] = s.values[i]; });
+      return { name: s.name, values: union.map(function (l) { return m[l] !== undefined ? m[l] : null; }) };
+    });
+    overlayMaps.forEach(function (o) {
+      newSeries.push({ name: o.name, values: union.map(function (l) { return o.map[l] !== undefined ? o.map[l] : null; }) });
+    });
+    return { labels: union, series: newSeries };
+  }
   /* ---------- 数据管理（保存/导出/URL 载入） ---------- */
   function openDataPanel() { el('data-overlay').classList.add('open'); }
   function closeDataPanel() { el('data-overlay').classList.remove('open'); }
@@ -528,6 +553,7 @@
   /* ---------- 首页 / 使用说明 ---------- */
   function renderHome() {
     clearStage();
+    state.macroItem = null; state.chartConfig = null;
     state.mode = 'home';
     state.viewKey = 'home';
     highlightNav('home');
@@ -560,7 +586,7 @@
     state.mode = 'macro';
     state.viewKey = 'china-macro';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
-    state.table = null; state.det = null;
+    state.table = null; state.det = null; state.macroItem = null; state.chartConfig = null;
     highlightNav('china-macro');
     el('stat-badge').style.display = 'none';
     el('btn-events').style.display = 'none';
@@ -618,7 +644,9 @@
 
   function openMacroItem(item) {
     try {
-      applyChartConfig({ type: item.type, title: item.title, unit: item.unit, labels: item.labels, series: item.series });
+      state.macroItem = item;
+      var merged = mergeOverlaySeries(item.labels, item.series, state.uploadedTable, state.overlayCols);
+      applyChartConfig({ type: item.type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series });
     } catch (e) { toast('打开图表失败'); }
   }
 
@@ -696,6 +724,7 @@
 
   /* ---------- 渲染内置模版 ---------- */
   function renderTemplate(id) {
+    state.macroItem = null; state.chartConfig = null;
     var sample = DataLoader.SAMPLES[id];
     if (!sample) return;
     clearStage();
@@ -748,7 +777,16 @@
       var c2 = document.createElement('div'); c2.className = 'chart-canvas'; stage.appendChild(c2);
       var renderType = sample.type;
       if (state.overrideType && sample.data && sample.data.labels !== undefined && sample.data.series !== undefined) renderType = state.overrideType;
-      var ci2 = ChartFactory.render(c2, renderType, sample.data, theme);
+      var renderData = sample.data;
+      if (state.overlayCols.length && sample.data.labels !== undefined && sample.data.series !== undefined) {
+        var merged = mergeOverlaySeries(sample.data.labels, sample.data.series, state.uploadedTable, state.overlayCols);
+        merged.unit = sample.data.unit;
+        merged.events = sample.data.events;
+        merged.annotations = sample.data.annotations;
+        merged.seriesColors = sample.data.seriesColors;
+        renderData = merged;
+      }
+      var ci2 = ChartFactory.render(c2, renderType, renderData, theme);
       attachAnnotationHandler(ci2);
       attachExtremeLabels(ci2);
       state.echartsEl = c2;
@@ -993,6 +1031,8 @@
   }
 
   function rerender() {
+    if (state.macroItem) { openMacroItem(state.macroItem); return; }
+    if (state.chartConfig) { applyChartConfig(state.chartConfig); return; }
     if (state.mode === 'dashboard') renderDashboard(state.dashboardDatasets, false);
     else if (state.mode === 'dataset') renderDatasetSingle(state.dataset);
     else if (state.mode === 'imported') renderUserChart(false);
@@ -1125,6 +1165,8 @@
 
   function showMapping(table) {
     state.table = table;
+    state.uploadedTable = table;
+    state.overlayCols = []; state.macroItem = null; state.chartConfig = null;
     var det0 = DataLoader.detectTable(table);
     if (!det0) { toast('无法解析数据'); return; }
     // 转换 Excel 日期序列号（如 46295 → 2026-09-28）后重新识别
@@ -1238,6 +1280,7 @@
   }
 
   function renderUserChart(closeAfter) {
+    state.macroItem = null; state.chartConfig = null;
     var m = state.mapping;
     var table = state.table;
     if (!table) return;
@@ -1420,11 +1463,23 @@
       var chip = e.target.closest('.col-chip');
       if (!chip) return;
       var col = chip.dataset.col;
-      var idx = state.mapping.yCols.indexOf(col);
-      if (idx >= 0) state.mapping.yCols.splice(idx, 1);
-      else state.mapping.yCols.push(col);
-      openIndicatorPanel();
-      rerender();
+      var isImported = (state.mode === 'imported' && state.table && !state.macroItem);
+      if (isImported) {
+        var idx = state.mapping.yCols.indexOf(col);
+        if (idx >= 0) state.mapping.yCols.splice(idx, 1);
+        else state.mapping.yCols.push(col);
+        openIndicatorPanel();
+        rerender();
+      } else {
+        // 叠加模式：把指标加到当前图对比
+        var oi = state.overlayCols.indexOf(col);
+        if (oi >= 0) state.overlayCols.splice(oi, 1);
+        else state.overlayCols.push(col);
+        openIndicatorPanel();
+        if (state.macroItem) openMacroItem(state.macroItem);
+        else if (state.mode === 'template') renderTemplate(state.currentTemplate);
+        else rerender();
+      }
     });
 
     el('csv-parse').addEventListener('click', function () {
@@ -1782,6 +1837,7 @@
   function applyChartConfig(cfg) {
     var type = cfg.type || 'area';
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
+    state.chartConfig = cfg;
     // 应用主题（链接可携带）
     if (cfg.theme && Themes.getTheme(cfg.theme)) {
       state.theme = cfg.theme;
