@@ -826,14 +826,19 @@
     var option = builder(el, data, theme);
     if (data && data.events && data.events.length) applyEvents(option, data.events, theme);
     if (data && data.annotations && data.annotations.length) applyAnnotations(option, data.annotations, theme);
-    if (data && data.showAllLabels) {
+    // 单条系列配色覆盖
+    if (data && data.seriesColors) {
       option.series.forEach(function (s) {
-        var hidden = (s.lineStyle && s.lineStyle.opacity === 0) || (s.tooltip && s.tooltip.show === false) || s.stack;
-        if (hidden || (s.type !== 'line' && s.type !== 'bar')) return;
-        s.label = {
-          show: true, position: 'top', distance: 3, color: theme.muted, fontSize: 9,
-          formatter: function (p) { return (p.value === null || p.value === undefined || isNaN(p.value)) ? '' : fmt(p.value); }
-        };
+        var c = data.seriesColors[s.name];
+        if (!c) return;
+        s.color = c;
+        if (s.type === 'line' || s.type === 'radar') {
+          s.lineStyle = Object.assign({}, s.lineStyle, { color: c });
+          if (s.areaStyle && s.areaStyle.color) s.areaStyle.color = hexToRgba(c, 0.25);
+        }
+        if (s.type === 'bar' || s.type === 'scatter' || s.type === 'pie') {
+          s.itemStyle = Object.assign({}, s.itemStyle, { color: c });
+        }
       });
     }
     if (watermarkOn) addWatermark(option, theme);

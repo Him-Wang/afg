@@ -395,6 +395,11 @@ textarea.csv-area {
 .an-delta .neg { color: var(--down); }
 .an-na { color: var(--muted); }
 
+/* 单条系列配色 */
+.color-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.color-name { flex: 1; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.color-input { width: 42px; height: 28px; border: none; background: none; cursor: pointer; padding: 0; }
+
 /* 响应式 */
 @media (max-width: 900px) {
   .sidebar { display: none; }

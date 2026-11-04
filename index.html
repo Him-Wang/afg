@@ -51,14 +51,15 @@
           <option value="rank">横向排名</option>
           <option value="candlestick">K 线</option>
         </select>
-        <select id="toolbar-palette" title="线条配色">
-          <option value="default">线条配色 · 默认</option>
+        <select id="toolbar-palette" title="整体配色（所有系列）">
+          <option value="default">整体配色 · 默认</option>
           <option value="gold">金棕</option>
           <option value="blue">蓝青</option>
           <option value="violet">紫罗兰</option>
           <option value="emerald">墨绿</option>
           <option value="warm">暖金</option>
         </select>
+        <button class="btn sm" id="btn-series-color">🎨 单条颜色</button>
         <button class="btn sm" id="tb-swapxy" title="交换 X/Y 轴方向">⇅ X/Y</button>
         <button class="btn sm" id="btn-transform">⚙ 数据变换</button>
         <button class="btn sm" id="btn-events" style="display:none">◈ 事件</button>
@@ -230,6 +231,17 @@
         </div>
         <div class="dataset-list" id="dataset-list"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 单条系列配色弹层 -->
+  <div class="overlay" id="color-overlay">
+    <div class="modal" style="width:min(420px,92vw)">
+      <div class="modal-head">
+        <div><h2>单条系列配色</h2><div class="sub">点击色块，为对应系列单独调整颜色</div></div>
+        <button class="modal-close" id="color-close">×</button>
+      </div>
+      <div id="color-list"></div>
     </div>
   </div>
 

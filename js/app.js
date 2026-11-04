@@ -17,7 +17,10 @@
       { id: 'macro-pmi-radar', label: '雷达图 · PMI 分项' },
       { id: 'macro-country-groups', label: '分组对比 · G7/新兴/欧元区' },
       { id: 'macro-world-map', label: '世界地图 · GDP 着色' },
-      { id: 'macro-corr-explore', label: '关联探索 · 散点矩阵' }
+      { id: 'macro-corr-explore', label: '关联探索 · 散点矩阵' },
+      { id: 'macro-cpi', label: 'CPI 同比' },
+      { id: 'macro-m2', label: 'M2 同比' },
+      { id: 'macro-pmi-monthly', label: '制造业 PMI 走势' }
     ]},
     { category: '行业数据', items: [
       { id: 'industry-rank', label: '横向排名 · 营收增速' },
@@ -71,6 +74,7 @@
     transposed: false,
     extremeLabels: false,
     palette: null,
+    seriesColors: {},
     annotations: {},
     customTitles: {},
     viewKey: 'tpl:macro-gdp-area',
@@ -100,6 +104,41 @@
     if (state.palette && PALETTES[state.palette]) return Object.assign({}, t, { series: PALETTES[state.palette] });
     return t;
   }
+
+  function currentSeriesNames() {
+    if (state.mode === 'imported' || state.mode === 'dataset') return state.mapping.yCols ? state.mapping.yCols.slice() : [];
+    if (state.mode === 'template') {
+      var s = DataLoader.SAMPLES[state.currentTemplate];
+      if (s && s.data) {
+        if (s.data.series) return s.data.series.map(function (x) { return x.name; });
+        var names = [];
+        (s.data.bars || []).forEach(function (b) { names.push(b.name); });
+        (s.data.lines || []).forEach(function (l) { names.push(l.name); });
+        return names;
+      }
+    }
+    return [];
+  }
+
+  function openColorPanel() {
+    var names = currentSeriesNames();
+    var list = el('color-list');
+    list.innerHTML = '';
+    if (!names.length) { toast('当前图表无可单独配色的系列'); return; }
+    names.forEach(function (name) {
+      var cur = state.seriesColors[name] || '';
+      var row = document.createElement('div');
+      row.className = 'color-row';
+      row.innerHTML =
+        '<span class="color-name">' + name + '</span>' +
+        '<input type="color" class="color-input" value="' + (cur || '#C9A96A') + '" data-name="' + name + '" title="选择颜色" />' +
+        (cur ? '<button class="btn sm color-reset" data-name="' + name + '">重置</button>' : '');
+      list.appendChild(row);
+    });
+    el('color-overlay').classList.add('open');
+  }
+
+  function closeColorPanel() { el('color-overlay').classList.remove('open'); }
 
   var TYPE_LABELS = { line: '折线图', area: '面积图', bar: '柱状图', stacked: '堆叠面积', rank: '横向排名', candlestick: 'K 线', radar: '雷达图', stackedBar: '堆叠柱状', perf: '业绩评估', worldMap: '世界地图', scatterMatrix: '散点矩阵' };
 
@@ -452,6 +491,7 @@
     var hasEvents = !!(EVENTS[id] && EVENTS[id].length);
     if (sample.data) sample.data.events = (hasEvents && state.showEvents) ? EVENTS[id] : [];
     if (sample.data) sample.data.annotations = echartsAnnotations(state.viewKey);
+    if (sample.data) sample.data.seriesColors = state.seriesColors;
 
     var evBtn = el('btn-events');
     if (evBtn) {
@@ -991,6 +1031,7 @@
         }
       }
       data.annotations = echartsAnnotations(state.viewKey);
+      data.seriesColors = state.seriesColors;
       renderAnalysis(labels, yCols.map(function (col) { return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) }; }));
       clearStage();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
@@ -1085,6 +1126,21 @@
     el('toolbar-palette').addEventListener('change', function () {
       state.palette = (this.value === 'default') ? null : this.value;
       rerender();
+    });
+    el('btn-series-color').addEventListener('click', openColorPanel);
+    el('color-close').addEventListener('click', closeColorPanel);
+    el('color-list').addEventListener('change', function (e) {
+      if (e.target.classList.contains('color-input')) {
+        state.seriesColors[e.target.dataset.name] = e.target.value;
+        rerender();
+      }
+    });
+    el('color-list').addEventListener('click', function (e) {
+      if (e.target.classList.contains('color-reset')) {
+        delete state.seriesColors[e.target.dataset.name];
+        openColorPanel();
+        rerender();
+      }
     });
 
     // 图片数据识别（在导入弹层内）
@@ -1279,6 +1335,7 @@
       state.priceEl = pc;
     } else {
       chart.data.annotations = echartsAnnotations(state.viewKey);
+      chart.data.seriesColors = state.seriesColors;
       var c = document.createElement('div'); c.className = 'chart-canvas'; stage.appendChild(c);
       var dsi = ChartFactory.render(c, chart.type, chart.data, theme);
       attachAnnotationHandler(dsi);
@@ -1307,8 +1364,10 @@
     var stage = el('chart-stage');
     var grid = document.createElement('div');
     grid.className = 'dash-grid';
+    var insts = [];
     datasets.forEach(function (ds) {
       var chart = datasetToChart(ds);
+      if (chart.data) chart.data.seriesColors = state.seriesColors;
       var panel = document.createElement('div');
       panel.className = 'dash-panel';
       panel.innerHTML =
@@ -1324,10 +1383,17 @@
           state.priceInsts.push(inst);
         }
       } else {
-        ChartFactory.render(body, chart.type, chart.data, theme);
+        insts.push(ChartFactory.render(body, chart.type, chart.data, theme));
       }
     });
     stage.appendChild(grid);
+    // 联动缩放（同组图表时间轴同步）
+    if (insts.length > 1) {
+      try {
+        insts.forEach(function (i) { i.group = 'dash-' + Date.now(); });
+        echarts.connect(insts[0].group);
+      } catch (e) {}
+    }
     syncToolbar();
     if (closeAfter !== false) closeModal();
   }
@@ -1345,15 +1411,22 @@
     var theme = getChartTheme();
     var stage = el('chart-stage');
     var grid = document.createElement('div'); grid.className = 'dash-grid';
+    var insts = [];
     cols.forEach(function (col) {
       var panel = document.createElement('div'); panel.className = 'dash-panel';
       panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + col + '</span></div><div class="dash-panel-body"></div>';
       grid.appendChild(panel);
       var body = panel.querySelector('.dash-panel-body');
-      var data = { labels: table.rows.map(function (r) { return String(r[timeCol]); }), series: [{ name: col, values: table.rows.map(function (r) { return toNum(r[col]); }) }] };
-      ChartFactory.render(body, (state.det && state.det.isTimeSeries) ? 'area' : 'bar', data, theme);
+      var data = { labels: table.rows.map(function (r) { return String(r[timeCol]); }), series: [{ name: col, values: table.rows.map(function (r) { return toNum(r[col]); }) }], seriesColors: state.seriesColors };
+      insts.push(ChartFactory.render(body, (state.det && state.det.isTimeSeries) ? 'area' : 'bar', data, theme));
     });
     stage.appendChild(grid);
+    if (insts.length > 1) {
+      try {
+        insts.forEach(function (i) { i.group = 'split-' + Date.now(); });
+        echarts.connect(insts[0].group);
+      } catch (e) {}
+    }
     setHead({ title: '多指标拆分视图', subtitle: '', unit: '', source: '' });
     el('hint').textContent = '已拆分为 ' + cols.length + ' 个图表';
     syncToolbar();
@@ -1554,6 +1627,7 @@
     else if (cfg.indicators !== undefined && cfg.series !== undefined) data = { indicators: cfg.indicators, series: cfg.series };
     else if (cfg.data) data = cfg.data;
     else { toast('JSON 缺少 labels/series 或 indicators/series'); return; }
+    data.seriesColors = state.seriesColors;
     clearStage();
     state.mode = 'imported'; state.isImported = true; state.viewKey = 'imported';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
