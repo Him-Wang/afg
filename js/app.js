@@ -70,6 +70,7 @@
     tableView: false,
     transposed: false,
     extremeLabels: false,
+    palette: null,
     annotations: {},
     customTitles: {},
     viewKey: 'tpl:macro-gdp-area',
@@ -82,6 +83,22 @@
   function fmtNum(v) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
+  /* 线条配色方案（暗系，与主题匹配） */
+  var PALETTES = {
+    default: null,
+    gold: ['#C9A96A', '#E6C88A', '#B0805A', '#D0B98E', '#9C8E6B', '#8A8578', '#B8975C', '#A5A5A5', '#D8B77E', '#6B6560'],
+    blue: ['#6F8FA8', '#5FA8A0', '#2962FF', '#7B9BFF', '#4DB6AC', '#7A8494', '#3E98C7', '#26A69A', '#6BA8C9', '#A5B8CC'],
+    violet: ['#9B7FB5', '#B39DDB', '#8E7BA6', '#7D3C98', '#6A5ACD', '#9B6CF6', '#A98BB8', '#C08484', '#7B7FB5', '#B5A6C9'],
+    emerald: ['#7FA06F', '#5BE7C4', '#2EC4A6', '#6E8B74', '#7FD1B9', '#8FAE9B', '#4CAF7D', '#B8D4C6', '#5FA878', '#A6C9A6'],
+    warm: ['#E6C88A', '#F0A85A', '#C08484', '#D4AF37', '#FFB74D', '#E0B36A', '#C98A6B', '#A67C7C', '#E6B8B0', '#D9A878']
+  };
+
+  function getChartTheme() {
+    var t = Themes.active().chart;
+    if (state.palette && PALETTES[state.palette]) return Object.assign({}, t, { series: PALETTES[state.palette] });
+    return t;
   }
 
   var TYPE_LABELS = { line: '折线图', area: '面积图', bar: '柱状图', stacked: '堆叠面积', rank: '横向排名', candlestick: 'K 线', radar: '雷达图', stackedBar: '堆叠柱状', perf: '业绩评估', worldMap: '世界地图', scatterMatrix: '散点矩阵' };
@@ -204,10 +221,9 @@
       while (lastI >= s && (valAt(lastI) === null || isNaN(valAt(lastI)))) lastI--;
       if (maxI < 0 || minI < 0) return;
       var xAxis = opt.xAxis && opt.xAxis[0];
-      function catOf(i) { return (xAxis && xAxis.data) ? xAxis.data[i] : i; }
       function pxOf(i) {
-        try { return inst.convertToPixel({ seriesIndex: si }, [catOf(i), valAt(i)]); }
-        catch (err) { try { return inst.convertToPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [catOf(i), valAt(i)]); } catch (e2) { return null; } }
+        try { return inst.convertToPixel({ seriesIndex: si }, [i, valAt(i)]); }
+        catch (err) { try { return inst.convertToPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [i, valAt(i)]); } catch (e2) { return null; } }
       }
       var name = series.name || ('指标' + (si + 1));
       var items = [];
@@ -236,15 +252,29 @@
       defs.appendChild(mk);
     });
 
-    marks.forEach(function (m) {
-      var lx = m.px + 6, ly = m.py - 30;
+    // 计算初始位置并做纵向去重（防遮挡）
+    var labelsInfo = marks.map(function (m) {
+      var shortName = m.name.length > 7 ? m.name.slice(0, 7) + '…' : m.name;
+      var lx = m.px + 6, ly = m.py - 26;
       if (m.kind === '最低') { lx = m.px + 6; ly = m.py + 6; }
-      else if (m.kind === '最新') { lx = m.px + 14; ly = m.py - 10; }
-      ly -= m.si * 3;
+      else if (m.kind === '最新') { lx = m.px + 14; ly = m.py - 8; }
+      ly -= m.si * 16;
+      return { m: m, shortName: shortName, lx: lx, ly: ly };
+    });
+    labelsInfo.sort(function (a, b) { return a.ly - b.ly; });
+    for (var li = 1; li < labelsInfo.length; li++) {
+      var prev = labelsInfo[li - 1];
+      if (Math.abs(labelsInfo[li].lx - prev.lx) < 130 && (labelsInfo[li].ly - prev.ly) < 22) {
+        labelsInfo[li].ly = prev.ly + 22;
+      }
+    }
+
+    labelsInfo.forEach(function (info) {
+      var m = info.m, lx = info.lx, ly = info.ly;
       var label = document.createElement('div');
       label.className = 'ext-label';
       label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:#0E0F12;font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
-      label.textContent = m.name + ' ' + m.kind + ' ' + fmtNum(m.val);
+      label.textContent = info.shortName + ' ' + m.kind + ' ' + fmtNum(m.val);
       overlay.appendChild(label);
       var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', m.px); line.setAttribute('y1', m.py);
@@ -304,7 +334,7 @@
   function applyPriceAnnotations(inst) {
     if (!inst || !inst.candle || !inst.candle.setMarkers) return;
     var list = priceAnnotations(state.viewKey);
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
     try {
       inst.candle.setMarkers(list.map(function (a) {
         return { time: a.time, position: 'aboveBar', color: theme.accent, shape: 'circle', text: a.text };
@@ -431,7 +461,7 @@
 
     updateStatBadge(sample);
 
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
     var stage = el('chart-stage');
 
     if (sample.type === 'candlestick') {
@@ -709,7 +739,7 @@
 
   /* ---------- 导出 ---------- */
   function exportImage() {
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
     var url = null;
     try {
       if (state.priceEl) {
@@ -866,6 +896,19 @@
     tbl.innerHTML = html;
   }
 
+  /* 应用数据行范围（选择数据区间后重新识别） */
+  function applyRowRange() {
+    if (!state.table) return;
+    var n = state.table.rows.length;
+    var s = parseInt(el('row-start').value, 10), e = parseInt(el('row-end').value, 10);
+    if (isNaN(s)) s = 1;
+    if (isNaN(e)) e = n;
+    if (s < 1 || e > n || s > e) { toast('行范围无效（1 ~ ' + n + '）'); return; }
+    state.table.rows = state.table.rows.slice(s - 1, e);
+    showMapping(state.table);
+    toast('已选择第 ' + s + ' ~ ' + e + ' 行，共 ' + state.table.rows.length + ' 行');
+  }
+
   /* 构建雷达图数据：wide=转置方向（首列为维度、数值列为实体），否则实体为行、维度为列 */
   function buildRadarData(rows, timeCol, yCols, wide) {
     function ceilMax(vals) { return Math.ceil(Math.max.apply(null, vals.concat([0])) * 1.3); }
@@ -900,7 +943,7 @@
     el('btn-events').style.display = 'none';
     el('stat-badge').style.display = 'none';
     var rows = DataLoader.sortRowsByTime(table.rows, state.mapping.timeCol);
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
 
     if (m.chartType === 'candlestick') {
       if (!state.det.ohlc) { toast('未检测到 open/high/low/close 列'); return; }
@@ -937,9 +980,15 @@
         if (state.transposed) wide = !wide;
         data = buildRadarData(rows, state.mapping.timeCol, yCols, wide);
       } else {
-        data = { labels: labels, series: yCols.map(function (col) {
-          return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) };
-        })};
+        if (state.transposed) {
+          data = { labels: yCols, series: rows.map(function (r) {
+            return { name: String(r[state.mapping.timeCol]), values: yCols.map(function (col) { return toNum(r[col]); }) };
+          })};
+        } else {
+          data = { labels: labels, series: yCols.map(function (col) {
+            return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) };
+          })};
+        }
       }
       data.annotations = echartsAnnotations(state.viewKey);
       renderAnalysis(labels, yCols.map(function (col) { return { name: col, values: rows.map(function (r) { return toNum(r[col]); }) }; }));
@@ -1033,6 +1082,10 @@
       if (state.mode === 'imported') { state.mapping.chartType = this.value; rerender(); }
       else toast('图表类型切换适用于导入的数据');
     });
+    el('toolbar-palette').addEventListener('change', function () {
+      state.palette = (this.value === 'default') ? null : this.value;
+      rerender();
+    });
 
     // 图片数据识别（在导入弹层内）
     el('img-calx').addEventListener('click', function () { dgSetMode('x1'); });
@@ -1074,6 +1127,8 @@
     });
     el('render-btn').addEventListener('click', function () { renderUserChart(true); });
     el('btn-split').addEventListener('click', renderSplitCharts);
+    el('btn-rowrange').addEventListener('click', applyRowRange);
+    el('btn-redetect').addEventListener('click', function () { showMapping(state.table); toast('已重新识别并推荐'); });
     el('render-all-btn').addEventListener('click', function () { renderDashboard(state.datasets, true); });
 
     window.addEventListener('resize', function () {
@@ -1210,7 +1265,7 @@
     highlightNav(null);
     el('btn-events').style.display = 'none';
     el('stat-badge').style.display = 'none';
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
     var stage = el('chart-stage');
 
     if (chart.type === 'candlestick') {
@@ -1248,7 +1303,7 @@
     setHead({ title: 'Excel 数据仪表盘', subtitle: '', unit: '', source: '' });
     el('hint').textContent = '已加载 Excel · ' + datasets.length + ' 个数据表';
 
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
     var stage = el('chart-stage');
     var grid = document.createElement('div');
     grid.className = 'dash-grid';
@@ -1287,7 +1342,7 @@
     state.mode = 'dashboard';
     state.dashboardDatasets = null; state.currentTemplate = null; state.dataset = null;
     highlightNav(null);
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
     var stage = el('chart-stage');
     var grid = document.createElement('div'); grid.className = 'dash-grid';
     cols.forEach(function (col) {
@@ -1506,7 +1561,7 @@
     highlightNav(null);
     el('btn-events').style.display = 'none';
     el('stat-badge').style.display = 'none';
-    var theme = Themes.active().chart;
+    var theme = getChartTheme();
     var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
     var ci = ChartFactory.render(c, type, data, theme);
     attachAnnotationHandler(ci);

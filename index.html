@@ -51,6 +51,14 @@
           <option value="rank">横向排名</option>
           <option value="candlestick">K 线</option>
         </select>
+        <select id="toolbar-palette" title="线条配色">
+          <option value="default">线条配色 · 默认</option>
+          <option value="gold">金棕</option>
+          <option value="blue">蓝青</option>
+          <option value="violet">紫罗兰</option>
+          <option value="emerald">墨绿</option>
+          <option value="warm">暖金</option>
+        </select>
         <button class="btn sm" id="tb-swapxy" title="交换 X/Y 轴方向">⇅ X/Y</button>
         <button class="btn sm" id="btn-transform">⚙ 数据变换</button>
         <button class="btn sm" id="btn-events" style="display:none">◈ 事件</button>
@@ -199,6 +207,13 @@
         </div>
         <div class="field-row"><label>Y / 数值列</label><span class="hint" id="y-hint">点击选择一列或多列</span></div>
         <div class="column-picker" id="y-cols"></div>
+        <div class="field-row">
+          <label>数据行范围</label>
+          <input type="number" id="row-start" min="1" placeholder="起始行" style="width:90px" />
+          <input type="number" id="row-end" min="1" placeholder="结束行" style="width:90px" />
+          <button class="btn" id="btn-rowrange">应用行范围</button>
+          <button class="btn" id="btn-redetect">重新识别/推荐</button>
+        </div>
         <div class="preview-wrap"><table class="preview-table" id="preview-table"></table></div>
         <div class="field-row" style="margin-top:16px">
           <button class="btn primary" id="render-btn">渲染图表</button>
