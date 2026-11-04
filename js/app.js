@@ -82,7 +82,7 @@
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
     mapping: { timeCol: '', yCols: [], chartType: 'line' },
-    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, chartConfig: null, timeRange: 'all'
+    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null
   };
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
@@ -217,8 +217,26 @@
   }
 
   /* 把额外指标叠加到当前图（按日期对齐） */
+  function alignSeriesToBase(baseLabels, overlayLabels, overlayValues) {
+    var aligned = new Array(baseLabels.length).fill(null);
+    var j = 0;
+    for (var i = 0; i < baseLabels.length; i++) {
+      var target = String(baseLabels[i]);
+      while (j < overlayLabels.length && String(overlayLabels[j]) <= target) j++;
+      if (j > 0) aligned[i] = overlayValues[j - 1];
+    }
+    return aligned;
+  }
+
   function mergeOverlaySeries(baseLabels, baseSeries, overlays) {
     if (!overlays || !overlays.length) return { labels: baseLabels, series: baseSeries };
+    if (state.alignToMain) {
+      // 按主图频率对齐：保留主图标签，叠加序列取"每个主图时间点之前最近的值"
+      var alignedSeries = overlays.map(function (o) {
+        return { name: o.name, values: alignSeriesToBase(baseLabels, o.labels, o.values) };
+      });
+      return { labels: baseLabels, series: baseSeries.concat(alignedSeries) };
+    }
     var labelSet = {};
     baseLabels.forEach(function (l) { labelSet[l] = true; });
     overlays.forEach(function (o) { o.labels.forEach(function (l) { labelSet[l] = true; }); });
@@ -592,7 +610,7 @@
   /* ---------- 首页 / 使用说明 ---------- */
   function renderHome() {
     clearStage();
-    state.macroItem = null; state.chartConfig = null;
+    state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     state.mode = 'home';
     state.viewKey = 'home';
     highlightNav('home');
@@ -625,7 +643,7 @@
     state.mode = 'macro';
     state.viewKey = 'china-macro';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
-    state.table = null; state.det = null; state.macroItem = null; state.chartConfig = null;
+    state.table = null; state.det = null; state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     highlightNav('china-macro');
     el('stat-badge').style.display = 'none';
     el('btn-events').style.display = 'none';
@@ -685,7 +703,8 @@
     try {
       state.macroItem = item;
       var merged = mergeOverlaySeries(item.labels, item.series, state.overlaySeries);
-      applyChartConfig({ type: item.type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series });
+      var type = state.macroTypeOverride || item.type;
+      applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series });
     } catch (e) { toast('打开图表失败'); }
   }
 
@@ -763,7 +782,7 @@
 
   /* ---------- 渲染内置模版 ---------- */
   function renderTemplate(id) {
-    state.macroItem = null; state.chartConfig = null;
+    state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var sample = DataLoader.SAMPLES[id];
     if (!sample) return;
     clearStage();
@@ -1195,7 +1214,11 @@
       canConvert = !!(s && s.data && s.data.labels !== undefined && s.data.series !== undefined);
     }
     sel.disabled = !(isData || canConvert);
-    if (isData) {
+    if (state.macroItem) {
+      sel.disabled = false;
+      var mt = state.macroTypeOverride || state.macroItem.type;
+      if (mt && sel.querySelector('option[value="' + mt + '"]')) sel.value = mt;
+    } else if (isData) {
       var t = state.mode === 'imported' ? state.mapping.chartType : '';
       if (t && sel.querySelector('option[value="' + t + '"]')) sel.value = t;
     } else if (state.mode === 'template' && canConvert) {
@@ -1209,7 +1232,7 @@
   function showMapping(table) {
     state.table = table;
     state.uploadedTable = table;
-    state.overlaySeries = []; state.macroItem = null; state.chartConfig = null;
+    state.overlaySeries = []; state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var det0 = DataLoader.detectTable(table);
     if (!det0) { toast('无法解析数据'); return; }
     // 转换 Excel 日期序列号（如 46295 → 2026-09-28）后重新识别
@@ -1323,7 +1346,7 @@
   }
 
   function renderUserChart(closeAfter) {
-    state.macroItem = null; state.chartConfig = null;
+    state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var m = state.mapping;
     var table = state.table;
     if (!table) return;
@@ -1473,6 +1496,12 @@
       rerender();
     });
     el('toolbar-chart-type').addEventListener('change', function () {
+      if (state.macroItem) {
+        var CART = { line: 1, area: 1, bar: 1, stacked: 1, stackedBar: 1, step: 1 };
+        if (CART[this.value]) { state.macroTypeOverride = this.value; openMacroItem(state.macroItem); }
+        else toast('该指标仅支持 折线/面积/柱状/堆叠');
+        return;
+      }
       if (state.mode === 'imported') { state.mapping.chartType = this.value; rerender(); }
       else if (state.mode === 'template') {
         var s = DataLoader.SAMPLES[state.currentTemplate];
@@ -1506,6 +1535,12 @@
     el('export-json').addEventListener('click', exportJson);
     el('url-load').addEventListener('click', loadDataUrl);
     el('btn-add-indicator').addEventListener('click', openIndicatorPanel);
+    el('align-main').addEventListener('change', function () {
+      state.alignToMain = this.checked;
+      if (state.macroItem) openMacroItem(state.macroItem);
+      else if (state.mode === 'template') renderTemplate(state.currentTemplate);
+      else rerender();
+    });
     el('indicator-close').addEventListener('click', closeIndicatorPanel);
     el('indicator-list').addEventListener('click', function (e) {
       var chip = e.target.closest('.col-chip');
