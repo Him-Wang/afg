@@ -513,20 +513,20 @@
     }
     function nonEmpty(row) { return row.filter(function (c) { return String(c).trim() !== ''; }).length; }
 
-    // 定位数据起始行：第一个"至少 2 个数值单元格"的行（表头/元数据行没有数值）
-    var dataStart = -1;
-    for (var i = 0; i < rows.length; i++) { if (numCount(rows[i]) >= 2) { dataStart = i; break; } }
-    if (dataStart < 0) {
-      for (i = 0; i < rows.length; i++) { if (numCount(rows[i]) >= 1) { dataStart = i; break; } }
-    }
-    if (dataStart < 0) return aoaToTable(aoa);
-
-    // 表头行：数据区之上非空单元格最多的那一行
+    // 表头行：前 15 行中非空单元格最多的那一行
     var headerIdx = -1, best = -1;
-    for (i = 0; i < dataStart; i++) {
+    for (var i = 0; i < Math.min(rows.length, 15); i++) {
       var ne = nonEmpty(rows[i]);
       if (ne > best) { best = ne; headerIdx = i; }
     }
+    // 数据起始行：表头之后第一个"至少 2 个数值单元格"的行（跳过元数据/分组行）
+    var dataStart = -1;
+    for (i = headerIdx + 1; i < rows.length; i++) { if (numCount(rows[i]) >= 2) { dataStart = i; break; } }
+    if (dataStart < 0) {
+      for (i = headerIdx + 1; i < rows.length; i++) { if (numCount(rows[i]) >= 1) { dataStart = i; break; } }
+    }
+    if (dataStart < 0) dataStart = headerIdx + 1;
+    if (dataStart > rows.length) return aoaToTable(aoa);
 
     // 列名
     var headerRow = headerIdx >= 0 ? rows[headerIdx] : null;
@@ -586,6 +586,7 @@
         if (block.length < 2) return;
         var table = smartBlockToTable(block);
         if (!table || !table.rows.length) return;
+        table = maybeTranspose(table);
         valid++;
         var det = detectTable(table);
         var name = blocks.filter(function (b) { return b.length >= 2; }).length > 1
@@ -623,7 +624,45 @@
       || /\d{4}[-/.]?Q[1-4]/i.test(s)
       || /Q[1-4][-/.]?\s?\d{4}/i.test(s)
       || /\d{4}[-/.]?H[1-2]/i.test(s)
-      || /^\d{4}年/.test(s);
+      || /^\d{4}年/.test(s)
+      || /^\d{1,2}月$/.test(s)
+      || /^\d{4}年\d{1,2}月/.test(s);
+  }
+
+  /* 转置表：指标在行、时间（月份/日期）在列 → 转成时间在行、指标在列 */
+  function transposeTable(table) {
+    if (!table || !table.columns || !table.rows || table.rows.length < 2) return table;
+    var labelCol = table.columns[0];
+    var numericCols = table.columns.filter(function (c) {
+      if (c === labelCol) return false;
+      var n = 0, num = 0;
+      table.rows.slice(0, 30).forEach(function (r) { var v = r[c]; if (String(v).trim() !== '') { n++; if (!isNaN(toNum(v))) num++; } });
+      return n > 0 && num / n > 0.6;
+    });
+    if (!numericCols.length) return table;
+    var indicatorNames = table.rows.map(function (r) { return String(r[labelCol]).trim(); });
+    var newColumns = ['时间'].concat(indicatorNames);
+    var newRows = numericCols.map(function (col) {
+      var o = {}; o['时间'] = col;
+      table.rows.forEach(function (r, ri) { o[indicatorNames[ri]] = r[col]; });
+      return o;
+    });
+    return toTable(newColumns, newRows);
+  }
+
+  /* 判断是否转置表：表头含多个日期/月份列，且首列为文本分类 */
+  function maybeTranspose(table) {
+    if (!table || !table.columns || !table.rows || table.rows.length < 2) return table;
+    var dateHeaders = table.columns.filter(function (c) { return isDateString(c); });
+    if (dateHeaders.length < 3) return table;
+    var firstCol = table.columns[0];
+    var firstText = true;
+    table.rows.slice(0, 20).forEach(function (r) {
+      var v = r[firstCol];
+      if (String(v).trim() === '') return;
+      if (isDateString(String(v)) || !isNaN(toNum(v))) firstText = false;
+    });
+    return firstText ? transposeTable(table) : table;
   }
   function toNum(v) {
     if (typeof v === 'number') return v;
@@ -898,6 +937,7 @@
     parseCSV: parseCSV, parseJSON: parseJSON, readExcel: readExcel, readExcelAll: readExcelAll,
     detectTable: detectTable, suggestType: suggestType, toNum: toNum, isDateString: isDateString,
     convertSerialTime: convertSerialTime, sortRowsByTime: sortRowsByTime,
+    transposeTable: transposeTable, maybeTranspose: maybeTranspose,
     isExcelSerial: isExcelSerial, parseTimeKey: parseTimeKey,
     inferFreq: inferFreq, freqToQuarter: freqToQuarter, freqToYear: freqToYear,
     pctChange: pctChange, cumulative: cumulative, formula: formula

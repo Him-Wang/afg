@@ -73,8 +73,8 @@
     tableView: false,
     transposed: false,
     extremeLabels: false,
-    palette: null,
     seriesColors: {},
+    overrideType: null,
     annotations: {},
     customTitles: {},
     viewKey: 'tpl:macro-gdp-area',
@@ -89,21 +89,7 @@
     return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
 
-  /* 线条配色方案（暗系，与主题匹配） */
-  var PALETTES = {
-    default: null,
-    gold: ['#C9A96A', '#E6C88A', '#B0805A', '#D0B98E', '#9C8E6B', '#8A8578', '#B8975C', '#A5A5A5', '#D8B77E', '#6B6560'],
-    blue: ['#6F8FA8', '#5FA8A0', '#2962FF', '#7B9BFF', '#4DB6AC', '#7A8494', '#3E98C7', '#26A69A', '#6BA8C9', '#A5B8CC'],
-    violet: ['#9B7FB5', '#B39DDB', '#8E7BA6', '#7D3C98', '#6A5ACD', '#9B6CF6', '#A98BB8', '#C08484', '#7B7FB5', '#B5A6C9'],
-    emerald: ['#7FA06F', '#5BE7C4', '#2EC4A6', '#6E8B74', '#7FD1B9', '#8FAE9B', '#4CAF7D', '#B8D4C6', '#5FA878', '#A6C9A6'],
-    warm: ['#E6C88A', '#F0A85A', '#C08484', '#D4AF37', '#FFB74D', '#E0B36A', '#C98A6B', '#A67C7C', '#E6B8B0', '#D9A878']
-  };
-
-  function getChartTheme() {
-    var t = Themes.active().chart;
-    if (state.palette && PALETTES[state.palette]) return Object.assign({}, t, { series: PALETTES[state.palette] });
-    return t;
-  }
+  function getChartTheme() { return Themes.active().chart; }
 
   function currentSeriesNames() {
     if (state.mode === 'imported' || state.mode === 'dataset') return state.mapping.yCols ? state.mapping.yCols.slice() : [];
@@ -125,13 +111,17 @@
     var list = el('color-list');
     list.innerHTML = '';
     if (!names.length) { toast('当前图表无可单独配色的系列'); return; }
+    var swatches = Themes.active().chart.series.slice(0, 10); // 主题配色
     names.forEach(function (name) {
       var cur = state.seriesColors[name] || '';
       var row = document.createElement('div');
       row.className = 'color-row';
+      var dots = swatches.map(function (c) {
+        return '<span class="color-dot' + (c === cur ? ' on' : '') + '" data-name="' + name + '" data-color="' + c + '" style="background:' + c + '"></span>';
+      }).join('');
       row.innerHTML =
         '<span class="color-name">' + name + '</span>' +
-        '<input type="color" class="color-input" value="' + (cur || '#C9A96A') + '" data-name="' + name + '" title="选择颜色" />' +
+        '<span class="color-dots">' + dots + '</span>' +
         (cur ? '<button class="btn sm color-reset" data-name="' + name + '">重置</button>' : '');
       list.appendChild(row);
     });
@@ -313,7 +303,7 @@
       var label = document.createElement('div');
       label.className = 'ext-label';
       label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:#0E0F12;font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
-      label.textContent = info.shortName + ' ' + m.kind + ' ' + fmtNum(m.val);
+      label.textContent = fmtNum(m.val);
       overlay.appendChild(label);
       var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', m.px); line.setAttribute('y1', m.py);
@@ -461,7 +451,7 @@
         nav.className = 'nav-item';
         nav.dataset.id = item.id;
         nav.innerHTML = '<span class="dot"></span><span>' + item.label + '</span>';
-        nav.addEventListener('click', function () { renderTemplate(item.id); });
+        nav.addEventListener('click', function () { state.overrideType = null; renderTemplate(item.id); });
         sb.appendChild(nav);
       });
     });
@@ -525,7 +515,9 @@
       renderWorldTable(sample.data);
     } else {
       var c2 = document.createElement('div'); c2.className = 'chart-canvas'; stage.appendChild(c2);
-      var ci2 = ChartFactory.render(c2, sample.type, sample.data, theme);
+      var renderType = sample.type;
+      if (state.overrideType && sample.data && sample.data.labels !== undefined && sample.data.series !== undefined) renderType = state.overrideType;
+      var ci2 = ChartFactory.render(c2, renderType, sample.data, theme);
       attachAnnotationHandler(ci2);
       attachExtremeLabels(ci2);
       state.echartsEl = c2;
@@ -780,19 +772,37 @@
   /* ---------- 导出 ---------- */
   function exportImage() {
     var theme = getChartTheme();
-    var url = null;
     try {
+      var imgSrc = null, w = 0, h = 0;
       if (state.priceEl) {
         var canvas = state.priceEl.querySelector('canvas');
-        if (canvas) url = canvas.toDataURL('image/png');
+        if (canvas) { imgSrc = canvas.toDataURL('image/png'); w = canvas.width; h = canvas.height; }
       } else if (state.echartsEl) {
         var inst = echarts.getInstanceByDom(state.echartsEl);
-        if (inst) url = inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: theme.bg });
+        if (inst) {
+          imgSrc = inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: theme.bg });
+          w = state.echartsEl.clientWidth * 2; h = state.echartsEl.clientHeight * 2;
+        }
       }
-      if (!url) { toast('当前模版暂不支持导出图片'); return; }
-      var a = document.createElement('a');
-      a.href = url; a.download = 'chart.png'; a.click();
-      toast('图片已导出');
+      if (!imgSrc) { toast('当前模版暂不支持导出图片'); return; }
+      var title = (el('chart-title').textContent || '').trim();
+      var titleH = title ? 46 : 0;
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h + titleH;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = theme.bg; ctx.fillRect(0, 0, c.width, c.height);
+      if (title) {
+        ctx.fillStyle = theme.text; ctx.font = 'bold 26px Inter, -apple-system, sans-serif'; ctx.textBaseline = 'top';
+        ctx.fillText(title, 24, 14);
+      }
+      var img = new Image();
+      img.onload = function () {
+        ctx.drawImage(img, 0, titleH, w, h);
+        var a = document.createElement('a');
+        a.href = c.toDataURL('image/png'); a.download = 'chart.png'; a.click();
+        toast('图片已导出');
+      };
+      img.src = imgSrc;
     } catch (e) { toast('导出失败'); }
   }
 
@@ -853,10 +863,19 @@
     var sel = el('toolbar-chart-type');
     if (!sel) return;
     var isData = (state.mode === 'imported' || state.mode === 'dataset');
-    sel.disabled = !isData;
+    var canConvert = false;
+    if (state.mode === 'template') {
+      var s = DataLoader.SAMPLES[state.currentTemplate];
+      canConvert = !!(s && s.data && s.data.labels !== undefined && s.data.series !== undefined);
+    }
+    sel.disabled = !(isData || canConvert);
     if (isData) {
       var t = state.mode === 'imported' ? state.mapping.chartType : '';
       if (t && sel.querySelector('option[value="' + t + '"]')) sel.value = t;
+    } else if (state.mode === 'template' && canConvert) {
+      var s2 = DataLoader.SAMPLES[state.currentTemplate];
+      var tv = state.overrideType || s2.type;
+      if (tv && sel.querySelector('option[value="' + tv + '"]')) sel.value = tv;
     }
     if (el('tb-swapxy')) el('tb-swapxy').classList.toggle('active', state.transposed);
   }
@@ -1121,23 +1140,23 @@
     });
     el('toolbar-chart-type').addEventListener('change', function () {
       if (state.mode === 'imported') { state.mapping.chartType = this.value; rerender(); }
-      else toast('图表类型切换适用于导入的数据');
-    });
-    el('toolbar-palette').addEventListener('change', function () {
-      state.palette = (this.value === 'default') ? null : this.value;
-      rerender();
+      else if (state.mode === 'template') {
+        var s = DataLoader.SAMPLES[state.currentTemplate];
+        if (s && s.data && s.data.labels !== undefined && s.data.series !== undefined) {
+          state.overrideType = this.value; rerender();
+        } else toast('该图表暂不支持切换类型');
+      } else toast('图表类型切换适用于导入的数据');
     });
     el('btn-series-color').addEventListener('click', openColorPanel);
     el('color-close').addEventListener('click', closeColorPanel);
-    el('color-list').addEventListener('change', function (e) {
-      if (e.target.classList.contains('color-input')) {
-        state.seriesColors[e.target.dataset.name] = e.target.value;
-        rerender();
-      }
-    });
     el('color-list').addEventListener('click', function (e) {
-      if (e.target.classList.contains('color-reset')) {
-        delete state.seriesColors[e.target.dataset.name];
+      var t = e.target;
+      if (t.classList.contains('color-dot')) {
+        state.seriesColors[t.dataset.name] = t.dataset.color;
+        rerender();
+        openColorPanel();
+      } else if (t.classList.contains('color-reset')) {
+        delete state.seriesColors[t.dataset.name];
         openColorPanel();
         rerender();
       }

@@ -61,25 +61,15 @@
   }
 
   function gridTop() { return { top: 46, left: 12, right: 16, bottom: 8, containLabel: true }; }
-  function gridZoom() { return { top: 46, left: 12, right: 16, bottom: 48, containLabel: true }; }
+  function gridZoom() { return { top: 46, left: 12, right: 16, bottom: 8, containLabel: true }; }
 
   var watermarkOn = true;
   function setWatermark(v) { watermarkOn = !!v; }
 
-  /* 可拖动/可缩放的时间轴 */
+  /* 可缩放的时间轴（鼠标滚轮/拖拽，无底部滑块） */
   function dataZoomCfg(theme) {
     return [
-      { type: 'inside', zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
-      {
-        type: 'slider', height: 26, bottom: 4, borderColor: 'transparent',
-        backgroundColor: hexToRgba(theme.text, 0.04),
-        fillerColor: hexToRgba(theme.accent, 0.14),
-        handleStyle: { color: theme.accent, borderColor: theme.accent },
-        moveHandleStyle: { color: theme.accent },
-        textStyle: { color: theme.muted, fontSize: 9 },
-        dataBackground: { lineStyle: { color: theme.muted + '55' }, areaStyle: { color: theme.muted + '22' } },
-        selectedDataBackground: { lineStyle: { color: theme.accent + '88' }, areaStyle: { color: theme.accent + '22' } }
-      }
+      { type: 'inside', zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false }
     ];
   }
 
@@ -250,7 +240,7 @@
       backgroundColor: theme.bg,
       tooltip: tooltip(theme),
       legend: Object.assign(legend(theme), { right: 16, top: 8 }),
-      grid: { top: 50, left: 12, right: 24, bottom: 48, containLabel: true },
+      grid: { top: 50, left: 12, right: 24, bottom: 8, containLabel: true },
       dataZoom: dataZoomCfg(theme),
       xAxis: [Object.assign({ type: 'category', data: data.labels }, axisCommon(theme))],
       yAxis: [
@@ -731,7 +721,7 @@
       axisPointer: { link: [{ xAxisIndex: 'all' }] },
       grid: [
         { left: 12, right: 16, top: 46, height: '48%', containLabel: true },
-        { left: 12, right: 16, bottom: 46, height: '20%', containLabel: true }
+        { left: 12, right: 16, bottom: 8, height: '24%', containLabel: true }
       ],
       xAxis: [
         Object.assign({ type: 'category', gridIndex: 0, data: labels, axisLabel: { show: false } }, axisCommon(theme)),
@@ -742,8 +732,7 @@
         Object.assign({ type: 'value', gridIndex: 1, max: 0, axisLabel: { color: theme.muted, fontSize: 10, formatter: '{value}%' } }, axisCommon(theme))
       ],
       dataZoom: [
-        { type: 'inside', xAxisIndex: [0, 1], zoomOnMouseWheel: true, moveOnMouseMove: true },
-        { type: 'slider', xAxisIndex: [0, 1], height: 26, bottom: 4, borderColor: 'transparent', backgroundColor: hexToRgba(theme.text, 0.04), fillerColor: hexToRgba(theme.accent, 0.14), handleStyle: { color: theme.accent, borderColor: theme.accent }, textStyle: { color: theme.muted, fontSize: 10 } }
+        { type: 'inside', xAxisIndex: [0, 1], zoomOnMouseWheel: true, moveOnMouseMove: true }
       ],
       series: series
     };

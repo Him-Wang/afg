@@ -398,7 +398,10 @@ textarea.csv-area {
 /* 单条系列配色 */
 .color-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .color-name { flex: 1; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.color-input { width: 42px; height: 28px; border: none; background: none; cursor: pointer; padding: 0; }
+.color-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+.color-dot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .1s ease; }
+.color-dot:hover { transform: scale(1.2); }
+.color-dot.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent); }
 
 /* 响应式 */
 @media (max-width: 900px) {
