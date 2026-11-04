@@ -260,6 +260,16 @@
     toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
   }
 
+  function toggleSidebar() {
+    var sb = el('sidebar');
+    var open = sb.classList.toggle('open');
+    el('sidebar-backdrop').classList.toggle('show', open);
+  }
+  function closeSidebar() {
+    el('sidebar').classList.remove('open');
+    el('sidebar-backdrop').classList.remove('show');
+  }
+
   function setHead(meta) {
     state.currentMeta = meta;
     el('chart-title').textContent = state.customTitles[state.viewKey] || meta.title;
@@ -553,7 +563,7 @@
     var home = document.createElement('div');
     home.className = 'nav-item'; home.dataset.id = 'home';
     home.innerHTML = '<span class="dot"></span><span>🏠 首页 · 使用说明</span>';
-    home.addEventListener('click', function () { renderHome(); });
+    home.addEventListener('click', function () { renderHome(); closeSidebar(); });
     sb.appendChild(home);
     var libLabel = document.createElement('div');
     libLabel.className = 'nav-group-label';
@@ -569,7 +579,7 @@
         nav.className = 'nav-item';
         nav.dataset.id = item.id;
         nav.innerHTML = '<span class="dot"></span><span>' + item.label + '</span>';
-        nav.addEventListener('click', function () { state.overrideType = null; renderTemplate(item.id); });
+        nav.addEventListener('click', function () { state.overrideType = null; renderTemplate(item.id); closeSidebar(); });
         sb.appendChild(nav);
       });
     });
@@ -1204,6 +1214,8 @@
   /* ---------- 事件绑定 ---------- */
   function bindEvents() {
     el('btn-import').addEventListener('click', openModal);
+    el('btn-menu').addEventListener('click', toggleSidebar);
+    el('sidebar-backdrop').addEventListener('click', closeSidebar);
     el('modal-close').addEventListener('click', closeModal);
     el('overlay').addEventListener('click', function (e) { if (e.target === el('overlay')) closeModal(); });
     el('btn-export').addEventListener('click', exportImage);

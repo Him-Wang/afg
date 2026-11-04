@@ -403,9 +403,54 @@ textarea.csv-area {
 .color-dot:hover { transform: scale(1.2); }
 .color-dot.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent); }
 
-/* 响应式 */
+/* 响应式（手机端） */
+.menu-btn { display: none; }
+.sidebar-backdrop { display: none; }
+
 @media (max-width: 900px) {
-  .sidebar { display: none; }
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  .dash-grid { grid-template-columns: 1fr; }
+  .menu-btn { display: inline-flex; }
+  .logo-sub { display: none; }
+
+  /* 侧边栏改为抽屉 */
+  .sidebar {
+    position: fixed; top: var(--header-h); bottom: 0; left: -270px;
+    width: 270px; z-index: 50; background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    transition: left .22s ease; box-shadow: 4px 0 24px rgba(0,0,0,.4);
+  }
+  .sidebar.open { left: 0; }
+  .sidebar-backdrop {
+    position: fixed; inset: 0; top: var(--header-h); background: rgba(0,0,0,.5);
+    z-index: 49;
+  }
+  .sidebar-backdrop.show { display: block; }
+
+  /* 功能栏横向滚动 */
+  .chart-toolbar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding: 8px 14px; }
+  .chart-toolbar .tb-spacer { display: none; }
+  .stat-badge { display: none !important; }
+
+  /* 图表自适应高度 */
+  .chart-canvas, .chart-stage .chart-canvas { height: 300px; }
+  .chart-stage { margin: 0 10px 10px; }
+  .chart-head { padding: 14px 16px 8px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .chart-title-block h1 { font-size: 17px; }
+
+  /* 弹窗铺满 */
+  .modal { width: 94vw !important; max-height: 88vh; padding: 18px; }
+
+  /* 网格卡片 */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); padding: 10px; min-height: auto; }
+  .dash-grid { grid-template-columns: 1fr; padding: 10px; }
+  .dash-panel-body { min-height: 220px; }
+  .home-view { padding: 24px 20px; min-height: auto; }
+  .home-title { font-size: 24px; }
+
+  /* 按钮更大，便于触控 */
+  .btn { padding: 9px 14px; font-size: 13px; }
+  .btn.sm { padding: 8px 12px; font-size: 12px; }
+
+  /* 事件说明 / 分析 */
+  .event-notes, .analysis { padding: 2px 16px 8px; }
+  .an-name { flex: 0 0 130px; }
 }
