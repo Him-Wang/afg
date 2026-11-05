@@ -198,6 +198,32 @@
     }
   };
 
+  SAMPLES['fin-sankey'] = {
+    meta: { title: '收入结构流向（桑基图）', subtitle: '营业收入 → 业务线 → 成本/费用/利润', unit: '亿元', source: '示例数据 · 演示用' },
+    type: 'sankey',
+    data: {
+      nodes: [
+        { name: '营业收入' },
+        { name: '产品线 A' }, { name: '产品线 B' }, { name: '产品线 C' },
+        { name: '营业成本' }, { name: '销售费用' }, { name: '管理费用' }, { name: '净利润' }
+      ],
+      links: [
+        { source: '营业收入', target: '产品线 A', value: 420 },
+        { source: '营业收入', target: '产品线 B', value: 330 },
+        { source: '营业收入', target: '产品线 C', value: 260 },
+        { source: '产品线 A', target: '营业成本', value: 240 },
+        { source: '产品线 A', target: '销售费用', value: 90 },
+        { source: '产品线 A', target: '净利润', value: 90 },
+        { source: '产品线 B', target: '营业成本', value: 200 },
+        { source: '产品线 B', target: '管理费用', value: 50 },
+        { source: '产品线 B', target: '净利润', value: 80 },
+        { source: '产品线 C', target: '营业成本', value: 150 },
+        { source: '产品线 C', target: '销售费用', value: 40 },
+        { source: '产品线 C', target: '净利润', value: 70 }
+      ]
+    }
+  };
+
   /* ============================================================
    * 机器学习示例数据（确定性生成）
    * ============================================================ */
@@ -828,12 +854,27 @@
   function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
 
   function inferFreq(labels) {
+    if (!labels || !labels.length) return null;
     var s = String(labels[0]).trim();
     if (/^\d{4}$/.test(s) || /^\d{4}年$/.test(s)) return 'year';
-    if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/.test(s)) return 'day';
     if (/Q[1-4](\s|$)/i.test(s) || /\d{4}Q[1-4]/i.test(s)) return 'quarter';
     if (/^\d{4}[-/.]\d{1,2}$/.test(s)) return 'month';
-    return null;
+    // YYYY-MM-DD：用相邻时间点间隔判断 日频/月频(月末)/季频(季末)
+    var times = [];
+    for (var i = 0; i < labels.length && times.length < 8; i++) {
+      var t = parseTimeKey(labels[i]);
+      if (t) times.push(t);
+    }
+    if (times.length < 2) return 'day';
+    var gaps = [];
+    for (var j = 1; j < times.length; j++) gaps.push(times[j] - times[j - 1]);
+    gaps.sort(function (a, b) { return a - b; });
+    var med = gaps[Math.floor(gaps.length / 2)];
+    var day = 86400000;
+    if (med < 2 * day) return 'day';
+    if (med < 60 * day) return 'month';
+    if (med < 200 * day) return 'quarter';
+    return 'year';
   }
 
   function periodKey(label) {

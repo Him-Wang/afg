@@ -497,6 +497,24 @@
     return option;
   }
 
+  /* ---------- 桑基图（公司财务资金流向） ---------- */
+  function sankey(el, data, theme) {
+    return {
+      backgroundColor: theme.bg,
+      tooltip: { trigger: 'item', triggerOn: 'mousemove', backgroundColor: theme.panel, borderColor: theme.accent + '55', textStyle: { color: theme.text, fontSize: 12 } },
+      series: [{
+        type: 'sankey',
+        left: 8, right: 60, top: 24, bottom: 24,
+        data: data.nodes,
+        links: data.links,
+        emphasis: { focus: 'adjacency' },
+        lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.35 },
+        itemStyle: { color: theme.accent, borderColor: theme.bg },
+        label: { color: theme.text, fontSize: 12 }
+      }]
+    };
+  }
+
   /* ---------- 迷你图（KPI 卡） ---------- */
   function sparkline(el, values, theme, color) {
     var c = color || theme.accent;
@@ -853,7 +871,7 @@
   var BUILDERS = {
     'area': lineArea, 'line': lineOnly, 'bar': barChart, 'step': stepLine,
     'dual': dual, 'heatmap': heatmap, 'rank': rank, 'bubble': bubble,
-    'treemap': treemap, 'stacked': stacked, 'stackedLine': stackedLine, 'season': season, 'waterfall': waterfall, 'donut': donut,
+    'treemap': treemap, 'stacked': stacked, 'stackedLine': stackedLine, 'season': season, 'waterfall': waterfall, 'donut': donut, 'sankey': sankey,
     'mlTrend': mlTrend, 'mlForecast': mlForecast, 'mlCluster': mlCluster,
     'mlCorr': mlCorr, 'mlDist': mlDist, 'stackedBar': stackedBar, 'radar': radar,
     'perf': perf, 'scatterMatrix': scatterMatrix, 'worldMap': worldMap

@@ -26,7 +26,6 @@
   var GOALS = [
     { id: 'trend', label: '趋势图', desc: '时间序列', icon: ICONS.trend },
     { id: 'perf', label: '业绩评估', desc: '收益/波动/回撤', icon: ICONS.perf },
-    { id: 'kline', label: 'K线', desc: '需 OHLC', icon: ICONS.kline },
     { id: 'ml', label: '机器学习', desc: '回归/预测', icon: ICONS.ml },
     { id: 'macro', label: '宏观分析', desc: '同比/环比', icon: ICONS.macro }
   ];
@@ -52,6 +51,7 @@
       { id: 'fin-waterfall', label: '瀑布图 · 营收桥接' },
       { id: 'fin-combo', label: '双轴组合 · 收入毛利' },
       { id: 'fin-donut', label: '环形图 · 收入结构' },
+      { id: 'fin-sankey', label: '桑基图 · 收入流向' },
       { id: 'fin-kpi', label: '指标卡 · 经营概览' }
     ]},
     { category: '基金业绩', items: [
@@ -1257,7 +1257,6 @@
   }
 
   function suggestGoal(det, table) {
-    if (det.ohlc) return 'kline';
     return 'trend';
   }
 
@@ -1501,9 +1500,9 @@
     if (!sel) return;
     var isData = (state.mode === 'imported' || state.mode === 'dataset');
     var isTemplate = (state.mode === 'template');
-    var isPrice = (state.isPriceData && state.mode === 'imported');
-    // 示例图/价格走势只做展示，图表类型切换关闭
-    sel.disabled = isTemplate || isPrice || !(isData || !!state.macroItem);
+    var isHighFreq = (state.dataFreq === 'day' && state.mode === 'imported');
+    // 示例图/高频数据只做展示，图表类型切换关闭；其他频率可选
+    sel.disabled = isTemplate || isHighFreq || !(isData || !!state.macroItem);
     if (state.macroItem) {
       var mt = state.macroTypeOverride || state.macroItem.type;
       if (mt && sel.querySelector('option[value="' + mt + '"]')) sel.value = mt;
@@ -1529,6 +1528,8 @@
     state.det = DataLoader.detectTable(table) || det0;
     markZerosAsEmpty(table, state.det);
     state.isPriceData = isPriceLike(table, state.det);
+    var _lbls = table.rows.slice(0, 20).map(function (r) { return String(r[state.det.timeCol]); });
+    state.dataFreq = DataLoader.inferFreq(_lbls);
     state.mapping.timeCol = state.det.timeCol;
     state.mapping.yCols = state.det.ohlc ? [] : state.det.numericCols.filter(function (c) { return c !== state.det.timeCol; });
     state.mapping.chartType = state.det.ohlc ? 'candlestick' : (state.det.isTimeSeries ? 'line' : 'bar');
@@ -2186,14 +2187,26 @@
     el('stat-badge').style.display = 'none';
     showBack(function () { renderSplitCharts(); });
     var theme = getChartTheme();
-    var labels = table.rows.map(function (r) { return String(r[timeCol]); });
-    var values = table.rows.map(function (r) { return vnum(r[col]); });
-    var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-    var ci = ChartFactory.render(c, 'line', { labels: labels, series: [{ name: col, values: values }], seriesColors: state.seriesColors }, theme);
-    attachExtremeLabels(ci);
-    state.echartsEl = c;
-    setHead({ title: col, subtitle: '走势图 · 仅展示有数据的区间', unit: '', source: '用户数据' });
-    el('hint').textContent = '单个指标走势';
+    if (state.isPriceData) {
+      // 金融资产：单点进去用基金业绩模版（净值 + 回撤 + 指标，随缩放更新）
+      var nav = [];
+      table.rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) nav.push({ date: String(r[timeCol]), value: v }); });
+      var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+      var ci = ChartFactory.render(c, 'perf', { name: col, nav: nav }, theme);
+      renderPerfMetrics({ name: col, nav: nav }, ci);
+      state.echartsEl = c;
+      setHead({ title: col + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 指标随缩放区间更新', unit: '净值', source: '用户数据' });
+      el('hint').textContent = '业绩评估 · 单个资产';
+    } else {
+      var labels = table.rows.map(function (r) { return String(r[timeCol]); });
+      var values = table.rows.map(function (r) { return vnum(r[col]); });
+      var c2 = document.createElement('div'); c2.className = 'chart-canvas'; el('chart-stage').appendChild(c2);
+      var ci2 = ChartFactory.render(c2, 'line', { labels: labels, series: [{ name: col, values: values }], seriesColors: state.seriesColors }, theme);
+      attachExtremeLabels(ci2);
+      state.echartsEl = c2;
+      setHead({ title: col, subtitle: '走势图 · 仅展示有数据的区间', unit: '', source: '用户数据' });
+      el('hint').textContent = '单个指标走势';
+    }
     syncToolbar();
   }
 
