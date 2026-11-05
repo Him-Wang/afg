@@ -2020,8 +2020,8 @@
   }
 
   function syncExtremeBtn() {
-    var b = el('tb-labels');
-    if (b) b.value = state.labelMode || 'off';
+    var b = el('btn-labels');
+    if (b) b.classList.toggle('active', state.labelMode === 'extreme');
   }
 
   function syncToolbar() {
@@ -2335,8 +2335,9 @@
       rerender();
       toast('已清除当前图表的说明');
     });
-    el('tb-labels').addEventListener('change', function () {
-      state.labelMode = this.value;
+    el('btn-labels').addEventListener('click', function () {
+      state.labelMode = (state.labelMode === 'extreme') ? 'off' : 'extreme';
+      this.classList.toggle('active', state.labelMode === 'extreme');
       if (state.echartsEl) {
         var inst = echarts.getInstanceByDom(state.echartsEl);
         if (inst) applyExtremeLabels(inst);
