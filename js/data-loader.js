@@ -538,13 +538,21 @@
       return c;
     }
     function nonEmpty(row) { return row.filter(function (c) { return String(c).trim() !== ''; }).length; }
-
-    // 表头行：前 15 行中非空单元格最多的那一行
-    var headerIdx = -1, best = -1;
-    for (var i = 0; i < Math.min(rows.length, 15); i++) {
-      var ne = nonEmpty(rows[i]);
-      if (ne > best) { best = ne; headerIdx = i; }
+    function textCount(row) {
+      var c = 0;
+      for (var i = 0; i < row.length; i++) { if (String(cellOf(row, i)).trim() !== '' && isNaN(toNum(cellOf(row, i)))) c++; }
+      return c;
     }
+
+    // 表头行：优先选"文本（非数值）单元格多"的行，其次选非空最多的行
+    var headerIdx = -1, bestTxt = -1, bestNe = -1, bestNeIdx = -1;
+    for (var i = 0; i < Math.min(rows.length, 15); i++) {
+      var tc = textCount(rows[i]);
+      var ne = nonEmpty(rows[i]);
+      if (ne > bestNe) { bestNe = ne; bestNeIdx = i; }
+      if (tc > bestTxt) { bestTxt = tc; headerIdx = i; }
+    }
+    if (headerIdx < 0 || bestTxt === 0) headerIdx = bestNeIdx;
     // 数据起始行：表头之后第一个"至少 2 个数值单元格"的行（跳过元数据/分组行）
     var dataStart = -1;
     for (i = headerIdx + 1; i < rows.length; i++) { if (numCount(rows[i]) >= 2) { dataStart = i; break; } }
@@ -565,7 +573,9 @@
     // 数据行：从 dataStart 起，保留含数值或日期的行（排除"单位/频度/来源/更新时间"等元数据行）
     var META_KEYS = /^(指标名称|指标|频度|频率|单位|来源|数据来源|更新时间|更新日期|名称|统计口径|备注)$/;
     var dataAO = rows.slice(dataStart).filter(function (r) {
-      if (META_KEYS.test(String(cellOf(r, 0)).trim())) return false;
+      var first = String(cellOf(r, 0)).trim();
+      if (first === '') return false; // 跳过无首列标签的代码/子表头行
+      if (META_KEYS.test(first)) return false;
       return numCount(r) >= 1 || dateCount(r) >= 1;
     });
     var objects = dataAO.map(function (r) {
