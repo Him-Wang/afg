@@ -103,7 +103,7 @@
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
     mapping: { timeCol: '', yCols: [], chartType: 'line' },
-    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, intlItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
+    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, intlItem: null, chartConfig: null, exploreConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
   };
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
@@ -980,6 +980,124 @@
     } catch (e) { toast('打开图表失败'); }
   }
 
+  /* ---------- 数据探索：用已有数据自由组合生成图表 ---------- */
+  var exploreSel = [];
+  function exploreData(source) {
+    if (source === 'china') return window.CHINA_MACRO;
+    if (source === 'intl') return window.INTL_MACRO;
+    return window.FINANCE_DATA;
+  }
+  function buildExploreItems(source) {
+    var D = exploreData(source) || { sections: [] };
+    var box = el('explore-items');
+    if (!box) return;
+    var sel = exploreSel;
+    sel.length = 0;
+    box.innerHTML = '';
+    D.sections.forEach(function (sec) {
+      var hd = document.createElement('div');
+      hd.className = 'nav-group-label';
+      hd.style.padding = '8px 4px 4px';
+      hd.textContent = sec.name;
+      box.appendChild(hd);
+      sec.items.forEach(function (item) {
+        if (!item.series || !item.series.length) return;
+        var key = source + ':' + item.title;
+        var chip = document.createElement('div');
+        chip.className = 'col-chip';
+        chip.textContent = item.title;
+        chip.dataset.key = key;
+        chip.addEventListener('click', function () {
+          var i = sel.indexOf(key);
+          if (i >= 0) sel.splice(i, 1); else sel.push(key);
+          chip.classList.toggle('on');
+        });
+        box.appendChild(chip);
+        item._exploreKey = key;
+      });
+    });
+  }
+  function openExplore() {
+    el('explore-overlay').classList.add('open');
+    buildExploreItems(el('explore-source').value);
+  }
+  function closeExplore() { el('explore-overlay').classList.remove('open'); }
+  function exploreItemByKey(source, key) {
+    var D = exploreData(source);
+    var title = key.split(':').slice(1).join(':');
+    for (var i = 0; i < D.sections.length; i++) {
+      for (var j = 0; j < D.sections[i].items.length; j++) {
+        if (D.sections[i].items[j].title === title) return D.sections[i].items[j];
+      }
+    }
+    return null;
+  }
+  function renderExplore() {
+    var source = el('explore-source').value;
+    var typ = el('explore-type').value;
+    var keys = exploreSel.slice();
+    if (keys.length < 2) { toast('请至少选择 2 个指标'); return; }
+    var items = keys.map(function (k) { return exploreItemByKey(source, k); }).filter(Boolean);
+    if (items.length < 2) { toast('未找到所选指标'); return; }
+    state.exploreConfig = { source: source, keys: keys, type: typ };
+    renderExploreFromConfig();
+    closeExplore();
+  }
+  function renderExploreFromConfig() {
+    var cfg = state.exploreConfig;
+    if (!cfg) return;
+    var source = cfg.source, typ = cfg.type, keys = cfg.keys;
+    var items = keys.map(function (k) { return exploreItemByKey(source, k); }).filter(Boolean);
+    if (items.length < 2) return;
+    var theme = getChartTheme();
+    var ranged = items.map(function (it) { return applyTimeRange(it.labels, it.series); });
+    clearStage();
+    state.mode = 'imported'; state.isImported = true; state.viewKey = 'explore';
+    state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null;
+    highlightNav('explore');
+    el('btn-events').style.display = 'none';
+    el('stat-badge').style.display = 'none';
+    var stage = el('chart-stage');
+    var c = document.createElement('div'); c.className = 'chart-canvas'; stage.appendChild(c);
+    var title = items.map(function (it) { return it.title; }).join(' vs ');
+    if (typ === 'multi') {
+      var merged = mergeOverlaySeries(ranged[0].labels, ranged[0].series, items.slice(1).map(function (it, i) {
+        return { name: it.title, labels: ranged[i + 1].labels, values: ranged[i + 1].series[0].values };
+      }));
+      ChartFactory.render(c, 'line', merged, theme);
+      setHead({ title: '多线对比', subtitle: title, unit: '', source: '已有数据' });
+    } else if (typ === 'heatmap') {
+      var labelSet = {};
+      ranged.forEach(function (r) { r.labels.forEach(function (l) { labelSet[l] = true; }); });
+      var xLabels = Object.keys(labelSet).sort();
+      var yLabels = items.map(function (it) { return it.title; });
+      var values = [];
+      items.forEach(function (it, i) {
+        var map = {};
+        ranged[i].labels.forEach(function (l, k) { map[l] = ranged[i].series[0].values[k]; });
+        xLabels.forEach(function (l, j) { if (map[l] !== undefined && map[l] !== null) values.push([j, i, Math.round(map[l] * 100) / 100]); });
+      });
+      ChartFactory.render(c, 'heatmap', { xLabels: xLabels, yLabels: yLabels, values: values }, theme);
+      setHead({ title: '热力矩阵', subtitle: title, unit: '', source: '已有数据' });
+    } else if (typ === 'scatter') {
+      var ser = items.map(function (it, i) { return { name: it.title, values: ranged[i].series[0].values }; });
+      ChartFactory.render(c, 'scatterMatrix', { series: ser }, theme);
+      setHead({ title: '散点矩阵 · 关联探索', subtitle: title, unit: '', source: '已有数据' });
+    } else if (typ === 'radar') {
+      var inds = items.map(function (it) { return { name: it.title }; });
+      var vals = items.map(function (it, i) { var v = ranged[i].series[0].values; return v[v.length - 1]; });
+      ChartFactory.render(c, 'radar', { indicators: inds, series: [{ name: '最新值', values: vals }] }, theme);
+      setHead({ title: '雷达图 · 最新快照', subtitle: title, unit: '', source: '已有数据' });
+    } else if (typ === 'rank') {
+      var rv = items.map(function (it, i) { var v = ranged[i].series[0].values; return v[v.length - 1]; });
+      ChartFactory.render(c, 'rank', { categories: items.map(function (it) { return it.title; }), values: rv }, theme);
+      setHead({ title: '横向排名 · 最新值', subtitle: title, unit: '', source: '已有数据' });
+    }
+    state.echartsEl = c;
+    el('hint').textContent = '数据探索 · 共 ' + items.length + ' 个指标';
+    syncToolbar();
+  }
+
   /* ---------- 侧边导航 ---------- */
   function buildSidebar() {
     var sb = el('sidebar');
@@ -1013,7 +1131,14 @@
     fin.addEventListener('click', function () { state.overlaySeries = []; renderFinance(); closeSidebar(); });
     sb.appendChild(fin);
 
-    // 5. 示例图（可展开子菜单）
+    // 5. 数据探索
+    var explore = document.createElement('div');
+    explore.className = 'nav-item'; explore.dataset.id = 'explore';
+    explore.innerHTML = '<span class="nav-icon">' + ICONS.ml + '</span><span>数据探索</span>';
+    explore.addEventListener('click', function () { openExplore(); closeSidebar(); });
+    sb.appendChild(explore);
+
+    // 6. 示例图（可展开子菜单）
     var ex = document.createElement('div');
     ex.className = 'nav-item nav-parent';
     ex.innerHTML = '<span class="nav-icon">' + ICONS.examples + '</span><span>示例图</span><span class="nav-caret">' + ICONS.caret + '</span>';
@@ -1666,6 +1791,7 @@
     if (state.macroItem) { openMacroItem(state.macroItem, true); return; }
     if (state.finItem) { openFinItem(state.finItem, true); return; }
     if (state.intlItem) { openIntlItem(state.intlItem, true); return; }
+    if (state.exploreConfig) { renderExploreFromConfig(); return; }
     if (state.chartConfig) { applyChartConfig(state.chartConfig); return; }
     if (state.mode === 'dashboard') renderDashboard(state.dashboardDatasets, false);
     else if (state.mode === 'dataset') renderDatasetSingle(state.dataset);
@@ -2177,6 +2303,10 @@
         rerender();
       }
     });
+    el('explore-close').addEventListener('click', closeExplore);
+    el('explore-source').addEventListener('change', function () { buildExploreItems(this.value); });
+    el('explore-generate').addEventListener('click', renderExplore);
+    el('explore-clear').addEventListener('click', function () { exploreSel.length = 0; document.querySelectorAll('#explore-items .col-chip.on').forEach(function (c) { c.classList.remove('on'); }); });
     el('btn-data-source').addEventListener('click', openDataPanel);
     el('data-close').addEventListener('click', closeDataPanel);
     el('save-local').addEventListener('click', saveLocal);

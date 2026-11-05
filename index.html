@@ -271,6 +271,38 @@
     </div>
   </div>
 
+  <!-- 数据探索弹层 -->
+  <div class="overlay" id="explore-overlay">
+    <div class="modal" style="width:min(640px,94vw)">
+      <div class="modal-head">
+        <div><h2>数据探索</h2><div class="sub">用已有数据自由组合，一键生成热力矩阵 / 散点矩阵 / 雷达图等</div></div>
+        <button class="modal-close" id="explore-close">×</button>
+      </div>
+      <div class="field-row">
+        <label>数据源</label>
+        <select id="explore-source">
+          <option value="china">中国宏观</option>
+          <option value="intl">国际宏观</option>
+          <option value="finance">金融数据</option>
+        </select>
+        <label style="margin-left:12px">图表类型</label>
+        <select id="explore-type">
+          <option value="heatmap">热力矩阵（指标×时间）</option>
+          <option value="multi">多线对比</option>
+          <option value="scatter">散点矩阵（关联）</option>
+          <option value="radar">雷达图（最新快照）</option>
+          <option value="rank">横向排名（最新值）</option>
+        </select>
+      </div>
+      <div class="field-row"><label>选择指标</label><span class="hint" id="explore-hint">可跨板块多选，例如「制造业PMI」+「GDP」做关联</span></div>
+      <div class="column-picker" id="explore-items" style="max-height:280px;overflow:auto"></div>
+      <div class="field-row" style="margin-top:14px">
+        <button class="btn primary" id="explore-generate">生成图表</button>
+        <button class="btn" id="explore-clear">清空选择</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <!-- 依赖库（本地化，双击离线可用） -->
