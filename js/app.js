@@ -383,6 +383,7 @@
   }
 
   function clearStage() {
+    hideBack();
     ChartFactory.disposeAll();
     state.priceInsts.forEach(function (inst) { PriceChart.destroy(inst); });
     state.priceInsts = [];
@@ -1139,13 +1140,17 @@
     };
   }
 
-  function renderPerfTable(navs) {
+  function renderPerfTable(navs, slice) {
     var wrap = document.createElement('div');
     wrap.className = 'analysis';
     var rows = ['annReturn', 'annVol', 'maxDD', 'sharp', 'var95', 'totalReturn'];
     var labels2 = { annReturn: '年化收益', annVol: '年化波动', maxDD: '最大回撤', sharp: '夏普比率', var95: 'VaR(95%)', totalReturn: '累计收益' };
     function pct(v) { return (v * 100).toFixed(2) + '%'; }
-    var metrics = navs.map(function (x) { return ML.perfMetrics(x.nav.map(function (p) { return p.value; })); });
+    function metricsOf(x) {
+      var nav = slice ? slice(x.nav) : x.nav;
+      return ML.perfMetrics(nav.map(function (p) { return p.value; }));
+    }
+    var metrics = navs.map(metricsOf);
     var html = '<div class="an-head">业绩指标（基于所选价格/净值列）</div><table class="preview-table"><thead><tr><th>指标</th>';
     navs.forEach(function (x) { html += '<th>' + x.name + '</th>'; });
     html += '</tr></thead><tbody>';
@@ -1161,6 +1166,46 @@
     html += '</tbody></table>';
     wrap.innerHTML = html;
     el('chart-stage').appendChild(wrap);
+    return wrap;
+  }
+
+  /* 价格型多指标：图表下对比指标表，随缩放区间联动更新 */
+  function renderPerfTableLive(inst, navs) {
+    var wrap = renderPerfTable(navs);
+    if (inst && inst.on) {
+      inst.on('datazoom', function () {
+        try {
+          var opt = inst.getOption();
+          var dz = opt.dataZoom && opt.dataZoom[0];
+          var start = dz ? dz.start : 0, end = dz ? dz.end : 100;
+          wrap.innerHTML = renderPerfTableHtml(navs, function (nav) {
+            var n = nav.length;
+            var s = Math.floor(n * start / 100), e = Math.ceil(n * end / 100);
+            return nav.slice(s, e);
+          });
+        } catch (e) {}
+      });
+    }
+  }
+
+  function renderPerfTableHtml(navs, slice) {
+    var rows = ['annReturn', 'annVol', 'maxDD', 'sharp', 'var95', 'totalReturn'];
+    var labels2 = { annReturn: '年化收益', annVol: '年化波动', maxDD: '最大回撤', sharp: '夏普比率', var95: 'VaR(95%)', totalReturn: '累计收益' };
+    function pct(v) { return (v * 100).toFixed(2) + '%'; }
+    var metrics = navs.map(function (x) { var nav = slice ? slice(x.nav) : x.nav; return ML.perfMetrics(nav.map(function (p) { return p.value; })); });
+    var html = '<div class="an-head">业绩指标（基于所选价格/净值列）</div><table class="preview-table"><thead><tr><th>指标</th>';
+    navs.forEach(function (x) { html += '<th>' + x.name + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function (k) {
+      html += '<tr><td>' + labels2[k] + '</td>';
+      metrics.forEach(function (m) {
+        var v = m ? m[k] : null;
+        var txt = (v === null || v === undefined) ? '—' : (k === 'sharp' ? v.toFixed(2) : pct(v));
+        html += '<td>' + txt + '</td>';
+      });
+      html += '</tr>';
+    });
+    return html + '</tbody></table>';
   }
 
   /* ---------- 机器学习模块（上传数据） ---------- */
@@ -1213,15 +1258,36 @@
 
   function suggestGoal(det, table) {
     if (det.ohlc) return 'kline';
-    if (det.isTimeSeries) {
-      var col = det.numericCols[0];
-      if (col && table.rows.length > 100) {
-        var samples = 0, big = 0;
-        table.rows.slice(-200).forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) { samples++; if (v > 50) big++; } });
-        if (samples && big / samples > 0.5) return 'perf';
-      }
-    }
     return 'trend';
+  }
+
+  /* 是否价格/净值型（指数点位、股价等，中位数>50） */
+  function isPriceLike(table, det) {
+    if (!table || !det || !det.numericCols) return false;
+    var col = det.numericCols[0];
+    if (!col || col === det.timeCol) return false;
+    var vals = [];
+    table.rows.slice(-300).forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) vals.push(v); });
+    if (vals.length < 3) return false;
+    vals.sort(function (a, b) { return a - b; });
+    return vals[Math.floor(vals.length / 2)] > 50;
+  }
+
+  /* 价格型列把 0 视为"无数据"（指数/资产未成立前填 0） */
+  function markZerosAsEmpty(table, det) {
+    if (!table || !det || !det.numericCols) return table;
+    det.numericCols.forEach(function (col) {
+      if (col === det.timeCol) return;
+      var vals = [];
+      table.rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) vals.push(v); });
+      if (vals.length < 3) return;
+      vals.sort(function (a, b) { return a - b; });
+      var median = vals[Math.floor(vals.length / 2)];
+      if (median > 50) { // 价格/点位型（中位数>50），0 视为无数据
+        table.rows.forEach(function (r) { if (DataLoader.toNum(r[col]) === 0) r[col] = ''; });
+      }
+    });
+    return table;
   }
 
   function renderWorldTable(data) {
@@ -1435,8 +1501,9 @@
     if (!sel) return;
     var isData = (state.mode === 'imported' || state.mode === 'dataset');
     var isTemplate = (state.mode === 'template');
-    // 示例图（模板）只做展示，图表类型切换关闭
-    sel.disabled = isTemplate || !(isData || !!state.macroItem);
+    var isPrice = (state.isPriceData && state.mode === 'imported');
+    // 示例图/价格走势只做展示，图表类型切换关闭
+    sel.disabled = isTemplate || isPrice || !(isData || !!state.macroItem);
     if (state.macroItem) {
       var mt = state.macroTypeOverride || state.macroItem.type;
       if (mt && sel.querySelector('option[value="' + mt + '"]')) sel.value = mt;
@@ -1460,9 +1527,11 @@
     // 转换 Excel 日期序列号（如 46295 → 2026-09-28）后重新识别
     DataLoader.convertSerialTime(table, det0);
     state.det = DataLoader.detectTable(table) || det0;
+    markZerosAsEmpty(table, state.det);
+    state.isPriceData = isPriceLike(table, state.det);
     state.mapping.timeCol = state.det.timeCol;
     state.mapping.yCols = state.det.ohlc ? [] : state.det.numericCols.filter(function (c) { return c !== state.det.timeCol; });
-    state.mapping.chartType = state.det.ohlc ? 'candlestick' : (state.det.isTimeSeries ? 'area' : 'bar');
+    state.mapping.chartType = state.det.ohlc ? 'candlestick' : (state.det.isTimeSeries ? 'line' : 'bar');
     state.transposed = false;
     if (el('btn-swapxy')) el('btn-swapxy').classList.remove('active');
 
@@ -1660,6 +1729,15 @@
       attachExtremeLabels(uinst);
       state.echartsEl = c;
       setHead({ title: '用户数据 · ' + (TYPE_LABELS[type] || type), subtitle: '', unit: '', source: '' });
+      // 价格型多指标：图表下方加对比指标表（随缩放区间更新）
+      if (state.isPriceData && yCols.length >= 2) {
+        var navsAll = yCols.map(function (col) {
+          var nav = [];
+          rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) nav.push({ date: String(r[state.mapping.timeCol]), value: v }); });
+          return { name: col, nav: nav };
+        }).filter(function (x) { return x.nav.length >= 2; });
+        if (navsAll.length >= 2) renderPerfTableLive(uinst, navsAll);
+      }
     }
     state.isImported = true;
     state.mode = 'imported';
@@ -1684,6 +1762,7 @@
         menu.classList.remove('open');
       }
     });
+    el('back-btn').addEventListener('click', function () { if (state.backFn) state.backFn(); });
     el('btn-menu').addEventListener('click', toggleSidebar);
     el('sidebar-backdrop').addEventListener('click', closeSidebar);
     el('modal-close').addEventListener('click', closeModal);
@@ -2072,80 +2151,61 @@
     var table = state.table, timeCol = state.mapping.timeCol;
     var cols = state.mapping.yCols.slice();
     if (cols.length < 2) { toast('至少选择 2 个数值列'); return; }
-    if (state.analysisGoal === 'perf') { renderPerfSplit(table, timeCol, cols); return; }
     closeModal();
     clearStage();
+    hideBack();
     state.mode = 'dashboard';
     state.dashboardDatasets = null; state.currentTemplate = null; state.dataset = null;
+    state.splitCols = cols.slice();
     highlightNav(null);
     var theme = getChartTheme();
     var stage = el('chart-stage');
     var grid = document.createElement('div'); grid.className = 'dash-grid';
-    var insts = [];
     cols.forEach(function (col) {
-      var panel = document.createElement('div'); panel.className = 'dash-panel';
-      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + col + '</span></div><div class="dash-panel-body"></div>';
+      var panel = document.createElement('div'); panel.className = 'dash-panel split-panel';
+      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + col + '</span><span class="ds-badge">点击查看</span></div><div class="dash-panel-body"></div>';
+      panel.addEventListener('click', function () { openSplitDetail(col); });
       grid.appendChild(panel);
       var body = panel.querySelector('.dash-panel-body');
       var data = { labels: table.rows.map(function (r) { return String(r[timeCol]); }), series: [{ name: col, values: table.rows.map(function (r) { return vnum(r[col]); }) }], seriesColors: state.seriesColors };
-      insts.push(ChartFactory.render(body, (state.det && state.det.isTimeSeries) ? 'area' : 'bar', data, theme));
+      ChartFactory.render(body, 'line', data, theme);
     });
     stage.appendChild(grid);
-    if (insts.length > 1) {
-      try {
-        insts.forEach(function (i) { i.group = 'split-' + Date.now(); });
-        echarts.connect(insts[0].group);
-      } catch (e) {}
-    }
-    setHead({ title: '多指标拆分视图', subtitle: '', unit: '', source: '' });
-    el('hint').textContent = '已拆分为 ' + cols.length + ' 个图表';
+    setHead({ title: '多指标拆分视图', subtitle: '点击任一卡片查看单个指标走势', unit: '', source: '用户数据' });
+    el('hint').textContent = '已拆分为 ' + cols.length + ' 个走势图';
     syncToolbar();
   }
 
-  /* 业绩评估拆分视图：每列一张净值+回撤图，点击展开 */
-  function renderPerfSplit(table, timeCol, cols) {
-    closeModal();
+  function openSplitDetail(col) {
+    var table = state.table, timeCol = state.mapping.timeCol;
     clearStage();
-    state.mode = 'dashboard';
-    state.dashboardDatasets = null; state.currentTemplate = null; state.dataset = null;
-    highlightNav(null);
-    var theme = getChartTheme();
-    var stage = el('chart-stage');
-    var grid = document.createElement('div'); grid.className = 'dash-grid';
-    cols.forEach(function (col) {
-      var nav = [];
-      table.rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) nav.push({ date: String(r[timeCol]), value: v }); });
-      if (nav.length < 2) return;
-      var m = ML.perfMetrics(nav.map(function (p) { return p.value; }));
-      var panel = document.createElement('div'); panel.className = 'dash-panel perf-panel';
-      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + col + '</span>' +
-        '<span class="perf-mini">年化 ' + (m.annReturn * 100).toFixed(1) + '% · 回撤 ' + (m.maxDD * 100).toFixed(1) + '%</span></div><div class="dash-panel-body"></div>';
-      panel.addEventListener('click', function () { openPerfSingle(col, nav); });
-      grid.appendChild(panel);
-      var body = panel.querySelector('.dash-panel-body');
-      ChartFactory.render(body, 'perf', { name: col, nav: nav }, theme);
-    });
-    stage.appendChild(grid);
-    setHead({ title: '业绩评估 · 拆分视图', subtitle: '每列一张净值 + 回撤图 · 点击卡片查看完整图表', unit: '', source: '用户数据' });
-    el('hint').textContent = '已拆分为 ' + cols.length + ' 个业绩图表';
-    syncToolbar();
-  }
-
-  function openPerfSingle(name, nav) {
-    clearStage();
-    state.mode = 'imported'; state.isImported = true; state.viewKey = 'perf-single';
+    state.mode = 'imported'; state.isImported = true; state.viewKey = 'split-detail';
     state.macroItem = null; state.chartConfig = null;
     highlightNav(null);
     el('btn-events').style.display = 'none';
     el('stat-badge').style.display = 'none';
+    showBack(function () { renderSplitCharts(); });
     var theme = getChartTheme();
+    var labels = table.rows.map(function (r) { return String(r[timeCol]); });
+    var values = table.rows.map(function (r) { return vnum(r[col]); });
     var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-    var ci = ChartFactory.render(c, 'perf', { name: name, nav: nav }, theme);
-    renderPerfMetrics({ name: name, nav: nav }, ci);
+    var ci = ChartFactory.render(c, 'line', { labels: labels, series: [{ name: col, values: values }], seriesColors: state.seriesColors }, theme);
+    attachExtremeLabels(ci);
     state.echartsEl = c;
-    setHead({ title: name + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）', unit: '净值', source: '用户数据' });
-    el('hint').textContent = '业绩评估 · 单指标';
+    setHead({ title: col, subtitle: '走势图 · 仅展示有数据的区间', unit: '', source: '用户数据' });
+    el('hint').textContent = '单个指标走势';
     syncToolbar();
+  }
+
+  function showBack(fn) {
+    state.backFn = fn;
+    var b = el('back-btn');
+    if (b) b.style.display = '';
+  }
+  function hideBack() {
+    state.backFn = null;
+    var b = el('back-btn');
+    if (b) b.style.display = 'none';
   }
 
   /* ============================================================
