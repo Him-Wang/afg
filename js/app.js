@@ -829,11 +829,13 @@
 
   function openMacroItem(item, keep) {
     try {
-      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; }
+      var vk = 'macro-item:' + item.title;
+      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; delete state.customTitles[vk]; }
       state.macroItem = item;
       var merged = mergeOverlaySeries(item.labels, item.series, state.overlaySeries);
       var type = state.macroTypeOverride || item.type;
-      applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series });
+      applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series, viewKey: vk });
+      showBack(function () { renderChinaMacro(); });
       if (state.overlaySeries.length) renderPeriodTable(merged.labels, merged.series);
     } catch (e) { toast('打开图表失败'); }
   }
@@ -931,13 +933,14 @@
 
   function openFinItem(item, keep) {
     try {
-      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; }
+      var fvk = 'fin-item:' + item.title;
+      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; delete state.customTitles[fvk]; }
       state.finItem = item;
       var ranged = applyTimeRange(item.labels, item.series);
       var labels = ranged.labels, values = ranged.series[0].values;
       var merged = mergeOverlaySeries(labels, [{ name: item.title, values: values }], state.overlaySeries);
       clearStage();
-      state.mode = 'imported'; state.isImported = true; state.viewKey = 'fin-item';
+      state.mode = 'imported'; state.isImported = true; state.viewKey = fvk;
       state.macroItem = null; state.chartConfig = null;
       highlightNav(null);
       el('btn-events').style.display = 'none';
@@ -952,7 +955,7 @@
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
         if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
-        setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 直接展示数值', unit: item.unit || '', source: '用户数据' });
+        setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '', unit: item.unit || '', source: '公开数据' });
         el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势';
       } else {
         // 业绩评估：净值 + 回撤 + 指标
@@ -1031,12 +1034,13 @@
 
   function openIntlItem(item, keep) {
     try {
-      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; }
+      var ivk = 'intl-item:' + item.title;
+      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; delete state.customTitles[ivk]; }
       state.intlItem = item;
       var ranged = applyTimeRange(item.labels, item.series);
       var merged = mergeOverlaySeries(ranged.labels, ranged.series, state.overlaySeries);
       clearStage();
-      state.mode = 'imported'; state.isImported = true; state.viewKey = 'intl-item';
+      state.mode = 'imported'; state.isImported = true; state.viewKey = ivk;
       state.macroItem = null; state.finItem = null; state.chartConfig = null;
       highlightNav(null);
       el('btn-events').style.display = 'none';
@@ -1518,7 +1522,7 @@
     el('btn-events').style.display = 'none';
     el('stat-badge').style.display = 'none';
     el('hint').textContent = '业绩评估 · 基于所选价格/净值列';
-    setHead({ title: '业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 年化收益/波动/夏普', unit: '净值', source: '用户数据' });
+    setHead({ title: '业绩评估', subtitle: '', unit: '净值', source: '用户数据' });
 
     var theme = getChartTheme();
     if (navs.length === 1) {
@@ -2749,7 +2753,7 @@
       var ci = ChartFactory.render(c, 'perf', { name: col, nav: nav }, theme);
       renderPerfMetrics({ name: col, nav: nav }, ci);
       state.echartsEl = c;
-      setHead({ title: col + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 指标随缩放区间更新', unit: '净值', source: '用户数据' });
+      setHead({ title: col + ' · 业绩评估', subtitle: '', unit: '净值', source: '用户数据' });
       el('hint').textContent = '业绩评估 · 单个资产';
     } else {
       var labels = table.rows.map(function (r) { return String(r[timeCol]); });
@@ -2906,7 +2910,7 @@
     }
     data.seriesColors = state.seriesColors;
     clearStage();
-    state.mode = 'imported'; state.isImported = true; state.viewKey = 'imported';
+    state.mode = 'imported'; state.isImported = true; state.viewKey = cfg.viewKey || 'imported';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
     state.table = null; state.det = null;
     highlightNav(null);
