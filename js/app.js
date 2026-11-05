@@ -102,7 +102,7 @@
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
     mapping: { timeCol: '', yCols: [], chartType: 'line' },
-    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
+    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
   };
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
@@ -201,6 +201,14 @@
           if (!item.series || !item.series.length) return;
           if (item.title === state.macroItem.title) return;
           options.push({ key: 'macro:' + item.title, name: item.title, labels: item.labels, values: item.series[0].values });
+        });
+      });
+    } else if (state.finItem) {
+      (window.FINANCE_DATA && window.FINANCE_DATA.sections || []).forEach(function (sec) {
+        sec.items.forEach(function (item) {
+          if (!item.series || !item.series.length) return;
+          if (item.title === state.finItem.title) return;
+          options.push({ key: 'fin:' + item.title, name: item.title, labels: item.labels, values: item.series[0].values });
         });
       });
     } else {
@@ -631,7 +639,7 @@
   /* ---------- 首页 / 使用说明 ---------- */
   function renderHome() {
     clearStage();
-    state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     state.mode = 'home';
     state.viewKey = 'home';
     highlightNav('home');
@@ -674,7 +682,7 @@
     state.mode = 'macro';
     state.viewKey = 'china-macro';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
-    state.table = null; state.det = null; state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     highlightNav('china-macro');
     el('stat-badge').style.display = 'none';
     el('btn-events').style.display = 'none';
@@ -773,7 +781,7 @@
     state.mode = 'macro';
     state.viewKey = 'finance';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
-    state.table = null; state.det = null; state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     highlightNav('finance');
     el('stat-badge').style.display = 'none';
     el('btn-events').style.display = 'none';
@@ -788,18 +796,6 @@
 
     var wrap = document.createElement('div');
     wrap.className = 'macro-dash';
-
-    // 时间区间选择
-    var rangeBar = document.createElement('div');
-    rangeBar.className = 'macro-range-bar';
-    var opts = [['all', '全部'], ['1y', '近1年'], ['5y', '近5年'], ['10y', '近10年']];
-    var selHtml = '<label>时间区间</label><select id="fin-range">';
-    opts.forEach(function (o) { selHtml += '<option value="' + o[0] + '"' + (state.timeRange === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; });
-    selHtml += '</select>';
-    rangeBar.innerHTML = selHtml;
-    rangeBar.querySelector('select').addEventListener('change', function () { state.timeRange = this.value; renderFinance(); });
-    wrap.appendChild(rangeBar);
-
     var theme = getChartTheme();
     state.macroInsts = [];
 
@@ -843,10 +839,13 @@
     syncToolbar();
   }
 
-  function openFinItem(item) {
+  function openFinItem(item, keep) {
     try {
+      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; }
+      state.finItem = item;
       var ranged = applyTimeRange(item.labels, item.series);
       var labels = ranged.labels, values = ranged.series[0].values;
+      var merged = mergeOverlaySeries(labels, [{ name: item.title, values: values }], state.overlaySeries);
       clearStage();
       state.mode = 'imported'; state.isImported = true; state.viewKey = 'fin-item';
       state.macroItem = null; state.chartConfig = null;
@@ -856,14 +855,16 @@
       showBack(function () { renderFinance(); });
       var theme = getChartTheme();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-      if (item.type === 'line') {
-        var ci = ChartFactory.render(c, 'line', { labels: labels, series: [{ name: item.title, values: values }] }, theme);
+      if (item.type === 'line' || state.overlaySeries.length) {
+        // 收益率/波动率 或 带叠加对比：直接折线
+        var ci = ChartFactory.render(c, 'line', { labels: merged.labels, series: merged.series }, theme);
         attachExtremeLabels(ci);
         state.echartsEl = c;
-        setHead({ title: item.title, subtitle: '走势 · 直接展示数值（不净值化）', unit: item.unit || '', source: '用户数据' });
-        el('hint').textContent = '收益率/波动率走势';
+        setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 直接展示数值', unit: item.unit || '', source: '用户数据' });
+        el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势';
       } else {
-        var nav = labels.map(function (d, i) { return { date: d, value: values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
+        // 业绩评估：净值 + 回撤 + 指标
+        var nav = merged.labels.map(function (d, i) { return { date: d, value: merged.series[0].values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
         var ci2 = ChartFactory.render(c, 'perf', { name: item.title, nav: nav }, theme);
         renderPerfMetrics({ name: item.title, nav: nav }, ci2);
         state.echartsEl = c;
@@ -937,7 +938,7 @@
 
   /* ---------- 渲染内置模版 ---------- */
   function renderTemplate(id) {
-    state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var sample = DataLoader.SAMPLES[id];
     if (!sample) return;
     clearStage();
@@ -1504,7 +1505,8 @@
   }
 
   function rerender() {
-    if (state.macroItem) { openMacroItem(state.macroItem); return; }
+    if (state.macroItem) { openMacroItem(state.macroItem, true); return; }
+    if (state.finItem) { openFinItem(state.finItem, true); return; }
     if (state.chartConfig) { applyChartConfig(state.chartConfig); return; }
     if (state.mode === 'dashboard') renderDashboard(state.dashboardDatasets, false);
     else if (state.mode === 'dataset') renderDatasetSingle(state.dataset);
@@ -1636,7 +1638,7 @@
     var isTemplate = (state.mode === 'template');
     var isHighFreq = (state.dataFreq === 'day' && state.mode === 'imported');
     // 示例图/高频数据只做展示，图表类型切换关闭；其他频率可选
-    sel.disabled = isTemplate || isHighFreq || !(isData || !!state.macroItem);
+    sel.disabled = isTemplate || isHighFreq || !!state.finItem || !(isData || !!state.macroItem);
     if (state.macroItem) {
       var mt = state.macroTypeOverride || state.macroItem.type;
       if (mt && sel.querySelector('option[value="' + mt + '"]')) sel.value = mt;
@@ -1654,7 +1656,7 @@
   function showMapping(table) {
     state.table = table;
     state.uploadedTable = table;
-    state.overlaySeries = []; state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.overlaySeries = []; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var det0 = DataLoader.detectTable(table);
     if (!det0) { toast('无法解析数据'); return; }
     // 转换 Excel 日期序列号（如 46295 → 2026-09-28）后重新识别
@@ -1797,7 +1799,7 @@
   }
 
   function renderUserChart(closeAfter) {
-    state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var m = state.mapping;
     var table = state.table;
     if (!table) return;
@@ -2028,6 +2030,7 @@
     el('align-main').addEventListener('change', function () {
       state.alignToMain = this.checked;
       if (state.macroItem) openMacroItem(state.macroItem, true);
+      else if (state.finItem) openFinItem(state.finItem, true);
       else if (state.mode === 'template') renderTemplate(state.currentTemplate);
       else rerender();
     });
@@ -2038,7 +2041,7 @@
       var key = chip.dataset.key;
       var opt = (state._indicatorOptions || []).filter(function (o) { return o.key === key; })[0];
       if (!opt) return;
-      var isImported = (state.mode === 'imported' && state.table && !state.macroItem);
+      var isImported = (state.mode === 'imported' && state.table && !state.macroItem && !state.finItem);
       if (isImported) {
         var idx = state.mapping.yCols.indexOf(opt.name);
         if (idx >= 0) state.mapping.yCols.splice(idx, 1);
@@ -2053,6 +2056,7 @@
         else state.overlaySeries.push(opt);
         openIndicatorPanel();
         if (state.macroItem) openMacroItem(state.macroItem, true);
+        else if (state.finItem) openFinItem(state.finItem, true);
         else if (state.mode === 'template') renderTemplate(state.currentTemplate);
         else rerender();
       }
