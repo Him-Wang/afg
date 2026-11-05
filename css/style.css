@@ -399,6 +399,8 @@ textarea.csv-area {
 .nav-macro { color: var(--accent); font-weight: 600; }
 .nav-macro .dot { background: var(--accent); }
 .macro-dash { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 18px; }
+.macro-range-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.macro-range-bar select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 12px; }
 .macro-section { display: flex; flex-direction: column; gap: 10px; }
 .macro-cat { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: var(--accent); text-transform: uppercase; padding-left: 2px; }
 .macro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }

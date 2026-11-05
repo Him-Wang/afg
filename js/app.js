@@ -782,12 +782,24 @@
     var F = window.FINANCE_DATA || { sections: [] };
     setHead({
       title: '金融数据一览',
-      subtitle: (F.updated ? '数据更新到 ' + F.updated : '暂无数据') + ' · 点击卡片查看业绩（净值+回撤+指标）',
+      subtitle: (F.updated ? '数据更新到 ' + F.updated : '暂无数据') + ' · 股票/商品/外汇用业绩模版，债券/VIX 用收益率折线',
       unit: '', source: 'Wind / 交易所 · 手工整理'
     });
 
     var wrap = document.createElement('div');
     wrap.className = 'macro-dash';
+
+    // 时间区间选择
+    var rangeBar = document.createElement('div');
+    rangeBar.className = 'macro-range-bar';
+    var opts = [['all', '全部'], ['1y', '近1年'], ['5y', '近5年'], ['10y', '近10年']];
+    var selHtml = '<label>时间区间</label><select id="fin-range">';
+    opts.forEach(function (o) { selHtml += '<option value="' + o[0] + '"' + (state.timeRange === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; });
+    selHtml += '</select>';
+    rangeBar.innerHTML = selHtml;
+    rangeBar.querySelector('select').addEventListener('change', function () { state.timeRange = this.value; renderFinance(); });
+    wrap.appendChild(rangeBar);
+
     var theme = getChartTheme();
     state.macroInsts = [];
 
@@ -802,7 +814,9 @@
       grid.className = 'macro-grid';
       sec.items.forEach(function (item) {
         if (!item || !item.series || !item.series.length) return;
-        var first = item.series[0];
+        var ranged = applyTimeRange(item.labels, item.series);
+        var fi = { title: item.title, unit: item.unit, type: item.type, labels: ranged.labels, series: ranged.series };
+        var first = fi.series[0];
         var vals = first.values;
         var latest = vals[vals.length - 1];
         var prev = vals.length > 1 ? vals[vals.length - 2] : null;
@@ -811,15 +825,15 @@
         var arrow = delta === null ? '' : (delta >= 0 ? '▲' : '▼');
         var card = document.createElement('div');
         card.className = 'macro-card';
-        card.title = '点击查看业绩';
+        card.title = fi.type === 'line' ? '点击查看走势' : '点击查看业绩';
         card.innerHTML =
-          '<div class="mc-name">' + item.title + '</div>' +
+          '<div class="mc-name">' + fi.title + '</div>' +
           '<div class="mc-val">' + fmtNum(latest) + '</div>' +
           '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
           '<div class="mc-chart"></div>';
-        card.addEventListener('click', function () { openFinItem(item); });
+        card.addEventListener('click', function () { openFinItem(fi); });
         grid.appendChild(card);
-        renderMacroSpark(card.querySelector('.mc-chart'), item, theme);
+        renderMacroSpark(card.querySelector('.mc-chart'), fi, theme);
       });
       secEl.appendChild(grid);
       wrap.appendChild(secEl);
@@ -831,7 +845,8 @@
 
   function openFinItem(item) {
     try {
-      var nav = item.labels.map(function (d, i) { return { date: d, value: item.series[0].values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
+      var ranged = applyTimeRange(item.labels, item.series);
+      var labels = ranged.labels, values = ranged.series[0].values;
       clearStage();
       state.mode = 'imported'; state.isImported = true; state.viewKey = 'fin-item';
       state.macroItem = null; state.chartConfig = null;
@@ -841,11 +856,20 @@
       showBack(function () { renderFinance(); });
       var theme = getChartTheme();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-      var ci = ChartFactory.render(c, 'perf', { name: item.title, nav: nav }, theme);
-      renderPerfMetrics({ name: item.title, nav: nav }, ci);
-      state.echartsEl = c;
-      setHead({ title: item.title + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 指标随缩放区间更新', unit: item.unit || '净值', source: '用户数据' });
-      el('hint').textContent = '业绩评估 · 单个资产';
+      if (item.type === 'line') {
+        var ci = ChartFactory.render(c, 'line', { labels: labels, series: [{ name: item.title, values: values }] }, theme);
+        attachExtremeLabels(ci);
+        state.echartsEl = c;
+        setHead({ title: item.title, subtitle: '走势 · 直接展示数值（不净值化）', unit: item.unit || '', source: '用户数据' });
+        el('hint').textContent = '收益率/波动率走势';
+      } else {
+        var nav = labels.map(function (d, i) { return { date: d, value: values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
+        var ci2 = ChartFactory.render(c, 'perf', { name: item.title, nav: nav }, theme);
+        renderPerfMetrics({ name: item.title, nav: nav }, ci2);
+        state.echartsEl = c;
+        setHead({ title: item.title + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 指标随缩放区间更新', unit: item.unit || '净值', source: '用户数据' });
+        el('hint').textContent = '业绩评估 · 单个资产';
+      }
       syncToolbar();
     } catch (e) { toast('打开图表失败'); }
   }
