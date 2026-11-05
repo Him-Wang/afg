@@ -363,12 +363,7 @@ def update_intl():
                         "labels": labels, "series": [{"name": title, "values": values}]})
             print("  ✓", title, len(labels), "期")
         sections.append({"name": cat, "items": out})
-    maxd = ""
-    for s in sections:
-        for it in s["items"]:
-            for d in it["labels"]:
-                if d > maxd:
-                    maxd = d
+    maxd = datetime.now().strftime("%Y-%m-%d")
     obj = {"updated": maxd, "sections": sections}
     write_js_var("intl-macro.js", "INTL_MACRO", obj, "国际宏观数据（akshare 自动更新）")
     total = sum(len(s["items"]) for s in sections)

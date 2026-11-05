@@ -964,7 +964,7 @@
       var merged = mergeOverlaySeries(ranged.labels, ranged.series, state.overlaySeries);
       clearStage();
       state.mode = 'imported'; state.isImported = true; state.viewKey = 'intl-item';
-      state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null;
+      state.macroItem = null; state.finItem = null; state.chartConfig = null;
       highlightNav(null);
       el('btn-events').style.display = 'none';
       el('stat-badge').style.display = 'none';
