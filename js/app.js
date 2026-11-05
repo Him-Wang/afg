@@ -93,7 +93,7 @@
     annotateMode: false,
     tableView: false,
     transposed: false,
-    extremeLabels: false,
+    labelMode: 'off',
     seriesColors: {},
     overrideType: null,
     annotations: {},
@@ -297,6 +297,48 @@
     });
     return { labels: union, series: newSeries };
   }
+  /* 量级差异大 → 自动双轴折线 */
+  function medianAbs(values) {
+    var v = values.filter(function (x) { return x !== null && x !== undefined && !isNaN(x) && x !== 0; });
+    if (!v.length) return 0;
+    v.sort(function (a, b) { return a - b; });
+    return Math.abs(v[Math.floor(v.length / 2)]);
+  }
+  function magnitudeMismatch(series) {
+    var stats = series.map(function (s) {
+      var v = s.values.filter(function (x) { return x !== null && x !== undefined && !isNaN(x) && x !== 0; });
+      if (!v.length) return null;
+      v.sort(function (a, b) { return a - b; });
+      return { min: v[0], max: v[v.length - 1], median: v[Math.floor(v.length / 2)] };
+    }).filter(Boolean);
+    if (stats.length < 2) return false;
+    // 1) 中位数差距 > 3 倍
+    var meds = stats.map(function (s) { return Math.abs(s.median); }).filter(function (m) { return m > 0; });
+    if (meds.length >= 2) {
+      var mx = Math.max.apply(null, meds), mn = Math.min.apply(null, meds);
+      if (mx / mn > 3) return true;
+    }
+    // 2) 数值区间完全不重叠
+    for (var i = 0; i < stats.length; i++) {
+      for (var j = i + 1; j < stats.length; j++) {
+        if (stats[i].max < stats[j].min || stats[j].max < stats[i].min) return true;
+      }
+    }
+    return false;
+  }
+  function renderAutoDual(c, type, data, theme) {
+    if ((type === 'line' || type === 'area') && data && data.series && data.series.length >= 2 && magnitudeMismatch(data.series)) {
+      var meds = data.series.map(function (s) { return medianAbs(s.values); });
+      var maxIdx = meds.indexOf(Math.max.apply(null, meds));
+      var dup = {
+        labels: data.labels,
+        series: data.series.map(function (s, i) { return { name: s.name, values: s.values, yAxisIndex: (i === maxIdx ? 0 : 1) }; })
+      };
+      return ChartFactory.render(c, 'dualLine', dup, theme);
+    }
+    return ChartFactory.render(c, type, data, theme);
+  }
+
   /* ---------- 数据管理（保存/导出/URL 载入） ---------- */
   function openDataPanel() { el('data-overlay').classList.add('open'); }
   function closeDataPanel() { el('data-overlay').classList.remove('open'); }
@@ -475,7 +517,22 @@
     if (!container) return;
     var old = container.querySelector('.ext-overlay');
     if (old) old.remove();
-    if (!state.extremeLabels) return;
+    var mode = state.labelMode || 'off';
+    var tc = Themes.active().chart;
+    // 全部数据模式用 ECharts 原生标签；切走时清除
+    if (mode !== 'all') {
+      var o0 = inst.getOption();
+      var had = (o0.series || []).some(function (s) { return s.label && s.label.show; });
+      if (had) inst.setOption({ series: (o0.series || []).map(function () { return { label: { show: false } }; }) });
+    }
+    if (mode === 'off') return;
+    if (mode === 'all') {
+      var o1 = inst.getOption();
+      inst.setOption({ series: (o1.series || []).map(function (s) {
+        return { label: { show: true, position: 'top', fontSize: 9, color: tc.muted } };
+      }) });
+      return;
+    }
     var opt = inst.getOption();
     var dz = opt.dataZoom && opt.dataZoom[0];
     var start = dz ? (dz.start || 0) : 0, end = dz ? (dz.end || 100) : 100;
@@ -874,7 +931,7 @@
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
       if (item.type === 'line' || state.overlaySeries.length) {
         // 收益率/波动率 或 带叠加对比：直接折线
-        var ci = ChartFactory.render(c, 'line', { labels: merged.labels, series: merged.series }, theme);
+        var ci = renderAutoDual(c, 'line', { labels: merged.labels, series: merged.series }, theme);
         attachExtremeLabels(ci);
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
@@ -971,7 +1028,7 @@
       showBack(function () { renderIntlMacro(); });
       var theme = getChartTheme();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-      var ci = ChartFactory.render(c, 'line', { labels: merged.labels, series: merged.series }, theme);
+      var ci = renderAutoDual(c, 'line', { labels: merged.labels, series: merged.series }, theme);
       attachExtremeLabels(ci);
       state.echartsEl = c;
       state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
@@ -1074,7 +1131,7 @@
       var merged = mergeOverlaySeries(ranged[0].labels, ranged[0].series, items.slice(1).map(function (it, i) {
         return { name: it.title, labels: ranged[i + 1].labels, values: ranged[i + 1].series[0].values };
       }));
-      ChartFactory.render(c, 'line', merged, theme);
+      renderAutoDual(c, 'line', merged, theme);
       setLast('line', merged);
       setHead({ title: '多线对比', subtitle: title, unit: '', source: '已有数据' });
     } else if (typ === 'heatmap') {
@@ -1924,8 +1981,8 @@
   }
 
   function syncExtremeBtn() {
-    var b = el('btn-labels');
-    if (b) b.classList.toggle('active', state.extremeLabels);
+    var b = el('tb-labels');
+    if (b) b.value = state.labelMode || 'off';
   }
 
   function syncToolbar() {
@@ -2222,7 +2279,6 @@
     el('modal-close').addEventListener('click', closeModal);
     el('overlay').addEventListener('click', function (e) { if (e.target === el('overlay')) closeModal(); });
     el('btn-export').addEventListener('click', exportImage);
-    el('btn-export-svg').addEventListener('click', exportSvg);
     el('btn-share-link').addEventListener('click', copyShareLink);
     el('btn-events').addEventListener('click', function () {
       state.showEvents = !state.showEvents;
@@ -2240,12 +2296,12 @@
       rerender();
       toast('已清除当前图表的说明');
     });
-    el('btn-labels').addEventListener('click', function () {
-      state.extremeLabels = !state.extremeLabels;
-      el('btn-labels').classList.toggle('active', state.extremeLabels);
-      if (state.mode === 'imported' || state.mode === 'dataset' || state.mode === 'template') {
-        rerender();
-      }
+    el('tb-labels').addEventListener('change', function () {
+      state.labelMode = this.value;
+      if (state.echartsEl) {
+        var inst = echarts.getInstanceByDom(state.echartsEl);
+        if (inst) applyExtremeLabels(inst);
+      } else { rerender(); }
     });
     el('btn-watermark').addEventListener('click', function () {
       state.showWatermark = !state.showWatermark;
@@ -2322,15 +2378,12 @@
     el('explore-source').addEventListener('change', function () { buildExploreItems(this.value); });
     el('explore-generate').addEventListener('click', renderExplore);
     el('explore-clear').addEventListener('click', function () { exploreSel.length = 0; document.querySelectorAll('#explore-items .col-chip.on').forEach(function (c) { c.classList.remove('on'); }); });
-    el('btn-data-source').addEventListener('click', openDataPanel);
     el('data-close').addEventListener('click', closeDataPanel);
     el('save-local').addEventListener('click', saveLocal);
     el('restore-local').addEventListener('click', restoreLocal);
     el('export-json').addEventListener('click', exportJson);
     el('url-load').addEventListener('click', loadDataUrl);
     el('btn-add-indicator').addEventListener('click', openIndicatorPanel);
-    el('btn-add-indicator-m').addEventListener('click', openIndicatorPanel);
-    el('btn-transform-m').addEventListener('click', openTransform);
     el('align-main').addEventListener('change', function () {
       state.alignToMain = this.checked;
       if (state.macroItem) openMacroItem(state.macroItem, true);
@@ -2415,7 +2468,7 @@
 
     window.addEventListener('resize', function () {
       ChartFactory.resizeAll();
-      if (state.extremeLabels && state.echartsEl) {
+      if (state.labelMode && state.labelMode !== 'off' && state.echartsEl) {
         var rinst = echarts.getInstanceByDom(state.echartsEl);
         if (rinst) applyExtremeLabels(rinst);
       }
@@ -2688,6 +2741,20 @@
   function currentTable() {
     if (state.mode === 'imported' && state.table) return { table: state.table, timeCol: state.mapping.timeCol };
     if (state.mode === 'dataset' && state.dataset) return { table: state.dataset.table, timeCol: state.dataset.detection.timeCol };
+    // 内置数据/探索图：从当前图表数据构造临时表，让数据变换也能用
+    var lc = state.lastChart;
+    var lcData = (lc && lc.data && lc.data.labels) ? lc.data : lc;
+    if (lcData && lcData.labels && lcData.series) {
+      var labels = lcData.labels;
+      var ser = lcData.series;
+      var cols = ['时间'].concat(ser.map(function (x) { return x.name; }));
+      var rows = labels.map(function (l, i) {
+        var row = {}; row['时间'] = l;
+        ser.forEach(function (x) { row[x.name] = x.values[i]; });
+        return row;
+      });
+      return { table: { columns: cols, rows: rows }, timeCol: '时间' };
+    }
     return null;
   }
 
@@ -2752,13 +2819,17 @@
 
   function commitTransform() {
     var t = state.tfTable;
+    var prevTitle = (state.lastChart && state.lastChart.title) || '';
+    var prevType = (state.lastChart && state.lastChart.type) || '';
+    if (['line', 'area', 'bar', 'stacked', 'stackedLine'].indexOf(prevType) < 0) prevType = state.det && state.det.isTimeSeries ? 'line' : 'bar';
     state.table = t;
     state.det = DataLoader.detectTable(t);
     state.mapping.timeCol = state.tfTimeCol;
     state.mapping.yCols = state.det.numericCols.filter(function (c) { return c !== state.tfTimeCol; });
-    state.mapping.chartType = state.det.isTimeSeries ? 'area' : 'bar';
+    state.mapping.chartType = state.det.isTimeSeries ? (prevType || 'area') : 'bar';
     state.isImported = true; state.mode = 'imported';
     state.viewKey = 'imported';
+    if (prevTitle) state.customTitles['imported'] = prevTitle + ' · 变换';
     closeTransform();
     renderUserChart(false);
   }
@@ -2772,6 +2843,7 @@
     var type = cfg.type || 'area';
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
     state.chartConfig = cfg;
+    if (cfg && cfg.labels && cfg.series) state.lastChart = cfg;
     // 应用主题（链接可携带）
     if (cfg.theme && Themes.getTheme(cfg.theme)) {
       state.theme = cfg.theme;
@@ -2802,7 +2874,7 @@
     el('stat-badge').style.display = 'none';
     var theme = getChartTheme();
     var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-    var ci = ChartFactory.render(c, type, data, theme);
+    var ci = renderAutoDual(c, type, data, theme);
     attachAnnotationHandler(ci);
     attachExtremeLabels(ci);
     state.echartsEl = c;
@@ -2856,6 +2928,23 @@
     }
   }
 
+  /* 数据归一化：所有序列按日期升序排列（最新数据在右） */
+  function normalizeSeriesData(D) {
+    if (!D || !D.sections) return D;
+    D.sections.forEach(function (sec) {
+      (sec.items || []).forEach(function (it) {
+        if (!it.labels || !it.series || !it.series.length) return;
+        var vals = it.series[0].values;
+        var pairs = [];
+        for (var i = 0; i < it.labels.length; i++) pairs.push({ l: String(it.labels[i]), v: vals[i] });
+        pairs.sort(function (a, b) { return a.l < b.l ? -1 : (a.l > b.l ? 1 : 0); });
+        it.labels = pairs.map(function (p) { return p.l; });
+        it.series[0].values = pairs.map(function (p) { return p.v; });
+      });
+    });
+    return D;
+  }
+
   /* ---------- 启动 ---------- */
   function init() {
     var q = {};
@@ -2864,6 +2953,9 @@
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) state.currentTemplate = q.tpl;
     Themes.applyTheme(state.theme);
     if (window.WORLD_GEOJSON) { try { echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {} }
+    normalizeSeriesData(window.CHINA_MACRO);
+    normalizeSeriesData(window.INTL_MACRO);
+    normalizeSeriesData(window.FINANCE_DATA);
     buildThemeSelect();
     buildSidebar();
     buildTabs();

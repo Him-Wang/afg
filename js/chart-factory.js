@@ -425,6 +425,30 @@
     };
   }
 
+  /* ---------- 双轴折线（量级差异大的多指标对比） ---------- */
+  function dualLine(el, data, theme) {
+    var series = (data.series || []).map(function (s, i) {
+      return withFocus({
+        name: s.name, type: 'line', data: s.values, yAxisIndex: s.yAxisIndex || 0,
+        symbol: 'none', smooth: true, color: theme.series[i % theme.series.length],
+        lineStyle: { width: 2.4 }
+      });
+    });
+    return {
+      backgroundColor: theme.bg,
+      tooltip: tooltip(theme),
+      legend: Object.assign(legend(theme), { right: 16, top: 8 }),
+      grid: { top: 50, left: 12, right: 24, bottom: 8, containLabel: true },
+      dataZoom: dataZoomCfg(theme),
+      xAxis: [Object.assign({ type: 'category', data: data.labels }, axisCommon(theme))],
+      yAxis: [
+        Object.assign({ type: 'value', scale: true }, axisCommon(theme)),
+        Object.assign({ type: 'value', scale: true, splitLine: { show: false } }, axisCommon(theme))
+      ],
+      series: series
+    };
+  }
+
   /* ---------- 瀑布图 ---------- */
   function waterfall(el, data, theme) {
     var values = data.values, labels = data.labels;
@@ -874,7 +898,7 @@
   /* ---------- 分发 ---------- */
   var BUILDERS = {
     'area': lineArea, 'line': lineOnly, 'bar': barChart, 'step': stepLine,
-    'dual': dual, 'heatmap': heatmap, 'rank': rank, 'bubble': bubble,
+    'dual': dual, 'dualLine': dualLine, 'heatmap': heatmap, 'rank': rank, 'bubble': bubble,
     'treemap': treemap, 'stacked': stacked, 'stackedLine': stackedLine, 'season': season, 'waterfall': waterfall, 'donut': donut, 'sankey': sankey,
     'mlTrend': mlTrend, 'mlForecast': mlForecast, 'mlCluster': mlCluster,
     'mlCorr': mlCorr, 'matrixHeat': matrixHeat, 'mlDist': mlDist, 'stackedBar': stackedBar, 'radar': radar,

@@ -61,8 +61,12 @@
           <option value="5y">近5年</option>
           <option value="10y">近10年</option>
         </select>
-        <button class="btn sm tb-mobile-only" id="btn-add-indicator-m">＋ 指标</button>
-        <button class="btn sm tb-mobile-only" id="btn-transform-m">数据变换</button>
+        <button class="btn sm" id="btn-add-indicator" title="叠加对比指标">＋ 指标</button>
+        <select id="tb-labels" title="数据标注">
+          <option value="off">数据标注</option>
+          <option value="extreme">极值数据</option>
+          <option value="all">全部数据</option>
+        </select>
         <div class="stat-badge" id="stat-badge"></div>
         <span class="tb-spacer"></span>
         <button class="btn sm" id="btn-export">⇩ 导出图片</button>
@@ -71,17 +75,13 @@
           <button class="btn sm" id="btn-more">⚙ 更多</button>
           <div class="tb-menu" id="tb-menu">
             <button class="btn sm" id="btn-series-color">🎨 单条颜色</button>
-            <button class="btn sm" id="btn-add-indicator">＋ 指标</button>
             <button class="btn sm" id="tb-swapxy" title="交换 X/Y 轴方向">⇅ 交换 X/Y</button>
             <button class="btn sm" id="btn-transform">⚙ 数据变换</button>
             <button class="btn sm" id="btn-events" style="display:none">◈ 事件</button>
             <button class="btn sm" id="btn-annot">✎ 说明</button>
-            <button class="btn sm" id="btn-labels" title="标注可视区间内最高/最低/最新值">极值标注</button>
             <button class="btn sm" id="btn-clear-annot" style="display:none">清除说明</button>
             <button class="btn sm" id="btn-table" style="display:none">☰ 表格</button>
             <button class="btn sm" id="btn-watermark">▦ 水印</button>
-            <button class="btn sm" id="btn-data-source">📂 数据</button>
-            <button class="btn sm" id="btn-export-svg">⇩ SVG</button>
           </div>
         </div>
       </div>
