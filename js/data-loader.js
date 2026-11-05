@@ -623,14 +623,15 @@
   function isDateString(s) {
     if (typeof s !== 'string') return false;
     s = s.trim();
-    return /^\d{4}$/.test(s)
-      || /^\d{4}[-/.]\d{1,2}([-/.]\d{1,2})?/.test(s)
-      || /\d{4}[-/.]?Q[1-4]/i.test(s)
-      || /Q[1-4][-/.]?\s?\d{4}/i.test(s)
-      || /\d{4}[-/.]?H[1-2]/i.test(s)
-      || /^\d{4}年/.test(s)
+    var Y = '(?:19|20)\\d{2}'; // 年份限定 1900-2099，避免把指数点位(如1003.63)误判为日期
+    return new RegExp('^' + Y + '$').test(s)
+      || new RegExp('^' + Y + '[-/.]\\d{1,2}([-/.]\\d{1,2})?$').test(s)
+      || new RegExp(Y + '[-/.]?Q[1-4]', 'i').test(s)
+      || new RegExp('Q[1-4][-/.]?\\s?' + Y, 'i').test(s)
+      || new RegExp(Y + '[-/.]?H[1-2]', 'i').test(s)
+      || new RegExp('^' + Y + '年').test(s)
       || /^\d{1,2}月$/.test(s)
-      || /^\d{4}年\d{1,2}月/.test(s);
+      || new RegExp('^' + Y + '年\\d{1,2}月').test(s);
   }
 
   /* 转置表：指标在行、时间（月份/日期）在列 → 转成时间在行、指标在列 */
@@ -805,8 +806,9 @@
       sample.forEach(function (r) { var v = r[timeCol]; if (String(v).trim() !== '') { n++; if (isDateLike(v)) d++; } });
       isTimeSeries = n > 0 && d / n >= 0.5;
     }
-    // 数值列：数值占比 >0.7
+    // 数值列：数值占比 >0.7（排除时间列）
     var numericCols = columns.filter(function (c) {
+      if (c === timeCol) return false;
       var nonNull = 0, num = 0;
       sample.forEach(function (r) { if (String(r[c]).trim() !== '') { nonNull++; if (!isNaN(toNum(r[c]))) num++; } });
       return nonNull > 0 && num / nonNull > 0.7;

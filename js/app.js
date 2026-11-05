@@ -1013,6 +1013,87 @@
     }
   }
 
+  /* ---------- 业绩评估模块（上传价格/净值数据） ---------- */
+  function renderPerfFromUpload() {
+    var table = state.table;
+    if (!table) { toast('请先上传数据'); return; }
+    var timeCol = state.mapping.timeCol;
+    var yCols = state.mapping.yCols.filter(function (c) { return c !== timeCol; });
+    if (!yCols.length) { toast('请选择至少一个价格/净值列'); return; }
+    var navs = [];
+    yCols.forEach(function (col) {
+      var nav = [];
+      table.rows.forEach(function (r) {
+        var v = DataLoader.toNum(r[col]);
+        if (!isNaN(v) && v > 0) nav.push({ date: String(r[timeCol]), value: v });
+      });
+      if (nav.length >= 2) navs.push({ name: col, nav: nav });
+    });
+    if (!navs.length) { toast('所选列无有效价格数据'); return; }
+
+    clearStage();
+    state.mode = 'imported'; state.isImported = true; state.viewKey = 'perf-upload';
+    state.macroItem = null; state.chartConfig = null;
+    highlightNav(null);
+    el('btn-events').style.display = 'none';
+    el('stat-badge').style.display = 'none';
+    el('hint').textContent = '业绩评估 · 基于所选价格/净值列';
+    setHead({ title: '业绩评估', subtitle: '已归一化（起点=1.0）· 年化收益/波动/最大回撤/夏普', unit: '净值', source: '用户数据' });
+
+    var labels = navs[0].nav.map(function (p) { return p.date; });
+    var series = navs.map(function (x) {
+      var base = x.nav[0].value;
+      var m = {};
+      x.nav.forEach(function (p) { m[p.date] = p.value; });
+      return { name: x.name, values: labels.map(function (d) { return m[d] ? (m[d] / base) : null; }) };
+    });
+
+    var theme = getChartTheme();
+    var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+    var ci = ChartFactory.render(c, 'line', { labels: labels, series: series }, theme);
+    attachExtremeLabels(ci);
+    state.echartsEl = c;
+    renderPerfTable(navs);
+    syncToolbar();
+  }
+
+  function renderPerfTable(navs) {
+    var wrap = document.createElement('div');
+    wrap.className = 'analysis';
+    var rows = ['annReturn', 'annVol', 'maxDD', 'sharp', 'var95', 'totalReturn'];
+    var labels2 = { annReturn: '年化收益', annVol: '年化波动', maxDD: '最大回撤', sharp: '夏普比率', var95: 'VaR(95%)', totalReturn: '累计收益' };
+    function pct(v) { return (v * 100).toFixed(2) + '%'; }
+    var metrics = navs.map(function (x) { return ML.perfMetrics(x.nav.map(function (p) { return p.value; })); });
+    var html = '<div class="an-head">业绩指标（基于所选价格/净值列）</div><table class="preview-table"><thead><tr><th>指标</th>';
+    navs.forEach(function (x) { html += '<th>' + x.name + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function (k) {
+      html += '<tr><td>' + labels2[k] + '</td>';
+      metrics.forEach(function (m) {
+        var v = m ? m[k] : null;
+        var txt = (v === null || v === undefined) ? '—' : (k === 'sharp' ? v.toFixed(2) : pct(v));
+        html += '<td>' + txt + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    el('chart-stage').appendChild(wrap);
+  }
+
+  function suggestGoal(det, table) {
+    if (det.ohlc) return 'kline';
+    if (det.isTimeSeries) {
+      var col = det.numericCols[0];
+      if (col && table.rows.length > 100) {
+        var samples = 0, big = 0;
+        table.rows.slice(-200).forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) { samples++; if (v > 50) big++; } });
+        if (samples && big / samples > 0.5) return 'perf';
+      }
+    }
+    return 'trend';
+  }
+
   function renderWorldTable(data) {
     var stage = el('chart-stage');
     var wrap = document.createElement('div');
@@ -1253,7 +1334,10 @@
     else if (state.det.isTimeSeries) info += '（时间序列）';
     else info += '（分类/实体）';
     if (state.mapping.yCols.length >= 4) info += '　·　检测到多个指标，建议拆分为多个图表';
-    el('detect-info').textContent = info;
+    var goal = suggestGoal(state.det, table);
+    if (el('analysis-goal')) el('analysis-goal').value = goal;
+    var goalLabel = { trend: '趋势图', perf: '业绩评估', kline: 'K线' }[goal] || '趋势图';
+    el('detect-info').textContent = info + '　·　建议分析目的：' + goalLabel;
     updateChartTypeHint();
     var splitBtn = el('btn-split');
     if (splitBtn) splitBtn.style.display = (state.mapping.yCols.length >= 4) ? '' : 'none';
@@ -1612,7 +1696,12 @@
       updateChartTypeHint();
       toast(state.transposed ? '已交换 X/Y（转置方向）' : '已恢复默认 X/Y');
     });
-    el('render-btn').addEventListener('click', function () { renderUserChart(true); });
+    el('render-btn').addEventListener('click', function () {
+      var goal = (el('analysis-goal') || {}).value || 'trend';
+      if (goal === 'perf') { renderPerfFromUpload(); closeModal(); return; }
+      if (goal === 'kline') { state.mapping.chartType = 'candlestick'; renderUserChart(true); return; }
+      renderUserChart(true);
+    });
     el('btn-split').addEventListener('click', renderSplitCharts);
     el('btn-rowrange').addEventListener('click', applyRowRange);
     el('btn-redetect').addEventListener('click', function () { showMapping(state.table); toast('已重新识别并推荐'); });
