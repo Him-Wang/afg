@@ -745,6 +745,7 @@
       var merged = mergeOverlaySeries(item.labels, item.series, state.overlaySeries);
       var type = state.macroTypeOverride || item.type;
       applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series });
+      if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
     } catch (e) { toast('打开图表失败'); }
   }
 
@@ -860,6 +861,7 @@
         var ci = ChartFactory.render(c, 'line', { labels: merged.labels, series: merged.series }, theme);
         attachExtremeLabels(ci);
         state.echartsEl = c;
+        if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
         setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 直接展示数值', unit: item.unit || '', source: '用户数据' });
         el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势';
       } else {
@@ -1253,6 +1255,52 @@
         { name: '回撤', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: dd, symbol: 'none', color: theme.down, lineStyle: { width: 1.2 }, areaStyle: { color: ChartFactory.hexToRgba(theme.down, 0.18) } }
       ])
     };
+  }
+
+  /* 多资产对比表（图表下方）：最新值/涨跌幅/高低/均值 + 价格型再补业绩指标 */
+  function renderCompareTable(labels, series) {
+    if (!series || series.length < 2) return null;
+    var priceLike = series.every(function (s) {
+      return s.values.some(function (v) { return v !== null && v !== undefined && !isNaN(v) && v > 0; });
+    });
+    var rows = ['latest', 'change', 'max', 'min', 'mean'];
+    var rowNames = { latest: '最新值', change: '区间涨跌幅', max: '最高', min: '最低', mean: '均值' };
+    if (priceLike) {
+      rows = rows.concat(['annReturn', 'annVol', 'maxDD', 'sharp']);
+      rowNames.annReturn = '年化收益'; rowNames.annVol = '年化波动'; rowNames.maxDD = '最大回撤'; rowNames.sharp = '夏普';
+    }
+    function stats(values) {
+      var vv = values.filter(function (v) { return v !== null && v !== undefined && !isNaN(v); });
+      if (vv.length < 2) return null;
+      var first = vv[0], last = vv[vv.length - 1];
+      var s = { latest: last, change: (first !== 0 ? (last - first) / Math.abs(first) * 100 : null), max: Math.max.apply(null, vv), min: Math.min.apply(null, vv), mean: ML.mean(vv) };
+      if (priceLike) { var pm = ML.perfMetrics(vv); s.annReturn = pm.annReturn; s.annVol = pm.annVol; s.maxDD = pm.maxDD; s.sharp = pm.sharp; }
+      return s;
+    }
+    var statsArr = series.map(function (s) { return stats(s.values); });
+    var html = '<div class="an-head">多资产对比</div><table class="preview-table"><thead><tr><th>指标</th>';
+    series.forEach(function (s) { html += '<th>' + s.name + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function (k) {
+      html += '<tr><td>' + rowNames[k] + '</td>';
+      statsArr.forEach(function (st) {
+        var v = st ? st[k] : null;
+        var txt = '—';
+        if (v !== null && v !== undefined && !isNaN(v)) {
+          if (k === 'change' || k === 'annReturn' || k === 'annVol' || k === 'maxDD') txt = (v * 100).toFixed(2) + '%';
+          else if (k === 'sharp') txt = v.toFixed(2);
+          else txt = fmtNum(v);
+        }
+        html += '<td>' + txt + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    var wrap = document.createElement('div');
+    wrap.className = 'analysis';
+    wrap.innerHTML = html;
+    el('chart-stage').appendChild(wrap);
+    return wrap;
   }
 
   function renderPerfTable(navs, slice) {
