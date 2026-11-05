@@ -709,14 +709,14 @@
   }
 
   /* 相关性矩阵 */
-  function mlCorr(el, data, theme) {
-    var res = ML.correlationMatrix(data.series);
-    var names = res.names, mat = res.matrix;
+  /* 相关性矩阵热力图（已计算好的矩阵） */
+  function matrixHeat(el, data, theme) {
+    var names = data.names, mat = data.matrix;
     var cells = [];
     for (var i = 0; i < names.length; i++)
       for (var j = 0; j < names.length; j++)
         cells.push([j, i, Math.round(mat[i][j] * 100) / 100]);
-    var option = {
+    return {
       backgroundColor: theme.bg,
       tooltip: Object.assign({}, tooltip(theme), { position: 'top', formatter: function (p) { return names[p.value[1]] + ' × ' + names[p.value[0]] + '：' + p.value[2].toFixed(2); } }),
       grid: { top: 12, left: 12, right: 74, bottom: 8, containLabel: true },
@@ -734,7 +734,11 @@
         emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,.5)' } }
       }]
     };
-    return option;
+  }
+
+  function mlCorr(el, data, theme) {
+    var res = ML.correlationMatrix(data.series);
+    return matrixHeat(el, { names: res.names, matrix: res.matrix }, theme);
   }
 
   /* 收益分布直方图 + KDE */
@@ -873,7 +877,7 @@
     'dual': dual, 'heatmap': heatmap, 'rank': rank, 'bubble': bubble,
     'treemap': treemap, 'stacked': stacked, 'stackedLine': stackedLine, 'season': season, 'waterfall': waterfall, 'donut': donut, 'sankey': sankey,
     'mlTrend': mlTrend, 'mlForecast': mlForecast, 'mlCluster': mlCluster,
-    'mlCorr': mlCorr, 'mlDist': mlDist, 'stackedBar': stackedBar, 'radar': radar,
+    'mlCorr': mlCorr, 'matrixHeat': matrixHeat, 'mlDist': mlDist, 'stackedBar': stackedBar, 'radar': radar,
     'perf': perf, 'scatterMatrix': scatterMatrix, 'worldMap': worldMap
   };
 

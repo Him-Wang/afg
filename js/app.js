@@ -767,6 +767,89 @@
     } catch (e) {}
   }
 
+  /* ---------- 金融数据一览（真实数据看板） ---------- */
+  function renderFinance() {
+    clearStage();
+    state.mode = 'macro';
+    state.viewKey = 'finance';
+    state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
+    state.table = null; state.det = null; state.macroItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    highlightNav('finance');
+    el('stat-badge').style.display = 'none';
+    el('btn-events').style.display = 'none';
+    el('btn-table').style.display = 'none';
+    el('hint').textContent = '';
+    var F = window.FINANCE_DATA || { sections: [] };
+    setHead({
+      title: '金融数据一览',
+      subtitle: (F.updated ? '数据更新到 ' + F.updated : '暂无数据') + ' · 点击卡片查看业绩（净值+回撤+指标）',
+      unit: '', source: 'Wind / 交易所 · 手工整理'
+    });
+
+    var wrap = document.createElement('div');
+    wrap.className = 'macro-dash';
+    var theme = getChartTheme();
+    state.macroInsts = [];
+
+    (F.sections || []).forEach(function (sec) {
+      var secEl = document.createElement('div');
+      secEl.className = 'macro-section';
+      var hd = document.createElement('div');
+      hd.className = 'macro-cat';
+      hd.textContent = sec.name;
+      secEl.appendChild(hd);
+      var grid = document.createElement('div');
+      grid.className = 'macro-grid';
+      sec.items.forEach(function (item) {
+        if (!item || !item.series || !item.series.length) return;
+        var first = item.series[0];
+        var vals = first.values;
+        var latest = vals[vals.length - 1];
+        var prev = vals.length > 1 ? vals[vals.length - 2] : null;
+        var delta = (prev === null || prev === undefined || isNaN(prev) || prev === 0) ? null : (latest - prev);
+        var upCls = delta === null ? '' : (delta >= 0 ? 'up' : 'down');
+        var arrow = delta === null ? '' : (delta >= 0 ? '▲' : '▼');
+        var card = document.createElement('div');
+        card.className = 'macro-card';
+        card.title = '点击查看业绩';
+        card.innerHTML =
+          '<div class="mc-name">' + item.title + '</div>' +
+          '<div class="mc-val">' + fmtNum(latest) + '</div>' +
+          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
+          '<div class="mc-chart"></div>';
+        card.addEventListener('click', function () { openFinItem(item); });
+        grid.appendChild(card);
+        renderMacroSpark(card.querySelector('.mc-chart'), item, theme);
+      });
+      secEl.appendChild(grid);
+      wrap.appendChild(secEl);
+    });
+
+    el('chart-stage').appendChild(wrap);
+    syncToolbar();
+  }
+
+  function openFinItem(item) {
+    try {
+      var nav = item.labels.map(function (d, i) { return { date: d, value: item.series[0].values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
+      clearStage();
+      state.mode = 'imported'; state.isImported = true; state.viewKey = 'fin-item';
+      state.macroItem = null; state.chartConfig = null;
+      highlightNav(null);
+      el('btn-events').style.display = 'none';
+      el('stat-badge').style.display = 'none';
+      showBack(function () { renderFinance(); });
+      var theme = getChartTheme();
+      var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+      var ci = ChartFactory.render(c, 'perf', { name: item.title, nav: nav }, theme);
+      renderPerfMetrics({ name: item.title, nav: nav }, ci);
+      state.echartsEl = c;
+      setHead({ title: item.title + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 指标随缩放区间更新', unit: item.unit || '净值', source: '用户数据' });
+      el('hint').textContent = '业绩评估 · 单个资产';
+      syncToolbar();
+    } catch (e) { toast('打开图表失败'); }
+  }
+
   /* ---------- 侧边导航 ---------- */
   function buildSidebar() {
     var sb = el('sidebar');
@@ -786,7 +869,14 @@
     macro.addEventListener('click', function () { state.overlaySeries = []; renderChinaMacro(); closeSidebar(); });
     sb.appendChild(macro);
 
-    // 3. 示例图（可展开子菜单）
+    // 3. 金融数据
+    var fin = document.createElement('div');
+    fin.className = 'nav-item nav-macro'; fin.dataset.id = 'finance';
+    fin.innerHTML = '<span class="nav-icon">' + ICONS.perf + '</span><span>金融数据</span>';
+    fin.addEventListener('click', function () { state.overlaySeries = []; renderFinance(); closeSidebar(); });
+    sb.appendChild(fin);
+
+    // 4. 示例图（可展开子菜单）
     var ex = document.createElement('div');
     ex.className = 'nav-item nav-parent';
     ex.innerHTML = '<span class="nav-icon">' + ICONS.examples + '</span><span>示例图</span><span class="nav-caret">' + ICONS.caret + '</span>';
@@ -1272,6 +1362,26 @@
     return vals[Math.floor(vals.length / 2)] > 50;
   }
 
+  /* 检测是否"已计算好的相关矩阵"（方阵 + 首列标签与列名一致） */
+  function detectCorrMatrix(table, det) {
+    if (!table || !det || !det.numericCols || det.numericCols.length < 3) return null;
+    if (table.rows.length !== det.numericCols.length) return null;
+    var labelCol = det.timeCol;
+    if (!labelCol) return null;
+    var names = det.numericCols.map(function (c) { return String(c).trim(); });
+    var labels = table.rows.map(function (r) { return String(r[labelCol]).trim(); });
+    var match = 0;
+    names.forEach(function (n, i) { if (labels[i] === n) match++; });
+    if (match / names.length < 0.8) return null;
+    var matrix = [];
+    for (var i = 0; i < names.length; i++) {
+      var row = [];
+      for (var j = 0; j < names.length; j++) row.push(DataLoader.toNum(table.rows[i][names[j]]));
+      matrix.push(row);
+    }
+    return { names: names, matrix: matrix };
+  }
+
   /* 价格型列把 0 视为"无数据"（指数/资产未成立前填 0） */
   function markZerosAsEmpty(table, det) {
     if (!table || !det || !det.numericCols) return table;
@@ -1672,6 +1782,23 @@
     el('stat-badge').style.display = 'none';
     var rows = DataLoader.sortRowsByTime(table.rows, state.mapping.timeCol);
     var theme = getChartTheme();
+
+    // 相关矩阵 → 默认热力图
+    var corrM = detectCorrMatrix(table, state.det);
+    if (corrM) {
+      clearStage();
+      state.mode = 'imported'; state.isImported = true; state.currentTemplate = null;
+      state.dataset = null; state.dashboardDatasets = null;
+      highlightNav(null);
+      var cm = document.createElement('div'); cm.className = 'chart-canvas'; el('chart-stage').appendChild(cm);
+      ChartFactory.render(cm, 'matrixHeat', corrM, theme);
+      state.echartsEl = cm;
+      setHead({ title: '相关系数矩阵', subtitle: '热力图 · 数值为相关系数', unit: '', source: '用户数据' });
+      el('hint').textContent = '相关矩阵热力图';
+      syncToolbar();
+      if (closeAfter !== false) closeModal();
+      return;
+    }
 
     if (m.chartType === 'candlestick') {
       if (!state.det.ohlc) { toast('未检测到 open/high/low/close 列'); return; }
@@ -2416,6 +2543,7 @@
     }
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) renderTemplate(q.tpl);
     else if (q.view === 'macro') renderChinaMacro();
+    else if (q.view === 'finance') renderFinance();
     else renderHome();
   }
 
