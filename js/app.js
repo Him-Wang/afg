@@ -15,8 +15,21 @@
     home: svgIcon('<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>'),
     macro: svgIcon('<path d="M6 20v-6M12 20V4M18 20v-9"/>'),
     examples: svgIcon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
-    caret: svgIcon('<path d="M9 18l6-6-6-6"/>', 12)
+    caret: svgIcon('<path d="M9 18l6-6-6-6"/>', 12),
+    trend: svgIcon('<path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>'),
+    perf: svgIcon('<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>'),
+    kline: svgIcon('<path d="M7 4v3M7 17v3M17 6v3M17 14v3M4 7h6M4 7v3M16 9h6M16 9v3M14 17h6M14 17v3"/>'),
+    ml: svgIcon('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'),
+    macro: svgIcon('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>')
   };
+
+  var GOALS = [
+    { id: 'trend', label: '趋势图', desc: '时间序列', icon: ICONS.trend },
+    { id: 'perf', label: '业绩评估', desc: '收益/波动/回撤', icon: ICONS.perf },
+    { id: 'kline', label: 'K线', desc: '需 OHLC', icon: ICONS.kline },
+    { id: 'ml', label: '机器学习', desc: '回归/预测', icon: ICONS.ml },
+    { id: 'macro', label: '宏观分析', desc: '同比/环比', icon: ICONS.macro }
+  ];
 
   var TEMPLATES = [
     { category: '宏观数据', items: [
@@ -1363,6 +1376,20 @@
     });
   }
 
+  function buildGoalCards() {
+    var box = el('analysis-goal');
+    if (!box) return;
+    box.innerHTML = '';
+    GOALS.forEach(function (g) {
+      var card = document.createElement('div');
+      card.className = 'goal-card' + (state.analysisGoal === g.id ? ' on' : '');
+      card.dataset.goal = g.id;
+      card.innerHTML = '<span class="goal-icon">' + g.icon + '</span><span class="goal-text"><b>' + g.label + '</b><i>' + g.desc + '</i></span>';
+      card.addEventListener('click', function () { state.analysisGoal = g.id; buildGoalCards(); });
+      box.appendChild(card);
+    });
+  }
+
   function buildSampleTab() {
     var list = el('sample-list');
     list.innerHTML = '';
@@ -1448,7 +1475,7 @@
     else info += '（分类/实体）';
     if (state.mapping.yCols.length >= 4) info += '　·　检测到多个指标，建议拆分为多个图表';
     var goal = suggestGoal(state.det, table);
-    if (el('analysis-goal')) el('analysis-goal').value = goal;
+    state.analysisGoal = goal; buildGoalCards();
     var goalLabel = { trend: '趋势图', perf: '业绩评估', kline: 'K线' }[goal] || '趋势图';
     el('detect-info').textContent = info + '　·　建议分析目的：' + goalLabel;
     updateChartTypeHint();
@@ -1492,16 +1519,38 @@
   function updatePreview() {
     var table = state.table;
     var tbl = el('preview-table');
+    var timeCol = state.mapping.timeCol;
     var html = '<thead><tr>';
-    table.columns.forEach(function (c) { html += '<th>' + c + '</th>'; });
+    table.columns.forEach(function (c) {
+      var cls = 'pv-th';
+      if (c === timeCol) cls += ' pv-x';
+      else if (state.mapping.yCols.indexOf(c) >= 0) cls += ' pv-y';
+      html += '<th class="' + cls + '" data-col="' + c + '" title="' + (c === timeCol ? 'X / 时间列' : '点击选择/取消该列作为 Y 数值') + '">' + c + '</th>';
+    });
     html += '</tr></thead><tbody>';
-    table.rows.slice(0, 8).forEach(function (r) {
+    table.rows.slice(0, 60).forEach(function (r) {
       html += '<tr>';
-      table.columns.forEach(function (c) { html += '<td>' + r[c] + '</td>'; });
+      table.columns.forEach(function (c) {
+        var cls = (c === timeCol) ? 'pv-x' : ((state.mapping.yCols.indexOf(c) >= 0) ? 'pv-y' : '');
+        html += '<td class="' + cls + '">' + r[c] + '</td>';
+      });
       html += '</tr>';
     });
+    if (table.rows.length > 60) html += '<tr><td colspan="' + table.columns.length + '" class="pv-more">… 共 ' + table.rows.length + ' 行，仅预览前 60 行（可用下方「数据行范围」选取区间）</td></tr>';
     html += '</tbody>';
     tbl.innerHTML = html;
+    // 表头点击切换 Y 列
+    tbl.querySelectorAll('th.pv-th').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var col = th.dataset.col;
+        if (col === timeCol) return;
+        var idx = state.mapping.yCols.indexOf(col);
+        if (idx >= 0) state.mapping.yCols.splice(idx, 1);
+        else state.mapping.yCols.push(col);
+        renderYChips();
+        updatePreview();
+      });
+    });
   }
 
   /* 应用数据行范围（选择数据区间后重新识别） */
@@ -1810,7 +1859,7 @@
       toast(state.transposed ? '已交换 X/Y（转置方向）' : '已恢复默认 X/Y');
     });
     el('render-btn').addEventListener('click', function () {
-      var goal = (el('analysis-goal') || {}).value || 'trend';
+      var goal = state.analysisGoal || 'trend';
       state.analysisGoal = goal;
       if (goal === 'perf') { renderPerfFromUpload(); closeModal(); return; }
       if (goal === 'kline') { state.mapping.chartType = 'candlestick'; renderUserChart(true); return; }
@@ -2281,6 +2330,7 @@
     buildSidebar();
     buildTabs();
     buildSampleTab();
+    buildGoalCards();
     bindEvents();
     if (el('btn-watermark')) el('btn-watermark').classList.add('active');
     el('footer-note').textContent = 'Advanced-Financial-Graph (AFG) · 数据仅本地处理 · 生成于 ' + new Date().toLocaleDateString('zh-CN');

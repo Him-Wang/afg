@@ -180,13 +180,7 @@
         <div style="font-size:12.5px;color:var(--muted)" id="detect-info"></div>
         <div class="field-row">
           <label>分析目的</label>
-          <select id="analysis-goal">
-            <option value="trend">📈 趋势图（时间序列）</option>
-            <option value="perf">📊 业绩评估（年化收益/波动/回撤/夏普）</option>
-            <option value="kline">🕯 K线（需 OHLC）</option>
-            <option value="ml">🤖 机器学习（回归/预测/聚类）</option>
-            <option value="macro">🧮 宏观分析（同比/环比/变频）</option>
-          </select>
+          <div class="goal-cards" id="analysis-goal"></div>
         </div>
         <div class="field-row">
           <label>X / 时间列</label>

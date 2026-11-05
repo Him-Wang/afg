@@ -271,10 +271,18 @@ textarea.csv-area {
 .col-chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 
 .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
-.preview-table th, .preview-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: right; }
-.preview-table th { color: var(--muted); font-weight: 600; background: var(--panel); }
+.preview-table th, .preview-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: right; white-space: nowrap; }
+.preview-table th { color: var(--muted); font-weight: 600; background: var(--panel); position: sticky; top: 0; }
+.preview-table th.pv-th { cursor: pointer; }
+.preview-table th.pv-th:hover { color: var(--text); }
 .preview-table td:first-child, .preview-table th:first-child { text-align: left; }
-.preview-wrap { max-height: 220px; overflow: auto; border-radius: 8px; }
+.preview-wrap { max-height: 260px; overflow: auto; border-radius: 8px; }
+
+/* 预览：X/时间列 与 已选 Y 列高亮 */
+.preview-table th.pv-x, .preview-table td.pv-x { color: var(--accent); }
+.preview-table th.pv-y { color: var(--accent); }
+.preview-table td.pv-y { background: var(--accent-soft); }
+.preview-table .pv-more { text-align: center; color: var(--muted); font-size: 11px; }
 
 /* 状态提示 */
 .toast {
@@ -415,6 +423,16 @@ textarea.csv-area {
 }
 .tb-label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; }
 .tb-spacer { flex: 1; }
+
+/* 分析目的卡片 */
+.goal-cards { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
+.goal-card { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.goal-card:hover { border-color: var(--accent); }
+.goal-card.on { border-color: var(--accent); background: var(--accent-soft); }
+.goal-icon { display: inline-flex; color: var(--accent); }
+.goal-text { display: flex; flex-direction: column; line-height: 1.2; }
+.goal-text b { font-size: 13px; }
+.goal-text i { font-style: normal; font-size: 11px; color: var(--muted); }
 #tb-swapxy.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
 /* 「更多」下拉菜单 */
