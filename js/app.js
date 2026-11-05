@@ -82,7 +82,7 @@
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
     mapping: { timeCol: '', yCols: [], chartType: 'line' },
-    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null
+    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
   };
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
@@ -625,12 +625,22 @@
       '<div class="home-title">智能制图 · 上传即用</div>' +
       '<div class="home-sub">只需上传数据，工具自动识别结构并推荐图表；你随时可自由切换图表类型、配色与功能。</div>' +
       '<div class="home-steps">' +
-        '<div class="home-step"><span class="hs-num">1</span><div><b>上传数据</b><p>支持 Excel（多工作表）/ CSV / JSON / 图片描点取数，数据仅在本地浏览器处理、不上传。</p></div></div>' +
-        '<div class="home-step"><span class="hs-num">2</span><div><b>智能识别</b><p>自动判断时间列、数值列、OHLC 与行列方向，并推荐合适的图表类型；不准确可手动交换 X/Y 或改图表。</p></div></div>' +
-        '<div class="home-step"><span class="hs-num">3</span><div><b>自由定制</b><p>一键切换图表、5 套配色、时间缩放、标注、数据变换、业绩指标、世界地图、雷达图等。</p></div></div>' +
+        '<div class="home-step"><span class="hs-num">1</span><div><b>上传数据</b><p>支持 Excel（多工作表）/ CSV / JSON，数据仅在本地浏览器处理、不上传。</p></div></div>' +
+        '<div class="home-step"><span class="hs-num">2</span><div><b>选择分析目的</b><p>趋势图 / 业绩评估 / K线 / 机器学习 / 宏观分析，自动推荐并按模块出图。</p></div></div>' +
+        '<div class="home-step"><span class="hs-num">3</span><div><b>自由定制</b><p>切换图表、5 套配色、时间区间、叠加指标、标注、数据变换、世界地图、雷达图等。</p></div></div>' +
       '</div>' +
       '<button class="btn primary home-cta" id="home-import">＋ 上传数据开始</button>' +
-      '<div class="home-note">想看效果？左侧「中国宏观数据一览」看最新宏观；「参考模板」可预览各图表样式。</div>';
+      '<div class="home-note">想看效果？左侧「中国宏观数据一览」看最新宏观；「参考模板」可预览各图表样式。</div>' +
+      '<div class="home-mcp">' +
+        '<h3>🔌 接入本地大模型（Kimi / Codex / WorkBuddy / Cursor / Claude 等）</h3>' +
+        '<p>AFG 提供 MCP 服务，让 Agent 在写研究时直接调用 <code>make_chart</code> 工具生成图表链接。</p>' +
+        '<ol style="padding-left:20px;margin:8px 0;color:var(--muted);font-size:13px;line-height:1.9">' +
+          '<li>进入 <code>mcp-server/</code> 目录，运行 <code>npm install</code></li>' +
+          '<li>在你的 Agent 的 MCP 设置里添加：Command=<code>node</code>，Args=<code>&lt;项目路径&gt;/mcp-server/server.js</code></li>' +
+          '<li>对 Agent 说「画一张 XX 的图」，它会调用工具返回一个图表链接，点开即可查看</li>' +
+        '</ol>' +
+        '<p style="font-size:12px;color:var(--muted)">详细配置见项目 <code>mcp-server/README.md</code>。工具名 <code>make_chart</code>，支持折线/面积/柱状/堆叠/雷达与 5 套配色。</p>' +
+      '</div>';
     el('chart-stage').appendChild(h);
     setHead({ title: 'AFG · 智能制图', subtitle: '上传数据 → 自动识别 → 推荐图表 → 自由定制', unit: '', source: '' });
     h.querySelector('#home-import').addEventListener('click', openModal);
@@ -747,13 +757,13 @@
     var home = document.createElement('div');
     home.className = 'nav-item'; home.dataset.id = 'home';
     home.innerHTML = '<span class="dot"></span><span>🏠 首页 · 使用说明</span>';
-    home.addEventListener('click', function () { renderHome(); closeSidebar(); });
+    home.addEventListener('click', function () { state.overlaySeries = []; renderHome(); closeSidebar(); });
     sb.appendChild(home);
     // 中国宏观数据一览（真实数据看板）
     var macro = document.createElement('div');
     macro.className = 'nav-item nav-macro'; macro.dataset.id = 'china-macro';
     macro.innerHTML = '<span class="dot"></span><span>📊 中国宏观数据一览</span>';
-    macro.addEventListener('click', function () { renderChinaMacro(); closeSidebar(); });
+    macro.addEventListener('click', function () { state.overlaySeries = []; renderChinaMacro(); closeSidebar(); });
     sb.appendChild(macro);
     var libLabel = document.createElement('div');
     libLabel.className = 'nav-group-label';
@@ -769,7 +779,7 @@
         nav.className = 'nav-item';
         nav.dataset.id = item.id;
         nav.innerHTML = '<span class="dot"></span><span>' + item.label + '</span>';
-        nav.addEventListener('click', function () { state.overrideType = null; renderTemplate(item.id); closeSidebar(); });
+        nav.addEventListener('click', function () { state.overrideType = null; state.overlaySeries = []; renderTemplate(item.id); closeSidebar(); });
         sb.appendChild(nav);
       });
     });
@@ -1038,23 +1048,66 @@
     el('btn-events').style.display = 'none';
     el('stat-badge').style.display = 'none';
     el('hint').textContent = '业绩评估 · 基于所选价格/净值列';
-    setHead({ title: '业绩评估', subtitle: '已归一化（起点=1.0）· 年化收益/波动/最大回撤/夏普', unit: '净值', source: '用户数据' });
-
-    var labels = navs[0].nav.map(function (p) { return p.date; });
-    var series = navs.map(function (x) {
-      var base = x.nav[0].value;
-      var m = {};
-      x.nav.forEach(function (p) { m[p.date] = p.value; });
-      return { name: x.name, values: labels.map(function (d) { return m[d] ? (m[d] / base) : null; }) };
-    });
+    setHead({ title: '业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 年化收益/波动/夏普', unit: '净值', source: '用户数据' });
 
     var theme = getChartTheme();
-    var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-    var ci = ChartFactory.render(c, 'line', { labels: labels, series: series }, theme);
-    attachExtremeLabels(ci);
-    state.echartsEl = c;
-    renderPerfTable(navs);
+    if (navs.length === 1) {
+      // 单指标：净值 + 回撤 + 指标卡
+      var data = { name: navs[0].name, nav: navs[0].nav };
+      var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+      var ci = ChartFactory.render(c, 'perf', data, theme);
+      renderPerfMetrics(data, ci);
+      state.echartsEl = c;
+    } else {
+      // 多指标：归一化净值对比（上）+ 首个回撤（下）+ 指标表
+      var labels = navs[0].nav.map(function (p) { return p.date; });
+      var series = navs.map(function (x) {
+        var base = x.nav[0].value;
+        var m = {};
+        x.nav.forEach(function (p) { m[p.date] = p.value; });
+        return { name: x.name, values: labels.map(function (d) { return m[d] ? (m[d] / base) : null; }) };
+      });
+      var dd = [];
+      var peak = -Infinity;
+      navs[0].nav.forEach(function (p) { peak = Math.max(peak, p.value); dd.push(Math.round((p.value / peak - 1) * 10000) / 100); });
+      var c2 = document.createElement('div'); c2.className = 'chart-canvas'; el('chart-stage').appendChild(c2);
+      var inst = echarts.init(c2);
+      inst.setOption(buildMultiNavPerfOption(theme, labels, series, dd));
+      state.echartsEl = c2;
+      renderPerfTable(navs);
+    }
     syncToolbar();
+  }
+
+  function buildMultiNavPerfOption(theme, labels, series, dd) {
+    return {
+      backgroundColor: theme.bg,
+      tooltip: {
+        trigger: 'axis', confine: true,
+        backgroundColor: theme.panel, borderColor: theme.accent + '55', borderWidth: 1,
+        textStyle: { color: theme.text, fontSize: 12 }
+      },
+      legend: { top: 8, textStyle: { color: theme.muted }, data: series.map(function (s) { return s.name; }).concat(['回撤']) },
+      axisPointer: { link: [{ xAxisIndex: 'all' }] },
+      grid: [
+        { left: 12, right: 16, top: 46, height: '48%', containLabel: true },
+        { left: 12, right: 16, bottom: 8, height: '24%', containLabel: true }
+      ],
+      xAxis: [
+        { type: 'category', gridIndex: 0, data: labels, axisLabel: { show: false, color: theme.muted } },
+        { type: 'category', gridIndex: 1, data: labels, axisLabel: { color: theme.muted, fontSize: 10 } }
+      ],
+      yAxis: [
+        { type: 'value', gridIndex: 0, scale: true, splitLine: { lineStyle: { color: theme.grid } } },
+        { type: 'value', gridIndex: 1, max: 0, axisLabel: { color: theme.muted, fontSize: 10, formatter: '{value}%' }, splitLine: { lineStyle: { color: theme.grid } } }
+      ],
+      dataZoom: [{ type: 'inside', xAxisIndex: [0, 1], zoomOnMouseWheel: true, moveOnMouseMove: true }],
+      series: series.map(function (s, i) {
+        return { name: s.name, type: 'line', xAxisIndex: 0, yAxisIndex: 0, data: s.values, symbol: 'none', color: theme.series[i % theme.series.length], lineStyle: { width: 2 } };
+      }).concat([
+        { name: '回撤', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: dd, symbol: 'none', color: theme.down, lineStyle: { width: 1.2 }, areaStyle: { color: ChartFactory.hexToRgba(theme.down, 0.18) } }
+      ])
+    };
   }
 
   function renderPerfTable(navs) {
@@ -1698,6 +1751,7 @@
     });
     el('render-btn').addEventListener('click', function () {
       var goal = (el('analysis-goal') || {}).value || 'trend';
+      state.analysisGoal = goal;
       if (goal === 'perf') { renderPerfFromUpload(); closeModal(); return; }
       if (goal === 'kline') { state.mapping.chartType = 'candlestick'; renderUserChart(true); return; }
       renderUserChart(true);
@@ -1907,6 +1961,7 @@
     var table = state.table, timeCol = state.mapping.timeCol;
     var cols = state.mapping.yCols.slice();
     if (cols.length < 2) { toast('至少选择 2 个数值列'); return; }
+    if (state.analysisGoal === 'perf') { renderPerfSplit(table, timeCol, cols); return; }
     closeModal();
     clearStage();
     state.mode = 'dashboard';
@@ -1933,6 +1988,52 @@
     }
     setHead({ title: '多指标拆分视图', subtitle: '', unit: '', source: '' });
     el('hint').textContent = '已拆分为 ' + cols.length + ' 个图表';
+    syncToolbar();
+  }
+
+  /* 业绩评估拆分视图：每列一张净值+回撤图，点击展开 */
+  function renderPerfSplit(table, timeCol, cols) {
+    closeModal();
+    clearStage();
+    state.mode = 'dashboard';
+    state.dashboardDatasets = null; state.currentTemplate = null; state.dataset = null;
+    highlightNav(null);
+    var theme = getChartTheme();
+    var stage = el('chart-stage');
+    var grid = document.createElement('div'); grid.className = 'dash-grid';
+    cols.forEach(function (col) {
+      var nav = [];
+      table.rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) nav.push({ date: String(r[timeCol]), value: v }); });
+      if (nav.length < 2) return;
+      var m = ML.perfMetrics(nav.map(function (p) { return p.value; }));
+      var panel = document.createElement('div'); panel.className = 'dash-panel perf-panel';
+      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + col + '</span>' +
+        '<span class="perf-mini">年化 ' + (m.annReturn * 100).toFixed(1) + '% · 回撤 ' + (m.maxDD * 100).toFixed(1) + '%</span></div><div class="dash-panel-body"></div>';
+      panel.addEventListener('click', function () { openPerfSingle(col, nav); });
+      grid.appendChild(panel);
+      var body = panel.querySelector('.dash-panel-body');
+      ChartFactory.render(body, 'perf', { name: col, nav: nav }, theme);
+    });
+    stage.appendChild(grid);
+    setHead({ title: '业绩评估 · 拆分视图', subtitle: '每列一张净值 + 回撤图 · 点击卡片查看完整图表', unit: '', source: '用户数据' });
+    el('hint').textContent = '已拆分为 ' + cols.length + ' 个业绩图表';
+    syncToolbar();
+  }
+
+  function openPerfSingle(name, nav) {
+    clearStage();
+    state.mode = 'imported'; state.isImported = true; state.viewKey = 'perf-single';
+    state.macroItem = null; state.chartConfig = null;
+    highlightNav(null);
+    el('btn-events').style.display = 'none';
+    el('stat-badge').style.display = 'none';
+    var theme = getChartTheme();
+    var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+    var ci = ChartFactory.render(c, 'perf', { name: name, nav: nav }, theme);
+    renderPerfMetrics({ name: name, nav: nav }, ci);
+    state.echartsEl = c;
+    setHead({ title: name + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）', unit: '净值', source: '用户数据' });
+    el('hint').textContent = '业绩评估 · 单指标';
     syncToolbar();
   }
 

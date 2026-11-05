@@ -372,6 +372,9 @@ textarea.csv-area {
 .home-step p { margin: 3px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .home-cta { align-self: flex-start; padding: 11px 24px; font-size: 14px; margin-top: 4px; }
 .home-note { font-size: 12.5px; color: var(--muted); }
+.home-mcp { margin-top: 12px; padding: 16px 18px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
+.home-mcp h3 { margin: 0 0 6px; font-size: 14px; }
+.home-mcp code { background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
 
 /* 中国宏观数据一览（看板） */
 .nav-macro { color: var(--accent); font-weight: 600; }
@@ -479,6 +482,9 @@ textarea.csv-area {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); padding: 10px; min-height: auto; }
   .dash-grid { grid-template-columns: 1fr; padding: 10px; }
   .dash-panel-body { min-height: 220px; }
+.perf-panel { cursor: pointer; }
+.perf-panel:hover { border-color: var(--accent); }
+.perf-mini { font-size: 11px; color: var(--accent); font-family: var(--font-mono); }
   .home-view { padding: 24px 20px; min-height: auto; }
   .home-title { font-size: 24px; }
 
