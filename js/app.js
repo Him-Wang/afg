@@ -103,7 +103,7 @@
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
     mapping: { timeCol: '', yCols: [], chartType: 'line' },
-    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, intlItem: null, chartConfig: null, exploreConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
+    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, intlItem: null, chartConfig: null, exploreConfig: null, lastChart: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
   };
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
@@ -877,6 +877,7 @@
         var ci = ChartFactory.render(c, 'line', { labels: merged.labels, series: merged.series }, theme);
         attachExtremeLabels(ci);
         state.echartsEl = c;
+        state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
         if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
         setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 直接展示数值', unit: item.unit || '', source: '用户数据' });
         el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势';
@@ -973,6 +974,7 @@
       var ci = ChartFactory.render(c, 'line', { labels: merged.labels, series: merged.series }, theme);
       attachExtremeLabels(ci);
       state.echartsEl = c;
+      state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
       if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
       setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 可直接叠加中国宏观等指标', unit: item.unit || '', source: '公开数据' });
       el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '单个指标走势';
@@ -988,32 +990,38 @@
     return window.FINANCE_DATA;
   }
   function buildExploreItems(source) {
-    var D = exploreData(source) || { sections: [] };
     var box = el('explore-items');
     if (!box) return;
-    var sel = exploreSel;
-    sel.length = 0;
+    exploreSel.length = 0;
     box.innerHTML = '';
-    D.sections.forEach(function (sec) {
+    var sources = (source === 'all') ? ['china', 'intl', 'finance'] : [source];
+    var labelMap = { china: '中国宏观', intl: '国际宏观', finance: '金融数据' };
+    sources.forEach(function (src) {
+      var D = exploreData(src) || { sections: [] };
+      // 该数据源有指标才加分组标题
+      var hasAny = D.sections.some(function (s) { return s.items && s.items.length; });
+      if (!hasAny) return;
       var hd = document.createElement('div');
       hd.className = 'nav-group-label';
-      hd.style.padding = '8px 4px 4px';
-      hd.textContent = sec.name;
+      hd.style.padding = '10px 4px 4px';
+      hd.textContent = labelMap[src] || src;
       box.appendChild(hd);
-      sec.items.forEach(function (item) {
-        if (!item.series || !item.series.length) return;
-        var key = source + ':' + item.title;
-        var chip = document.createElement('div');
-        chip.className = 'col-chip';
-        chip.textContent = item.title;
-        chip.dataset.key = key;
-        chip.addEventListener('click', function () {
-          var i = sel.indexOf(key);
-          if (i >= 0) sel.splice(i, 1); else sel.push(key);
-          chip.classList.toggle('on');
+      D.sections.forEach(function (sec) {
+        sec.items.forEach(function (item) {
+          if (!item.series || !item.series.length) return;
+          var key = src + ':' + item.title;
+          var chip = document.createElement('div');
+          chip.className = 'col-chip';
+          chip.textContent = item.title;
+          chip.dataset.key = key;
+          chip.addEventListener('click', function () {
+            var i = exploreSel.indexOf(key);
+            if (i >= 0) exploreSel.splice(i, 1); else exploreSel.push(key);
+            chip.classList.toggle('on');
+          });
+          box.appendChild(chip);
+          item._exploreKey = key;
         });
-        box.appendChild(chip);
-        item._exploreKey = key;
       });
     });
   }
@@ -1022,9 +1030,10 @@
     buildExploreItems(el('explore-source').value);
   }
   function closeExplore() { el('explore-overlay').classList.remove('open'); }
-  function exploreItemByKey(source, key) {
-    var D = exploreData(source);
+  function exploreItemByKey(key) {
+    var src = key.split(':')[0];
     var title = key.split(':').slice(1).join(':');
+    var D = exploreData(src);
     for (var i = 0; i < D.sections.length; i++) {
       for (var j = 0; j < D.sections[i].items.length; j++) {
         if (D.sections[i].items[j].title === title) return D.sections[i].items[j];
@@ -1037,7 +1046,7 @@
     var typ = el('explore-type').value;
     var keys = exploreSel.slice();
     if (keys.length < 2) { toast('请至少选择 2 个指标'); return; }
-    var items = keys.map(function (k) { return exploreItemByKey(source, k); }).filter(Boolean);
+    var items = keys.map(function (k) { return exploreItemByKey(k); }).filter(Boolean);
     if (items.length < 2) { toast('未找到所选指标'); return; }
     state.exploreConfig = { source: source, keys: keys, type: typ };
     renderExploreFromConfig();
@@ -1047,7 +1056,7 @@
     var cfg = state.exploreConfig;
     if (!cfg) return;
     var source = cfg.source, typ = cfg.type, keys = cfg.keys;
-    var items = keys.map(function (k) { return exploreItemByKey(source, k); }).filter(Boolean);
+    var items = keys.map(function (k) { return exploreItemByKey(k); }).filter(Boolean);
     if (items.length < 2) return;
     var theme = getChartTheme();
     var ranged = items.map(function (it) { return applyTimeRange(it.labels, it.series); });
@@ -1060,11 +1069,13 @@
     var stage = el('chart-stage');
     var c = document.createElement('div'); c.className = 'chart-canvas'; stage.appendChild(c);
     var title = items.map(function (it) { return it.title; }).join(' vs ');
+    function setLast(t, d) { state.lastChart = { type: t, title: title, data: d }; }
     if (typ === 'multi') {
       var merged = mergeOverlaySeries(ranged[0].labels, ranged[0].series, items.slice(1).map(function (it, i) {
         return { name: it.title, labels: ranged[i + 1].labels, values: ranged[i + 1].series[0].values };
       }));
       ChartFactory.render(c, 'line', merged, theme);
+      setLast('line', merged);
       setHead({ title: '多线对比', subtitle: title, unit: '', source: '已有数据' });
     } else if (typ === 'heatmap') {
       var labelSet = {};
@@ -1078,19 +1089,23 @@
         xLabels.forEach(function (l, j) { if (map[l] !== undefined && map[l] !== null) values.push([j, i, Math.round(map[l] * 100) / 100]); });
       });
       ChartFactory.render(c, 'heatmap', { xLabels: xLabels, yLabels: yLabels, values: values }, theme);
+      setLast('heatmap', { xLabels: xLabels, yLabels: yLabels, values: values });
       setHead({ title: '热力矩阵', subtitle: title, unit: '', source: '已有数据' });
     } else if (typ === 'scatter') {
       var ser = items.map(function (it, i) { return { name: it.title, values: ranged[i].series[0].values }; });
       ChartFactory.render(c, 'scatterMatrix', { series: ser }, theme);
+      setLast('scatterMatrix', { series: ser });
       setHead({ title: '散点矩阵 · 关联探索', subtitle: title, unit: '', source: '已有数据' });
     } else if (typ === 'radar') {
       var inds = items.map(function (it) { return { name: it.title }; });
       var vals = items.map(function (it, i) { var v = ranged[i].series[0].values; return v[v.length - 1]; });
       ChartFactory.render(c, 'radar', { indicators: inds, series: [{ name: '最新值', values: vals }] }, theme);
+      setLast('radar', { indicators: inds, series: [{ name: '最新值', values: vals }] });
       setHead({ title: '雷达图 · 最新快照', subtitle: title, unit: '', source: '已有数据' });
     } else if (typ === 'rank') {
       var rv = items.map(function (it, i) { var v = ranged[i].series[0].values; return v[v.length - 1]; });
       ChartFactory.render(c, 'rank', { categories: items.map(function (it) { return it.title; }), values: rv }, theme);
+      setLast('rank', { categories: items.map(function (it) { return it.title; }), values: rv });
       setHead({ title: '横向排名 · 最新值', subtitle: title, unit: '', source: '已有数据' });
     }
     state.echartsEl = c;
@@ -2823,8 +2838,12 @@
   }
 
   function copyShareLink() {
-    if (state.mode !== 'imported' || !state.table) { toast('复制链接仅适用于已导入的数据'); return; }
-    var json = JSON.stringify(buildChartConfig());
+    var cfg;
+    if (state.mode === 'imported' && state.table) cfg = buildChartConfig();
+    else if (state.lastChart) cfg = state.lastChart;
+    else if (state.chartConfig) cfg = state.chartConfig;
+    else { toast('当前图表暂不支持复制链接'); return; }
+    var json = JSON.stringify(cfg);
     var b64 = b64Encode(json);
     var url = location.href.split('?')[0] + '?chart=' + b64;
     function done() { toast('图表链接已复制（部署后可分享）'); }
