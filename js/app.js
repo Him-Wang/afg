@@ -103,7 +103,7 @@
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
     mapping: { timeCol: '', yCols: [], chartType: 'line' },
-    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
+    uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, intlItem: null, chartConfig: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
   };
 
   function vnum(v) { var n = toNum(v); return isNaN(n) ? null : n; }
@@ -210,6 +210,21 @@
           if (!item.series || !item.series.length) return;
           if (item.title === state.finItem.title) return;
           options.push({ key: 'fin:' + item.title, name: item.title, labels: item.labels, values: item.series[0].values });
+        });
+      });
+    } else if (state.intlItem) {
+      // 国际宏观：可叠加其他国家指标 + 中国宏观数据对比
+      (window.INTL_MACRO && window.INTL_MACRO.sections || []).forEach(function (sec) {
+        sec.items.forEach(function (item) {
+          if (!item.series || !item.series.length) return;
+          if (item.title === state.intlItem.title) return;
+          options.push({ key: 'intl:' + item.title, name: item.title, labels: item.labels, values: item.series[0].values });
+        });
+      });
+      (window.CHINA_MACRO && window.CHINA_MACRO.sections || []).forEach(function (sec) {
+        sec.items.forEach(function (item) {
+          if (!item.series || !item.series.length) return;
+          options.push({ key: 'cn:' + item.title, name: '【中国】' + item.title, labels: item.labels, values: item.series[0].values });
         });
       });
     } else {
@@ -640,7 +655,7 @@
   /* ---------- 首页 / 使用说明 ---------- */
   function renderHome() {
     clearStage();
-    state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     state.mode = 'home';
     state.viewKey = 'home';
     highlightNav('home');
@@ -683,7 +698,7 @@
     state.mode = 'macro';
     state.viewKey = 'china-macro';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
-    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     highlightNav('china-macro');
     el('stat-badge').style.display = 'none';
     el('btn-events').style.display = 'none';
@@ -783,7 +798,7 @@
     state.mode = 'macro';
     state.viewKey = 'finance';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
-    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     highlightNav('finance');
     el('stat-badge').style.display = 'none';
     el('btn-events').style.display = 'none';
@@ -884,7 +899,7 @@
     state.mode = 'macro';
     state.viewKey = 'intl-macro';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
-    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     highlightNav('intl-macro');
     el('stat-badge').style.display = 'none';
     el('btn-events').style.display = 'none';
@@ -940,21 +955,27 @@
     syncToolbar();
   }
 
-  function openIntlItem(item) {
+  function openIntlItem(item, keep) {
     try {
+      if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; }
+      state.intlItem = item;
+      var ranged = applyTimeRange(item.labels, item.series);
+      var merged = mergeOverlaySeries(ranged.labels, ranged.series, state.overlaySeries);
       clearStage();
       state.mode = 'imported'; state.isImported = true; state.viewKey = 'intl-item';
-      state.macroItem = null; state.finItem = null; state.chartConfig = null;
+      state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null;
       highlightNav(null);
       el('btn-events').style.display = 'none';
       el('stat-badge').style.display = 'none';
       showBack(function () { renderIntlMacro(); });
       var theme = getChartTheme();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
-      var ci = ChartFactory.render(c, 'line', { labels: item.labels, series: item.series }, theme);
+      var ci = ChartFactory.render(c, 'line', { labels: merged.labels, series: merged.series }, theme);
+      attachExtremeLabels(ci);
       state.echartsEl = c;
-      setHead({ title: item.title, subtitle: '走势', unit: item.unit || '', source: '公开数据' });
-      el('hint').textContent = '单个指标走势';
+      if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
+      setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 可直接叠加中国宏观等指标', unit: item.unit || '', source: '公开数据' });
+      el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '单个指标走势';
       syncToolbar();
     } catch (e) { toast('打开图表失败'); }
   }
@@ -978,19 +999,19 @@
     macro.addEventListener('click', function () { state.overlaySeries = []; renderChinaMacro(); closeSidebar(); });
     sb.appendChild(macro);
 
-    // 3. 金融数据
-    var fin = document.createElement('div');
-    fin.className = 'nav-item nav-macro'; fin.dataset.id = 'finance';
-    fin.innerHTML = '<span class="nav-icon">' + ICONS.perf + '</span><span>金融数据</span>';
-    fin.addEventListener('click', function () { state.overlaySeries = []; renderFinance(); closeSidebar(); });
-    sb.appendChild(fin);
-
-    // 4. 国际宏观数据
+    // 3. 国际宏观数据
     var intl = document.createElement('div');
     intl.className = 'nav-item nav-macro'; intl.dataset.id = 'intl-macro';
     intl.innerHTML = '<span class="nav-icon">' + ICONS.globe + '</span><span>国际宏观数据</span>';
     intl.addEventListener('click', function () { state.overlaySeries = []; renderIntlMacro(); closeSidebar(); });
     sb.appendChild(intl);
+
+    // 4. 金融数据
+    var fin = document.createElement('div');
+    fin.className = 'nav-item nav-macro'; fin.dataset.id = 'finance';
+    fin.innerHTML = '<span class="nav-icon">' + ICONS.perf + '</span><span>金融数据</span>';
+    fin.addEventListener('click', function () { state.overlaySeries = []; renderFinance(); closeSidebar(); });
+    sb.appendChild(fin);
 
     // 5. 示例图（可展开子菜单）
     var ex = document.createElement('div');
@@ -1029,7 +1050,7 @@
 
   /* ---------- 渲染内置模版 ---------- */
   function renderTemplate(id) {
-    state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var sample = DataLoader.SAMPLES[id];
     if (!sample) return;
     clearStage();
@@ -1644,6 +1665,7 @@
   function rerender() {
     if (state.macroItem) { openMacroItem(state.macroItem, true); return; }
     if (state.finItem) { openFinItem(state.finItem, true); return; }
+    if (state.intlItem) { openIntlItem(state.intlItem, true); return; }
     if (state.chartConfig) { applyChartConfig(state.chartConfig); return; }
     if (state.mode === 'dashboard') renderDashboard(state.dashboardDatasets, false);
     else if (state.mode === 'dataset') renderDatasetSingle(state.dataset);
@@ -1793,7 +1815,7 @@
   function showMapping(table) {
     state.table = table;
     state.uploadedTable = table;
-    state.overlaySeries = []; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.overlaySeries = []; state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var det0 = DataLoader.detectTable(table);
     if (!det0) { toast('无法解析数据'); return; }
     // 转换 Excel 日期序列号（如 46295 → 2026-09-28）后重新识别
@@ -1936,7 +1958,7 @@
   }
 
   function renderUserChart(closeAfter) {
-    state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var m = state.mapping;
     var table = state.table;
     if (!table) return;
@@ -2168,6 +2190,7 @@
       state.alignToMain = this.checked;
       if (state.macroItem) openMacroItem(state.macroItem, true);
       else if (state.finItem) openFinItem(state.finItem, true);
+      else if (state.intlItem) openIntlItem(state.intlItem, true);
       else if (state.mode === 'template') renderTemplate(state.currentTemplate);
       else rerender();
     });
@@ -2178,7 +2201,7 @@
       var key = chip.dataset.key;
       var opt = (state._indicatorOptions || []).filter(function (o) { return o.key === key; })[0];
       if (!opt) return;
-      var isImported = (state.mode === 'imported' && state.table && !state.macroItem && !state.finItem);
+      var isImported = (state.mode === 'imported' && state.table && !state.macroItem && !state.finItem && !state.intlItem);
       if (isImported) {
         var idx = state.mapping.yCols.indexOf(opt.name);
         if (idx >= 0) state.mapping.yCols.splice(idx, 1);
@@ -2194,6 +2217,7 @@
         openIndicatorPanel();
         if (state.macroItem) openMacroItem(state.macroItem, true);
         else if (state.finItem) openFinItem(state.finItem, true);
+        else if (state.intlItem) openIntlItem(state.intlItem, true);
         else if (state.mode === 'template') renderTemplate(state.currentTemplate);
         else rerender();
       }

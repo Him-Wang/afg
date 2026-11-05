@@ -238,16 +238,157 @@ def update_macro():
     print("宏观数据更新完成：更新 %d 个指标" % updated)
 
 
+# ---------- 国际宏观数据（akshare） ----------
+INTL_GROUPS = {
+    "央行基准利率": [
+        ("美国联邦基金利率", "macro_bank_usa_interest_rate"),
+        ("欧元区央行利率", "macro_bank_euro_interest_rate"),
+        ("日本央行利率", "macro_bank_japan_interest_rate"),
+        ("英国央行利率", "macro_bank_english_interest_rate"),
+        ("中国央行利率", "macro_bank_china_interest_rate"),
+        ("澳大利亚央行利率", "macro_bank_australia_interest_rate"),
+        ("印度央行利率", "macro_bank_india_interest_rate"),
+        ("巴西央行利率", "macro_bank_brazil_interest_rate"),
+    ],
+    "通胀 CPI": [
+        ("美国CPI同比", "macro_usa_cpi_yoy"),
+        ("欧元区CPI同比", "macro_euro_cpi_yoy"),
+        ("日本CPI同比", "macro_japan_cpi_yearly"),
+        ("英国CPI同比", "macro_uk_cpi_yearly"),
+        ("德国CPI同比", "macro_germany_cpi_yearly"),
+        ("澳大利亚CPI同比", "macro_australia_cpi_yearly"),
+        ("加拿大CPI同比", "macro_canada_cpi_yearly"),
+    ],
+    "增长 GDP": [
+        ("欧元区GDP同比", "macro_euro_gdp_yoy"),
+        ("英国GDP同比", "macro_uk_gdp_yearly"),
+        ("德国GDP同比", "macro_germany_gdp"),
+        ("加拿大GDP", "macro_canada_gdp_monthly"),
+        ("美国GDP", "macro_usa_gdp_monthly"),
+    ],
+    "PPI": [
+        ("美国PPI", "macro_usa_ppi"),
+        ("美国核心PPI", "macro_usa_core_ppi"),
+        ("欧元区PPI环比", "macro_euro_ppi_mom"),
+        ("澳大利亚PPI", "macro_australia_ppi_quarterly"),
+    ],
+    "景气 PMI": [
+        ("美国ISM制造业PMI", "macro_usa_ism_pmi"),
+        ("美国ISM非制造业PMI", "macro_usa_ism_non_pmi"),
+        ("欧元区制造业PMI", "macro_euro_manufacturing_pmi"),
+        ("欧元区服务业PMI", "macro_euro_services_pmi"),
+    ],
+    "就业": [
+        ("美国失业率", "macro_usa_unemployment_rate"),
+        ("美国非农就业", "macro_usa_non_farm"),
+        ("欧元区失业率", "macro_euro_unemployment_rate_mom"),
+        ("英国失业率", "macro_uk_unemployment_rate"),
+        ("日本失业率", "macro_japan_unemployment_rate"),
+        ("加拿大失业率", "macro_canada_unemployment_rate"),
+        ("澳大利亚失业率", "macro_australia_unemployment_rate"),
+    ],
+    "货币供应": [
+        ("中国M1同比", "china_m1"),
+        ("中国M2同比", "china_m2"),
+    ],
+}
+
+
+def _sorted_series(labels, values):
+    pairs = sorted(zip(labels, values), key=lambda x: x[0])
+    return [p[0] for p in pairs], [p[1] for p in pairs]
+
+
+def fetch_china_money(col):
+    df = ak.macro_china_money_supply()
+    labels, values = [], []
+    for _, r in df.iterrows():
+        v = r[col]
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            continue
+        if v != v:
+            continue
+        labels.append(str(r["月份"]))
+        values.append(v)
+    return _sorted_series(labels, values)
+
+
+def fetch_ak_macro(fn):
+    if fn == "china_m1":
+        return fetch_china_money("货币(M1)-同比增长")
+    if fn == "china_m2":
+        return fetch_china_money("货币和准货币(M2)-同比增长")
+    try:
+        df = getattr(ak, fn)()
+    except Exception:
+        return [], []
+    if df is None or len(df) == 0:
+        return [], []
+    cols = list(df.columns)
+    date_col = next((c for c in ["日期", "时间", "发布日期"] if c in cols), None)
+    val_col = next((c for c in ["今值", "现值"] if c in cols), None)
+    if not date_col or not val_col:
+        return [], []
+    labels, values = [], []
+    for _, r in df.iterrows():
+        v = r[val_col]
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            continue
+        if v != v:
+            continue
+        labels.append(str(r[date_col]))
+        values.append(v)
+    return _sorted_series(labels, values)
+
+
+def update_intl():
+    print("抓取国际宏观数据 (akshare) ...")
+    sections = []
+    for cat, items in INTL_GROUPS.items():
+        out = []
+        for title, fn in items:
+            try:
+                labels, values = fetch_ak_macro(fn)
+            except Exception as e:
+                print("  ✗", title, str(e)[:60])
+                continue
+            if len(labels) < 2:
+                print("  - 跳过", title)
+                continue
+            out.append({"title": title, "unit": "%", "type": "line",
+                        "labels": labels, "series": [{"name": title, "values": values}]})
+            print("  ✓", title, len(labels), "期")
+        sections.append({"name": cat, "items": out})
+    maxd = ""
+    for s in sections:
+        for it in s["items"]:
+            for d in it["labels"]:
+                if d > maxd:
+                    maxd = d
+    obj = {"updated": maxd, "sections": sections}
+    write_js_var("intl-macro.js", "INTL_MACRO", obj, "国际宏观数据（akshare 自动更新）")
+    total = sum(len(s["items"]) for s in sections)
+    print("国际宏观数据更新完成：%d 项" % total)
+
+
 def main():
     args = set(sys.argv[1:])
     no_push = "--no-push" in args
-    do_fin = "--finance" in args or "--macro" not in args
-    do_macro = "--macro" in args or "--finance" not in args
+    any_specific = any(a in args for a in ("--finance", "--macro", "--intl"))
+    do_fin = "--finance" in args or not any_specific
+    do_macro = "--macro" in args or not any_specific
+    do_intl = "--intl" in args or not any_specific
 
     if do_fin:
         update_finance()
     if do_macro:
         update_macro()
+    if do_intl:
+        update_intl()
     if not no_push:
         git_push()
 
