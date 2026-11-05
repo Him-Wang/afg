@@ -15,12 +15,8 @@
       { id: 'macro-heatmap', label: '热力矩阵 · 全球增速' },
       { id: 'macro-sheirong-stack', label: '堆叠柱状 · 社融月度' },
       { id: 'macro-pmi-radar', label: '雷达图 · PMI 分项' },
-      { id: 'macro-country-groups', label: '分组对比 · G7/新兴/欧元区' },
       { id: 'macro-world-map', label: '世界地图 · GDP 着色' },
-      { id: 'macro-corr-explore', label: '关联探索 · 散点矩阵' },
-      { id: 'macro-cpi', label: 'CPI 同比' },
-      { id: 'macro-m2', label: 'M2 同比' },
-      { id: 'macro-pmi-monthly', label: '制造业 PMI 走势' }
+      { id: 'macro-corr-explore', label: '关联探索 · 散点矩阵' }
     ]},
     { category: '行业数据', items: [
       { id: 'industry-rank', label: '横向排名 · 营收增速' },
@@ -750,13 +746,9 @@
   function buildSidebar() {
     var sb = el('sidebar');
     sb.innerHTML = '';
-    var startLabel = document.createElement('div');
-    startLabel.className = 'nav-group-label';
-    startLabel.textContent = '开始';
-    sb.appendChild(startLabel);
     var home = document.createElement('div');
     home.className = 'nav-item'; home.dataset.id = 'home';
-    home.innerHTML = '<span class="dot"></span><span>🏠 首页 · 使用说明</span>';
+    home.innerHTML = '<span class="dot"></span><span>🏠 主页 · 使用说明</span>';
     home.addEventListener('click', function () { state.overlaySeries = []; renderHome(); closeSidebar(); });
     sb.appendChild(home);
     // 中国宏观数据一览（真实数据看板）
@@ -765,9 +757,10 @@
     macro.innerHTML = '<span class="dot"></span><span>📊 中国宏观数据一览</span>';
     macro.addEventListener('click', function () { state.overlaySeries = []; renderChinaMacro(); closeSidebar(); });
     sb.appendChild(macro);
+    // 示例图（展示不同模版）
     var libLabel = document.createElement('div');
     libLabel.className = 'nav-group-label';
-    libLabel.textContent = '参考模板 · 示例（点击预览）';
+    libLabel.textContent = '示例图 · 展示不同模版';
     sb.appendChild(libLabel);
     TEMPLATES.forEach(function (group) {
       var label = document.createElement('div');
@@ -1132,6 +1125,54 @@
     html += '</tbody></table>';
     wrap.innerHTML = html;
     el('chart-stage').appendChild(wrap);
+  }
+
+  /* ---------- 机器学习模块（上传数据） ---------- */
+  function renderMlFromUpload() {
+    var table = state.table, timeCol = state.mapping.timeCol;
+    var col = state.mapping.yCols.filter(function (c) { return c !== timeCol; })[0];
+    if (!col) { toast('请选择至少一个数值列'); return; }
+    var labels = [], values = [];
+    table.rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v)) { labels.push(String(r[timeCol])); values.push(v); } });
+    if (labels.length < 3) { toast('有效数据点太少，无法做回归'); return; }
+    clearStage();
+    state.mode = 'imported'; state.isImported = true; state.viewKey = 'ml-upload';
+    state.macroItem = null; state.chartConfig = null;
+    highlightNav(null);
+    el('btn-events').style.display = 'none'; el('stat-badge').style.display = 'none';
+    setHead({ title: col + ' · 回归趋势', subtitle: '线性回归 · 95% 置信带', unit: '', source: '用户数据' });
+    var theme = getChartTheme();
+    var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+    var ci = ChartFactory.render(c, 'mlTrend', { labels: labels, values: values }, theme);
+    state.echartsEl = c;
+    el('hint').textContent = '机器学习 · 回归趋势与置信带';
+    syncToolbar();
+  }
+
+  /* ---------- 宏观分析模块（上传数据：同比/环比） ---------- */
+  function renderMacroFromUpload() {
+    var table = state.table, timeCol = state.mapping.timeCol;
+    var labels0 = table.rows.map(function (r) { return String(r[timeCol]); });
+    var freq = DataLoader.inferFreq(labels0);
+    var lag = (freq === 'month') ? 12 : (freq === 'quarter') ? 4 : 1;
+    var sub = DataLoader.pctChange(table, timeCol, lag);
+    if (!sub || !sub.rows.length) { toast('无法计算同比/环比'); return; }
+    var labels = sub.rows.map(function (r) { return String(r[timeCol]); });
+    var cols = sub.columns.filter(function (c) { return c !== timeCol; });
+    var series = cols.map(function (c) { return { name: c, values: sub.rows.map(function (r) { return vnum(r[c]); }) }; });
+    clearStage();
+    state.mode = 'imported'; state.isImported = true; state.viewKey = 'macro-upload';
+    state.macroItem = null; state.chartConfig = null;
+    highlightNav(null);
+    el('btn-events').style.display = 'none'; el('stat-badge').style.display = 'none';
+    setHead({ title: (lag === 12 ? '同比' : (lag === 4 ? '环比(季)' : '环比')) + '变化', subtitle: '基于所选指标 · 单位：%', unit: '%', source: '用户数据' });
+    var theme = getChartTheme();
+    var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+    var ci = ChartFactory.render(c, 'line', { labels: labels, series: series }, theme);
+    attachExtremeLabels(ci);
+    state.echartsEl = c;
+    el('hint').textContent = '宏观分析 · 同比/环比（可在「数据变换」里进一步调整）';
+    syncToolbar();
   }
 
   function suggestGoal(det, table) {
@@ -1754,6 +1795,8 @@
       state.analysisGoal = goal;
       if (goal === 'perf') { renderPerfFromUpload(); closeModal(); return; }
       if (goal === 'kline') { state.mapping.chartType = 'candlestick'; renderUserChart(true); return; }
+      if (goal === 'ml') { renderMlFromUpload(); closeModal(); return; }
+      if (goal === 'macro') { renderMacroFromUpload(); closeModal(); return; }
       renderUserChart(true);
     });
     el('btn-split').addEventListener('click', renderSplitCharts);
