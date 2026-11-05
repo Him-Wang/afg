@@ -20,7 +20,8 @@
     perf: svgIcon('<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>'),
     kline: svgIcon('<path d="M7 4v3M7 17v3M17 6v3M17 14v3M4 7h6M4 7v3M16 9h6M16 9v3M14 17h6M14 17v3"/>'),
     ml: svgIcon('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'),
-    macro: svgIcon('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>')
+    macro: svgIcon('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>'),
+    globe: svgIcon('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/>')
   };
 
   var GOALS = [
@@ -877,6 +878,87 @@
     } catch (e) { toast('打开图表失败'); }
   }
 
+  /* ---------- 国际宏观数据看板 ---------- */
+  function renderIntlMacro() {
+    clearStage();
+    state.mode = 'macro';
+    state.viewKey = 'intl-macro';
+    state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
+    state.table = null; state.det = null; state.macroItem = null; state.finItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    highlightNav('intl-macro');
+    el('stat-badge').style.display = 'none';
+    el('btn-events').style.display = 'none';
+    el('btn-table').style.display = 'none';
+    el('hint').textContent = '';
+    var M = window.INTL_MACRO || { sections: [] };
+    setHead({
+      title: '国际宏观数据',
+      subtitle: (M.updated ? '数据更新到 ' + M.updated : '暂无数据') + ' · 主流国家 GDP/CPI/PPI/PMI/基准利率',
+      unit: '', source: 'akshare · 公开数据'
+    });
+
+    var wrap = document.createElement('div');
+    wrap.className = 'macro-dash';
+    var theme = getChartTheme();
+    state.macroInsts = [];
+
+    (M.sections || []).forEach(function (sec) {
+      var secEl = document.createElement('div');
+      secEl.className = 'macro-section';
+      var hd = document.createElement('div');
+      hd.className = 'macro-cat';
+      hd.textContent = sec.name;
+      secEl.appendChild(hd);
+      var grid = document.createElement('div');
+      grid.className = 'macro-grid';
+      sec.items.forEach(function (item) {
+        if (!item || !item.series || !item.series.length) return;
+        var first = item.series[0];
+        var vals = first.values;
+        var latest = vals[vals.length - 1];
+        var prev = vals.length > 1 ? vals[vals.length - 2] : null;
+        var delta = (prev === null || prev === undefined || isNaN(prev) || prev === 0) ? null : (latest - prev);
+        var upCls = delta === null ? '' : (delta >= 0 ? 'up' : 'down');
+        var arrow = delta === null ? '' : (delta >= 0 ? '▲' : '▼');
+        var card = document.createElement('div');
+        card.className = 'macro-card';
+        card.title = '点击查看走势';
+        card.innerHTML =
+          '<div class="mc-name">' + item.title + '</div>' +
+          '<div class="mc-val">' + fmtNum(latest) + '</div>' +
+          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
+          '<div class="mc-chart"></div>';
+        card.addEventListener('click', function () { openIntlItem(item); });
+        grid.appendChild(card);
+        renderMacroSpark(card.querySelector('.mc-chart'), item, theme);
+      });
+      secEl.appendChild(grid);
+      wrap.appendChild(secEl);
+    });
+
+    el('chart-stage').appendChild(wrap);
+    syncToolbar();
+  }
+
+  function openIntlItem(item) {
+    try {
+      clearStage();
+      state.mode = 'imported'; state.isImported = true; state.viewKey = 'intl-item';
+      state.macroItem = null; state.finItem = null; state.chartConfig = null;
+      highlightNav(null);
+      el('btn-events').style.display = 'none';
+      el('stat-badge').style.display = 'none';
+      showBack(function () { renderIntlMacro(); });
+      var theme = getChartTheme();
+      var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
+      var ci = ChartFactory.render(c, 'line', { labels: item.labels, series: item.series }, theme);
+      state.echartsEl = c;
+      setHead({ title: item.title, subtitle: '走势', unit: item.unit || '', source: '公开数据' });
+      el('hint').textContent = '单个指标走势';
+      syncToolbar();
+    } catch (e) { toast('打开图表失败'); }
+  }
+
   /* ---------- 侧边导航 ---------- */
   function buildSidebar() {
     var sb = el('sidebar');
@@ -903,7 +985,14 @@
     fin.addEventListener('click', function () { state.overlaySeries = []; renderFinance(); closeSidebar(); });
     sb.appendChild(fin);
 
-    // 4. 示例图（可展开子菜单）
+    // 4. 国际宏观数据
+    var intl = document.createElement('div');
+    intl.className = 'nav-item nav-macro'; intl.dataset.id = 'intl-macro';
+    intl.innerHTML = '<span class="nav-icon">' + ICONS.globe + '</span><span>国际宏观数据</span>';
+    intl.addEventListener('click', function () { state.overlaySeries = []; renderIntlMacro(); closeSidebar(); });
+    sb.appendChild(intl);
+
+    // 5. 示例图（可展开子菜单）
     var ex = document.createElement('div');
     ex.className = 'nav-item nav-parent';
     ex.innerHTML = '<span class="nav-icon">' + ICONS.examples + '</span><span>示例图</span><span class="nav-caret">' + ICONS.caret + '</span>';
@@ -2620,6 +2709,7 @@
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) renderTemplate(q.tpl);
     else if (q.view === 'macro') renderChinaMacro();
     else if (q.view === 'finance') renderFinance();
+    else if (q.view === 'intl') renderIntlMacro();
     else renderHome();
   }
 
