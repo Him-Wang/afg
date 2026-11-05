@@ -7,6 +7,17 @@
   var el = function (id) { return document.getElementById(id); };
   var toNum = DataLoader.toNum;
 
+  /* 简洁 SVG 图标（stroke 风格，随主题着色） */
+  function svgIcon(path, size) {
+    return '<svg viewBox="0 0 24 24" width="' + (size || 15) + '" height="' + (size || 15) + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>';
+  }
+  var ICONS = {
+    home: svgIcon('<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>'),
+    macro: svgIcon('<path d="M6 20v-6M12 20V4M18 20v-9"/>'),
+    examples: svgIcon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+    caret: svgIcon('<path d="M9 18l6-6-6-6"/>', 12)
+  };
+
   var TEMPLATES = [
     { category: '宏观数据', items: [
       { id: 'macro-gdp-area', label: '渐变面积 · GDP 增速' },
@@ -746,36 +757,48 @@
   function buildSidebar() {
     var sb = el('sidebar');
     sb.innerHTML = '';
+
+    // 1. 使用说明
     var home = document.createElement('div');
     home.className = 'nav-item'; home.dataset.id = 'home';
-    home.innerHTML = '<span class="dot"></span><span>🏠 主页 · 使用说明</span>';
+    home.innerHTML = '<span class="nav-icon">' + ICONS.home + '</span><span>使用说明</span>';
     home.addEventListener('click', function () { state.overlaySeries = []; renderHome(); closeSidebar(); });
     sb.appendChild(home);
-    // 中国宏观数据一览（真实数据看板）
+
+    // 2. 中国宏观数据
     var macro = document.createElement('div');
     macro.className = 'nav-item nav-macro'; macro.dataset.id = 'china-macro';
-    macro.innerHTML = '<span class="dot"></span><span>📊 中国宏观数据一览</span>';
+    macro.innerHTML = '<span class="nav-icon">' + ICONS.macro + '</span><span>中国宏观数据</span>';
     macro.addEventListener('click', function () { state.overlaySeries = []; renderChinaMacro(); closeSidebar(); });
     sb.appendChild(macro);
-    // 示例图（展示不同模版）
-    var libLabel = document.createElement('div');
-    libLabel.className = 'nav-group-label';
-    libLabel.textContent = '示例图 · 展示不同模版';
-    sb.appendChild(libLabel);
+
+    // 3. 示例图（可展开子菜单）
+    var ex = document.createElement('div');
+    ex.className = 'nav-item nav-parent';
+    ex.innerHTML = '<span class="nav-icon">' + ICONS.examples + '</span><span>示例图</span><span class="nav-caret">' + ICONS.caret + '</span>';
+    var submenu = document.createElement('div');
+    submenu.className = 'nav-submenu';
+    ex.addEventListener('click', function () {
+      var open = submenu.classList.toggle('open');
+      ex.classList.toggle('open', open);
+    });
+    sb.appendChild(ex);
+
     TEMPLATES.forEach(function (group) {
       var label = document.createElement('div');
       label.className = 'nav-group-label';
       label.textContent = group.category;
-      sb.appendChild(label);
+      submenu.appendChild(label);
       group.items.forEach(function (item) {
         var nav = document.createElement('div');
-        nav.className = 'nav-item';
+        nav.className = 'nav-item nav-sub';
         nav.dataset.id = item.id;
-        nav.innerHTML = '<span class="dot"></span><span>' + item.label + '</span>';
+        nav.innerHTML = '<span>' + item.label + '</span>';
         nav.addEventListener('click', function () { state.overrideType = null; state.overlaySeries = []; renderTemplate(item.id); closeSidebar(); });
-        sb.appendChild(nav);
+        submenu.appendChild(nav);
       });
     });
+    sb.appendChild(submenu);
   }
 
   function highlightNav(id) {
@@ -1384,22 +1407,18 @@
     var sel = el('toolbar-chart-type');
     if (!sel) return;
     var isData = (state.mode === 'imported' || state.mode === 'dataset');
-    var canConvert = false;
-    if (state.mode === 'template') {
-      var s = DataLoader.SAMPLES[state.currentTemplate];
-      canConvert = !!(s && s.data && s.data.labels !== undefined && s.data.series !== undefined);
-    }
-    sel.disabled = !(isData || canConvert);
+    var isTemplate = (state.mode === 'template');
+    // 示例图（模板）只做展示，图表类型切换关闭
+    sel.disabled = isTemplate || !(isData || !!state.macroItem);
     if (state.macroItem) {
-      sel.disabled = false;
       var mt = state.macroTypeOverride || state.macroItem.type;
       if (mt && sel.querySelector('option[value="' + mt + '"]')) sel.value = mt;
     } else if (isData) {
       var t = state.mode === 'imported' ? state.mapping.chartType : '';
       if (t && sel.querySelector('option[value="' + t + '"]')) sel.value = t;
-    } else if (state.mode === 'template' && canConvert) {
+    } else if (isTemplate) {
       var s2 = DataLoader.SAMPLES[state.currentTemplate];
-      var tv = state.overrideType || s2.type;
+      var tv = s2 ? s2.type : '';
       if (tv && sel.querySelector('option[value="' + tv + '"]')) sel.value = tv;
     }
     if (el('tb-swapxy')) el('tb-swapxy').classList.toggle('active', state.transposed);
