@@ -528,8 +528,24 @@
     if (mode === 'off') return;
     if (mode === 'all') {
       var o1 = inst.getOption();
+      var dz1 = o1.dataZoom && o1.dataZoom[0];
+      var st1 = dz1 ? (dz1.start || 0) : 0, en1 = dz1 ? (dz1.end || 100) : 100;
+      var total = 0;
+      (o1.series || []).forEach(function (s) { total = Math.max(total, (s.data || []).length); });
+      var visible = Math.max(1, Math.round(total * (en1 - st1) / 100));
+      if (visible > 300) {
+        toast('可见 ' + visible + ' 个数据点，请先用「区间」缩小到 300 个点以内再标注全部数据');
+        return;
+      }
+      var dense = visible > 24;
       inst.setOption({ series: (o1.series || []).map(function (s) {
-        return { label: { show: true, position: 'top', fontSize: 9, color: tc.muted } };
+        return { label: {
+          show: true, position: 'top', fontSize: dense ? 7 : 10, color: tc.muted,
+          rotate: dense ? 90 : 0,
+          align: dense ? 'left' : 'center',
+          verticalAlign: dense ? 'middle' : 'bottom',
+          distance: dense ? 3 : 2
+        } };
       }) });
       return;
     }
@@ -818,7 +834,7 @@
       var merged = mergeOverlaySeries(item.labels, item.series, state.overlaySeries);
       var type = state.macroTypeOverride || item.type;
       applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series });
-      if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
+      if (state.overlaySeries.length) renderPeriodTable(merged.labels, merged.series);
     } catch (e) { toast('打开图表失败'); }
   }
 
@@ -1032,7 +1048,7 @@
       attachExtremeLabels(ci);
       state.echartsEl = c;
       state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
-      if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
+      if (state.overlaySeries.length) renderPeriodTable(merged.labels, merged.series);
       setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 可直接叠加中国宏观等指标', unit: item.unit || '', source: '公开数据' });
       el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '单个指标走势';
       syncToolbar();
@@ -1603,6 +1619,29 @@
       html += '</tr>';
     });
     html += '</tbody></table>';
+    var wrap = document.createElement('div');
+    wrap.className = 'analysis';
+    wrap.innerHTML = html;
+    el('chart-stage').appendChild(wrap);
+    return wrap;
+  }
+
+  /* 宏观多指标：下方列出每期数据的明细表 */
+  function renderPeriodTable(labels, series) {
+    if (!series || series.length < 2) return null;
+    var html = '<div class="an-head">分期数据</div>';
+    html += '<div style="max-height:340px;overflow:auto"><table class="preview-table"><thead><tr><th>时间</th>';
+    series.forEach(function (s) { html += '<th>' + s.name + '</th>'; });
+    html += '</tr></thead><tbody>';
+    for (var i = labels.length - 1; i >= 0; i--) {
+      html += '<tr><td>' + labels[i] + '</td>';
+      for (var j = 0; j < series.length; j++) {
+        var v = series[j].values[i];
+        html += '<td>' + (v === null || v === undefined || isNaN(v) ? '—' : fmtNum(v)) + '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
     var wrap = document.createElement('div');
     wrap.className = 'analysis';
     wrap.innerHTML = html;
