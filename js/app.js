@@ -87,8 +87,38 @@
     ]
   };
 
+  /* 中国宏观历史事件（用于在宏观图表上标注） */
+  var CN_EVENTS = [
+    { d: '2008-11', label: '四万亿刺激', desc: '国际金融危机后推出四万亿投资计划，基建与信贷大幅扩张。' },
+    { d: '2015-06', label: 'A股异常波动', desc: '股市大幅回撤，监管出手救市，金融条件阶段性收紧。' },
+    { d: '2018-03', label: '中美贸易摩擦', desc: '美国对华加征关税，出口与制造业预期承压。' },
+    { d: '2020-02', label: '新冠疫情', desc: '疫情爆发、经济活动停摆，GDP 同比创历史最大降幅。' },
+    { d: '2021-01', label: '低基数反弹', desc: '低基数叠加复工复产，读数普遍冲高。' },
+    { d: '2022-04', label: '上海封控', desc: '长三角供应链受阻，消费、工业生产明显走弱。' },
+    { d: '2023-07', label: '政治局会议', desc: '提出活跃资本市场、调整优化房地产政策。' },
+    { d: '2024-09', label: '一揽子增量政策', desc: '降准降息 + 地产松绑 + 资本市场支持，预期扭转。' },
+    { d: '2025-05', label: '降准降息', desc: '政策利率下调、降准落地，稳增长加力。' },
+    { d: '2026-11', label: '政策利率换锚', desc: '隔夜逆回购成为主政策利率，形成 1.00%~1.50% 走廊。' }
+  ];
+
+  /* 按图表时间范围筛选事件 */
+  function cnEventsForLabels(labels) {
+    if (!labels || labels.length < 2) return [];
+    function toMonth(v) {
+      var m = String(v === undefined || v === null ? '' : v).match(/(\d{4})\D+(\d{1,2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 12 + (parseInt(m[2] || '1', 10) - 1);
+    }
+    var a = toMonth(labels[0]), b = toMonth(labels[labels.length - 1]);
+    if (a === null || b === null) return [];
+    return CN_EVENTS.filter(function (e) {
+      var t = toMonth(e.d);
+      return t !== null && t >= a - 1 && t <= b + 1;
+    });
+  }
+
   var state = {
-    theme: 'midnight-gold',
+    theme: 'paper',
     currentTemplate: 'macro-gdp-area',
     mode: 'template',
     isImported: false,
@@ -160,6 +190,19 @@
   function getChartTheme() { return Themes.active().chart; }
 
   function currentSeriesNames() {
+    // 优先从已渲染图表读取（适配宏观/金融/国际等所有视图）
+    if (state.echartsEl) {
+      try {
+        var _inst = echarts.getInstanceByDom(state.echartsEl);
+        if (_inst) {
+          var _o = _inst.getOption();
+          if (_o.series && _o.series.length) {
+            var _names = _o.series.map(function (x) { return x.name; }).filter(Boolean);
+            if (_names.length) return _names;
+          }
+        }
+      } catch (e) {}
+    }
     if (state.mode === 'imported' || state.mode === 'dataset') return state.mapping.yCols ? state.mapping.yCols.slice() : [];
     if (state.mode === 'template') {
       var s = DataLoader.SAMPLES[state.currentTemplate];
@@ -958,7 +1001,7 @@
   /* AI 画图示例（等价于 Agent 调用 make_chart 生成的结果） */
   function showExampleChart() {
     var cfg = {
-      type: 'area', viewKey: 'example', theme: 'midnight-gold',
+      type: 'area', viewKey: 'example', theme: 'paper',
       title: 'AI 示例 · 全球主要经济体 GDP 增速', subtitle: '对 AI 说一句话即可生成这样的图', unit: '%',
       labels: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
       series: [
@@ -1148,7 +1191,8 @@
       state.macroItem = item;
       var merged = mergeOverlaySeries(item.labels, item.series, state.overlaySeries);
       var type = state.macroTypeOverride || item.type;
-      applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series, viewKey: vk }, true);
+      applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series,
+        viewKey: vk, events: cnEventsForLabels(merged.labels) }, true);
       showBack(function () { renderChinaMacro(); });
       if (state.overlaySeries.length) renderPeriodTable(merged.labels, merged.series);
     } catch (e) { toast('打开图表失败'); }
@@ -1178,6 +1222,8 @@
           valueFormatter: function (v) { return fmtNum(v); }
         }
       });
+      // 卡片刚插入 DOM 时尺寸可能为 0，下一帧再 resize
+      requestAnimationFrame(function () { try { inst.resize(); } catch (e2) {} });
     } catch (e) {}
   }
 
@@ -1848,7 +1894,13 @@
     state.mode = 'imported'; state.isImported = true; state.viewKey = 'perf-upload';
     state.macroItem = null; state.chartConfig = null;
     highlightNav(null);
-    el('btn-events').style.display = 'none';
+    var evBtn2 = el('btn-events');
+    if (cfgEvents) {
+      evBtn2.style.display = '';
+      evBtn2.classList.toggle('active', state.showEvents);
+    } else {
+      evBtn2.style.display = 'none';
+    }
     el('stat-badge').style.display = 'none';
     el('hint').textContent = '业绩评估 · 基于所选价格/净值列';
     setHead({ title: '业绩评估', subtitle: '', unit: '净值', source: '用户数据' });
@@ -3157,7 +3209,13 @@
     state.currentTemplate = null; state.dashboardDatasets = null;
     state.viewKey = 'ds:' + dataset.name;
     highlightNav(null);
-    el('btn-events').style.display = 'none';
+    var evBtn2 = el('btn-events');
+    if (cfgEvents) {
+      evBtn2.style.display = '';
+      evBtn2.classList.toggle('active', state.showEvents);
+    } else {
+      evBtn2.style.display = 'none';
+    }
     el('stat-badge').style.display = 'none';
     var theme = getChartTheme();
     var stage = el('chart-stage');
@@ -3193,7 +3251,13 @@
     state.isImported = false;
     state.currentTemplate = null; state.dataset = null;
     highlightNav(null);
-    el('btn-events').style.display = 'none';
+    var evBtn2 = el('btn-events');
+    if (cfgEvents) {
+      evBtn2.style.display = '';
+      evBtn2.classList.toggle('active', state.showEvents);
+    } else {
+      evBtn2.style.display = 'none';
+    }
     el('stat-badge').style.display = 'none';
     setHead({ title: 'Excel 数据仪表盘', subtitle: '', unit: '', source: '' });
     el('hint').textContent = '已加载 Excel · ' + datasets.length + ' 个数据表';
@@ -3272,7 +3336,13 @@
     state.mode = 'imported'; state.isImported = true; state.viewKey = 'split-detail';
     state.macroItem = null; state.chartConfig = null;
     highlightNav(null);
-    el('btn-events').style.display = 'none';
+    var evBtn2 = el('btn-events');
+    if (cfgEvents) {
+      evBtn2.style.display = '';
+      evBtn2.classList.toggle('active', state.showEvents);
+    } else {
+      evBtn2.style.display = 'none';
+    }
     el('stat-badge').style.display = 'none';
     showBack(function () { renderSplitCharts(); });
     var theme = getChartTheme();
@@ -3448,12 +3518,20 @@
       data = { labels: mg.labels, series: mg.series };
     }
     data.seriesColors = state.seriesColors;
+    var cfgEvents = (cfg.events && cfg.events.length) ? cfg.events : null;
+    if (cfgEvents) data.events = state.showEvents ? cfgEvents : [];
     clearStage();
     state.mode = 'imported'; state.isImported = true; state.viewKey = cfg.viewKey || 'imported';
     state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
     state.table = null; state.det = null;
     highlightNav(null);
-    el('btn-events').style.display = 'none';
+    var evBtn2 = el('btn-events');
+    if (cfgEvents) {
+      evBtn2.style.display = '';
+      evBtn2.classList.toggle('active', state.showEvents);
+    } else {
+      evBtn2.style.display = 'none';
+    }
     el('stat-badge').style.display = 'none';
     var theme = getChartTheme();
     var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);

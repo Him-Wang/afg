@@ -619,20 +619,45 @@
    * 事件标注 & 水印（通用后处理）
    * ============================================================ */
   function applyEvents(option, events, theme) {
-    if (!option.series || !option.series.length) return;
+    if (!option.series || !option.series.length || !events || !events.length) return;
     var color = theme.accent;
+    var xa = option.xAxis && (Array.isArray(option.xAxis) ? option.xAxis[0] : option.xAxis);
+    var labels = (xa && xa.data) || [];
+    function toMonth(s) {
+      var m = String(s === undefined || s === null ? '' : s).match(/(\d{4})\D+(\d{1,2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 12 + (parseInt(m[2] || '1', 10) - 1);
+    }
+    // 把事件日期吸附到最近的实际标签上（兼容月/季/年等不同频率）
+    var seen = {};
+    var marks = [];
+    events.forEach(function (e) {
+      var target = toMonth(e.x !== undefined ? e.x : e.d);
+      if (target === null) return;
+      var best = null, bestDiff = Infinity;
+      labels.forEach(function (l) {
+        var lm = toMonth(l);
+        if (lm === null) return;
+        var diff = Math.abs(lm - target);
+        if (diff < bestDiff) { bestDiff = diff; best = l; }
+      });
+      if (best === null || bestDiff > 6) return;   // 超出数据范围不标
+      if (seen[best]) return;                       // 同一位置只标一次
+      seen[best] = true;
+      marks.push({ xAxis: best, label: { formatter: e.label }, _desc: e.desc });
+    });
+    if (!marks.length) return;
     option.series[0].markLine = {
       silent: true,
       symbol: ['none', 'none'],
-      lineStyle: { color: color, width: 1, type: 'dashed', opacity: 0.8 },
+      lineStyle: { color: color, width: 1, type: 'dashed', opacity: 0.7 },
       label: {
-        show: true, position: 'insideEndTop', rotate: 0,
-        color: color, fontSize: 10, fontWeight: 600, distance: 4,
-        textAlign: 'center', verticalAlign: 'bottom'
+        show: true, position: 'insideEndTop', rotate: 90,
+        color: color, fontSize: 9, fontWeight: 600, distance: 3,
+        textAlign: 'left', verticalAlign: 'bottom',
+        backgroundColor: theme.panel, padding: [2, 3], borderRadius: 2
       },
-      data: events.map(function (e) {
-        return { xAxis: e.x, label: { formatter: e.label } };
-      })
+      data: marks
     };
   }
 
@@ -1042,12 +1067,21 @@
       }
       if (lastVal !== null && isFinite(lastVal)) {
         var col = s0.color || theme.accent;
-        s0.markLine = {
-          silent: true, symbol: 'none',
+        var refEntry = {
+          yAxis: lastVal,
           lineStyle: { color: hexToRgba(col, 0.5), type: 'dashed', width: 1 },
-          label: { show: false },
-          data: [{ yAxis: lastVal }]
+          label: { show: false }
         };
+        if (s0.markLine && Array.isArray(s0.markLine.data) && s0.markLine.data.length) {
+          s0.markLine.data.push(refEntry);          // 已有事件标注 → 追加，不覆盖
+        } else {
+          s0.markLine = {
+            silent: true, symbol: 'none',
+            lineStyle: { color: hexToRgba(col, 0.5), type: 'dashed', width: 1 },
+            label: { show: false },
+            data: [refEntry]
+          };
+        }
       }
     }
     return option;
@@ -1109,5 +1143,5 @@
     instances.forEach(function (i) { try { i.resize(); } catch (e) {} });
   }
 
-  global.ChartFactory = { render: render, renderKpiSpark: renderKpiSpark, disposeAll: disposeAll, resizeAll: resizeAll, BUILDERS: BUILDERS, setWatermark: setWatermark };
+  global.ChartFactory = { render: render, renderKpiSpark: renderKpiSpark, disposeAll: disposeAll, resizeAll: resizeAll, BUILDERS: BUILDERS, setWatermark: setWatermark, hexToRgba: hexToRgba };
 })(window);

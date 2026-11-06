@@ -151,9 +151,9 @@
     }
   };
 
-  var activeId = 'midnight-gold';
+  var activeId = 'paper';
 
-  function getTheme(id) { return THEMES[id] || THEMES['midnight-gold']; }
+  function getTheme(id) { return THEMES[id] || THEMES['paper']; }
   function active() { return getTheme(activeId); }
   function ids() { return Object.keys(THEMES); }
 
