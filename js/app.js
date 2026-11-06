@@ -954,7 +954,7 @@
         attachExtremeLabels(ci);
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
-        if (state.overlaySeries.length) renderCompareTable(merged.labels, merged.series);
+        renderFinanceMetricsTable(merged.labels, merged.series);
         setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '', unit: item.unit || '', source: '公开数据' });
         el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势';
       } else {
@@ -962,8 +962,9 @@
         var nav = merged.labels.map(function (d, i) { return { date: d, value: merged.series[0].values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
         var ci2 = ChartFactory.render(c, 'perf', { name: item.title, nav: nav }, theme);
         renderPerfMetrics({ name: item.title, nav: nav }, ci2);
+        renderFinanceMetricsTable(merged.labels, merged.series);
         state.echartsEl = c;
-        setHead({ title: item.title + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）· 指标随缩放区间更新', unit: item.unit || '净值', source: '用户数据' });
+        setHead({ title: item.title + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）', unit: item.unit || '净值', source: '基金' });
         el('hint').textContent = '业绩评估 · 单个资产';
       }
       syncToolbar();
@@ -1645,6 +1646,54 @@
       }
       html += '</tr>';
     }
+    html += '</tbody></table></div>';
+    var wrap = document.createElement('div');
+    wrap.className = 'analysis';
+    wrap.innerHTML = html;
+    el('chart-stage').appendChild(wrap);
+    return wrap;
+  }
+
+  /* 金融资产：业绩指标表（年化回报/波动/回撤/夏普/索提诺/M²/Jensen alpha 等） */
+  function financeBenchmark() {
+    var D = window.FINANCE_DATA;
+    if (!D) return null;
+    var found = null;
+    (D.sections || []).forEach(function (sec) {
+      (sec.items || []).forEach(function (it) {
+        if (!found && it.title === '沪深300') found = it;
+      });
+    });
+    return found;
+  }
+  function renderFinanceMetricsTable(labels, series) {
+    if (!series || !series.length) return null;
+    var bench = financeBenchmark();
+    var benchVals = bench ? alignSeriesToBase(labels, bench.labels, bench.series[0].values) : null;
+    var metrics = series.map(function (s) { return ML.perfMetrics(s.values, benchVals); });
+    var rows = [
+      ['annReturn', '年化回报'], ['annVol', '年化波动（标准差）'], ['maxDD', '最大回撤'],
+      ['sharp', '夏普比率'], ['sortino', '索提诺比率'], ['m2', 'M²'],
+      ['alpha', '詹森 alpha'], ['beta', 'Beta'], ['calmar', '卡玛比率'],
+      ['var95', 'VaR 95%'], ['totalReturn', '累计收益']
+    ];
+    var pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
+    var html = '<div class="an-head">业绩指标' + (bench ? '（基准：沪深300 · 无风险利率 2%）' : '') + '</div>';
+    html += '<div style="overflow:auto"><table class="preview-table"><thead><tr><th>指标</th>';
+    series.forEach(function (s) { html += '<th>' + s.name + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      html += '<tr><td>' + r[1] + '</td>';
+      metrics.forEach(function (m) {
+        var v = m ? m[r[0]] : null;
+        var txt = '—';
+        if (v !== null && v !== undefined && !isNaN(v)) {
+          txt = (pctRows.indexOf(r[0]) >= 0) ? (v * 100).toFixed(2) + '%' : v.toFixed(2);
+        }
+        html += '<td>' + txt + '</td>';
+      });
+      html += '</tr>';
+    });
     html += '</tbody></table></div>';
     var wrap = document.createElement('div');
     wrap.className = 'analysis';

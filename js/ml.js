@@ -146,25 +146,67 @@
     return Math.exp(-0.5 * u * u) / (sigma * Math.sqrt(2 * Math.PI));
   }
 
-  /* 基金/指数业绩指标：年化收益、年化波动、最大回撤、夏普、VaR */
-  function perfMetrics(values) {
-    var n = values.length;
+  /* 基金/指数业绩指标：年化收益、年化波动、最大回撤、夏普、索提诺、M²、Jensen-alpha、VaR、卡玛 */
+  var RF = 0.02; // 无风险利率
+  function perfMetrics(values, benchmark) {
+    if (!values || values.length < 2) return null;
+    // 剔除空值
+    var pts = [];
+    for (var k = 0; k < values.length; k++) {
+      var v = values[k];
+      if (v === null || v === undefined || isNaN(v) || v <= 0) continue;
+      pts.push(v);
+    }
+    var n = pts.length;
     if (n < 2) return null;
-    var start = values[0], end = values[n - 1];
+    var start = pts[0], end = pts[n - 1];
     var rets = [];
-    for (var i = 1; i < n; i++) rets.push(values[i] / values[i - 1] - 1);
+    for (var i = 1; i < n; i++) rets.push(pts[i] / pts[i - 1] - 1);
     var annReturn = Math.pow(end / start, 252 / (n - 1)) - 1;
     var annVol = std(rets) * Math.sqrt(252);
     var peak = -Infinity, maxDD = 0;
-    values.forEach(function (v) { peak = Math.max(peak, v); var dd = v / peak - 1; if (dd < maxDD) maxDD = dd; });
-    var rf = 0.02;
-    var sharp = annVol > 0 ? (annReturn - rf) / annVol : 0;
+    pts.forEach(function (v) { peak = Math.max(peak, v); var dd = v / peak - 1; if (dd < maxDD) maxDD = dd; });
+    var sharp = annVol > 0 ? (annReturn - RF) / annVol : 0;
     var sorted = rets.slice().sort(function (a, b) { return a - b; });
     var q = sorted.length ? sorted[Math.floor(sorted.length * 0.05)] : 0;
     var var95 = -q;
+    // 索提诺：下行偏差（以无风险日收益率作为最低可接受收益）
+    var mar = RF / 252;
+    var downSum = 0, downCnt = 0;
+    rets.forEach(function (r) { if (r < mar) { downSum += (r - mar) * (r - mar); downCnt++; } });
+    var downDev = Math.sqrt(downSum / Math.max(1, rets.length)) * Math.sqrt(252);
+    var sortino = downDev > 0 ? (annReturn - RF) / downDev : 0;
+    var calmar = maxDD < 0 ? annReturn / Math.abs(maxDD) : null;
+    // 基准相关：Jensen alpha / beta / M²
+    var alpha = null, beta = null, m2 = null, benchAnn = null;
+    if (benchmark && benchmark.length >= 2) {
+      // 按同一索引取成对有效值（避免空值导致错位）
+      var pa = [], pb = [];
+      var lim = Math.min(values.length, benchmark.length);
+      for (var j = 0; j < lim; j++) {
+        var av = values[j], bv = benchmark[j];
+        if (av > 0 && bv > 0) { pa.push(av); pb.push(bv); }
+      }
+      if (pa.length >= 3) {
+        var ra = [], rb = [];
+        for (var j2 = 1; j2 < pa.length; j2++) { ra.push(pa[j2] / pa[j2 - 1] - 1); rb.push(pb[j2] / pb[j2 - 1] - 1); }
+        var ma = mean(ra), mb = mean(rb);
+        var cov = 0, varb = 0;
+        for (var z = 0; z < ra.length; z++) { cov += (ra[z] - ma) * (rb[z] - mb); varb += (rb[z] - mb) * (rb[z] - mb); }
+        cov /= ra.length; varb /= ra.length;
+        beta = varb > 0 ? cov / varb : null;
+        // 基准年化用几何口径，与资产口径一致
+        benchAnn = Math.pow(pb[pb.length - 1] / pb[0], 252 / (pb.length - 1)) - 1;
+        if (beta !== null) alpha = annReturn - (RF + beta * (benchAnn - RF));
+        // M² = Rf + Sharpe × σ_基准
+        var benchVol = Math.sqrt(varb) * Math.sqrt(252);
+        m2 = RF + sharp * benchVol;
+      }
+    }
     return {
-      annReturn: annReturn, annVol: annVol, maxDD: maxDD, sharp: sharp, var95: var95,
-      totalReturn: end / start - 1, n: n
+      annReturn: annReturn, annVol: annVol, maxDD: maxDD, sharp: sharp, sortino: sortino,
+      m2: m2, alpha: alpha, beta: beta, benchAnn: benchAnn, calmar: calmar,
+      var95: var95, totalReturn: end / start - 1, n: n
     };
   }
 
