@@ -751,9 +751,9 @@
         cells.push([j, i, Math.round(mat[i][j] * 100) / 100]);
     return {
       backgroundColor: theme.bg,
-      tooltip: Object.assign({}, tooltip(theme), { position: 'top', formatter: function (p) { return names[p.value[1]] + ' × ' + names[p.value[0]] + '：' + p.value[2].toFixed(2); } }),
-      grid: { top: 12, left: 12, right: 74, bottom: 8, containLabel: true },
-      xAxis: [Object.assign({ type: 'category', data: names, splitArea: { show: true }, axisLabel: { color: theme.muted, fontSize: 10, interval: 0, rotate: 30 } }, axisCommon(theme))],
+      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', axisPointer: null, position: 'top', formatter: function (p) { return names[p.value[1]] + ' × ' + names[p.value[0]] + '：' + p.value[2].toFixed(2); } }),
+      grid: { top: 16, left: 16, right: 78, bottom: 18, containLabel: true },
+      xAxis: [Object.assign({ type: 'category', data: names, splitArea: { show: true }, axisLabel: { color: theme.muted, fontSize: 10, interval: 0, rotate: 35, margin: 8 } }, axisCommon(theme))],
       yAxis: [Object.assign({ type: 'category', data: names, splitArea: { show: true }, axisLabel: { color: theme.muted, fontSize: 10 } }, axisCommon(theme))],
       visualMap: {
         min: -1, max: 1, calculable: false, orient: 'vertical', right: 6, top: 'middle',
@@ -891,10 +891,10 @@
       visualMap: {
         min: Math.min(min, -1), max: Math.max(max, 1), calculable: false, orient: 'vertical', right: 8, top: 'middle',
         itemWidth: 10, itemHeight: 100, textStyle: { color: theme.muted, fontSize: 10 },
-        inRange: { color: [hexToRgba(theme.down, 0.85), theme.bg, hexToRgba(theme.accent, 0.9)] }
+        inRange: { color: [hexToRgba(theme.down, 0.75), hexToRgba(theme.accent, 0.35), hexToRgba(theme.accent, 0.95)] }
       },
       series: [{
-        type: 'map', map: 'world', roam: true, zoom: 1.15,
+        type: 'map', map: 'world', roam: true, zoom: 1.25,
         nameProperty: 'name',
         itemStyle: { areaColor: hexToRgba(theme.text, 0.06), borderColor: hexToRgba(theme.text, 0.25), borderWidth: 0.6 },
         emphasis: { itemStyle: { areaColor: hexToRgba(theme.accent, 0.4) }, label: { show: true, color: theme.text, fontSize: 11 } },
