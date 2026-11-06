@@ -671,7 +671,7 @@
       items.forEach(function (it) {
         var p = pxOf(it.i);
         if (!p) return;
-        marks.push({ px: p[0], py: p[1], name: name, kind: it.kind, val: valAt(it.i), color: it.color, si: si });
+        marks.push({ px: p[0], py: p[1], name: name, kind: it.kind, val: valAt(it.i), color: it.color, si: si, i: it.i });
       });
     });
     if (!marks.length) return;
@@ -713,16 +713,20 @@
       var label = document.createElement('div');
       label.className = 'ext-label';
       label.dataset.series = m.name || '';
+      label.dataset.idx = m.i;
       var txtColor = pickTextColor(m.color);
       label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:default;background:' + m.color + ';color:' + txtColor + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
       label.textContent = fmtNum(m.val);
       overlay.appendChild(label);
       // 边界收敛：保证标签完整显示在图表内
       var lw = label.offsetWidth || 48, lh = label.offsetHeight || 18;
-      if (lx + lw > cw - 6) lx = cw - lw - 6;
-      if (lx < 6) lx = 6;
-      if (ly + lh > chh - 6) ly = chh - lh - 6;
-      if (ly < 6) ly = 6;
+      var pr0 = getPlotRect(inst);
+      var bx0 = pr0 ? pr0.x : 0, by0 = pr0 ? pr0.y : 0;
+      var bw0 = pr0 ? pr0.w : cw, bh0 = pr0 ? pr0.h : chh;
+      if (lx + lw > bx0 + bw0 - 3) lx = bx0 + bw0 - lw - 3;
+      if (lx < bx0 + 3) lx = bx0 + 3;
+      if (ly + lh > by0 + bh0 - 3) ly = by0 + bh0 - lh - 3;
+      if (ly < by0 + 3) ly = by0 + 3;
       label.style.left = lx + 'px';
       label.style.top = ly + 'px';
       var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -755,11 +759,27 @@
     });
   }
 
-  /* 统一标注布局：限制在图表内 + 两两不重叠（不再允许拖动） */
-  function layoutChartLabels(container) {
+  /* 取绘图区（坐标轴内部）范围，标注不得超出 */
+  function getPlotRect(inst) {
+    try {
+      var gm = inst.getModel().getComponent('grid', 0);
+      if (gm && gm.coordinateSystem) {
+        var r = gm.coordinateSystem.getRect();
+        if (r && r.width > 0 && r.height > 0) return { x: r.x, y: r.y, w: r.width, h: r.height };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  /* 统一标注布局：限制在绘图区内 + 两两不重叠（不可拖动） */
+  function layoutChartLabels(inst) {
+    var container = inst && inst.getDom && inst.getDom();
     if (!container) return;
+    var pr = getPlotRect(inst);
     var cw = container.clientWidth, ch = container.clientHeight;
     if (!cw || !ch) return;
+    var bx = pr ? pr.x : 0, by = pr ? pr.y : 0;
+    var bw = pr ? pr.w : cw, bh = pr ? pr.h : ch;
     var els = Array.prototype.slice.call(container.querySelectorAll('.ext-label, .last-tag'));
     if (!els.length) return;
     var placed = [];
@@ -774,19 +794,19 @@
     els.forEach(function (el) {
       var w = el.offsetWidth || 50, h = el.offsetHeight || 18;
       var x = el.offsetLeft, y = el.offsetTop;
-      x = Math.max(4, Math.min(x, cw - w - 4));
-      y = Math.max(4, Math.min(y, ch - h - 4));
+      x = Math.max(bx + 3, Math.min(x, bx + bw - w - 3));
+      y = Math.max(by + 3, Math.min(y, by + bh - h - 3));
       var guard = 0;
       while (collides(x, y, w, h) && guard < 40) {
         y += h + 3;
-        if (y + h > ch - 4) {
-          y = 4;
-          x = (x + w + 6 + w > cw - 4) ? 4 : x + w + 6;
+        if (y + h > by + bh - 3) {
+          y = by + 3;
+          x = (x + w + 6 + w > bx + bw - 3) ? bx + 3 : x + w + 6;
         }
         guard++;
       }
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
+      el.style.left = Math.round(x) + 'px';
+      el.style.top = Math.round(y) + 'px';
       el.style.cursor = 'default';
       placed.push({ x: x, y: y, w: w, h: h });
     });
@@ -822,6 +842,11 @@
         li = i; lv = v; break;
       }
       if (li < 0) return;
+      // 该点已有「最高/最低」极值标注 → 不再重复显示最新值
+      var dupMark = Array.prototype.some.call(container.querySelectorAll('.ext-label'), function (el) {
+        return (el.dataset.series || '') === (s.name || '') && String(el.dataset.idx) === String(li);
+      });
+      if (dupMark) return;
       var p = null;
       try { p = inst.convertToPixel({ seriesIndex: si }, [li, lv]); } catch (e) { return; }
       if (!p) return;
@@ -836,13 +861,16 @@
       tag.textContent = fmtNum(lv);
       container.appendChild(tag);
       var tw = tag.offsetWidth || 54, th = tag.offsetHeight || 18;
+      var prt = getPlotRect(inst);
+      var bxt = prt ? prt.x : 0, byt = prt ? prt.y : 0;
+      var bwt = prt ? prt.w : cw, bht = prt ? prt.h : chh;
       var tx = p[0] - tw - 8;
-      if (tx < 6) tx = p[0] + 8;
-      if (tx + tw > cw - 6) tx = cw - tw - 6;
-      if (tx < 6) tx = 6;
+      if (tx < bxt + 3) tx = p[0] + 8;
+      if (tx + tw > bxt + bwt - 3) tx = bxt + bwt - tw - 3;
+      if (tx < bxt + 3) tx = bxt + 3;
       var ty = p[1] - th / 2;
-      if (ty < 6) ty = 6;
-      if (ty + th > chh - 6) ty = chh - th - 6;
+      if (ty < byt + 3) ty = byt + 3;
+      if (ty + th > byt + bht - 3) ty = byt + bht - th - 3;
       // 纵向错开，避免互相重叠
       var guard = 0;
       while (overlaps(tx, ty, tw, th) && guard < 24) { ty += th + 3; if (ty + th > chh - 6) { ty = Math.max(6, p[1] - th / 2 - (guard + 1) * (th + 3)); } guard++; }
@@ -980,7 +1008,7 @@
     if (!inst) return;
     applyExtremeLabels(inst);
     applyLastValueTag(inst);
-    layoutChartLabels(inst.getDom && inst.getDom());
+    layoutChartLabels(inst);
     bindFocusLegend(inst);
     bindAnnoFocus(inst);
     if (inst._extBound) return;
@@ -3006,7 +3034,11 @@
       this.classList.toggle('active', state.labelMode === 'extreme');
       if (state.echartsEl) {
         var inst = echarts.getInstanceByDom(state.echartsEl);
-        if (inst) applyExtremeLabels(inst);
+        if (inst) {
+          applyExtremeLabels(inst);
+          applyLastValueTag(inst);     // 重建最新值标签：与极值重合的点自动跳过
+          layoutChartLabels(inst);
+        }
       } else { rerender(); }
     });
     el('btn-watermark').addEventListener('click', function () {
