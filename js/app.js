@@ -874,6 +874,12 @@
             '<button class="btn" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
           '</div>' +
           '<div class="home-ai-way">' +
+            '<div class="haw-badge">' + T('home.ai.wayC') + '</div>' +
+            '<p class="haw-desc">' + T('home.ai.wayC.desc') + '</p>' +
+            '<div class="home-cta-row"><button class="btn primary" id="home-ai-selfinstall">' + T('home.ai.copyC') + '</button></div>' +
+            '<p class="home-mcp-detail-line">' + T('home.ai.wayC.warn') + '</p>' +
+          '</div>' +
+          '<div class="home-ai-way">' +
             '<div class="haw-badge">' + T('home.ai.wayB') + '</div>' +
             '<p class="haw-desc">' + T('home.ai.wayB.desc') + '</p>' +
             '<details class="home-guide-details">' +
@@ -916,6 +922,50 @@
         '- labels 与每个 series 的 values 长度必须一致',
         '',
         '请把我的数据整理成上面的 JSON，并生成完整链接。'
+      ].join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(prompt).then(function () { toast(T('home.ai.copied')); }, function () { toast('复制失败'); });
+      } else {
+        var ta = document.createElement('textarea'); ta.value = prompt; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); toast(T('home.ai.copied')); } catch (e) {}
+        ta.remove();
+      }
+    });
+    var selfBtn = h.querySelector('#home-ai-selfinstall');
+    if (selfBtn) selfBtn.addEventListener('click', function () {
+      var en = (window.I18N && window.I18N.getLang() === 'en');
+      var prompt = en ? [
+        'Please set up the AFG charting tool (an MCP server) for yourself. Do it step by step and tell me if anything needs my input.',
+        '',
+        '1) Check environment: run `node -v`. If Node.js is missing, give me the download link and stop.',
+        '2) Fetch the project (prefer git):',
+        '   git clone https://github.com/saviorbill/afg.git ~/afg',
+        '   (if git is unavailable, tell me and I will download the ZIP manually)',
+        '3) Install dependencies: cd ~/afg/mcp-server && npm install',
+        '4) Get the absolute path: cd ~/afg/mcp-server && pwd  → the config needs <that path>/server.js',
+        '5) Register the MCP server in your own MCP config file:',
+        '   {"mcpServers":{"afg-charts":{"command":"node","args":["<ABSOLUTE_PATH>/server.js"]}}}',
+        '   If you cannot find your config file, tell me the path and ask me to confirm before writing.',
+        '6) Reload/reconnect MCP, then list your tools and confirm `make_chart` is available.',
+        '7) Finally call make_chart once with a tiny test dataset and give me the resulting link.',
+        '',
+        'Report each step result. Do not skip steps.'
+      ].join('\n') : [
+        '请帮我在你这里配置 AFG 图表工具（MCP 服务器），一步一步执行，遇到需要我确认的地方先问我。',
+        '',
+        '1) 检查环境：运行 `node -v`。如果没有 Node.js，给我下载地址并停下。',
+        '2) 获取项目（优先用 git）：',
+        '   git clone https://github.com/saviorbill/afg.git ~/afg',
+        '   （如果没有 git，告诉我，我手动下载 ZIP）',
+        '3) 安装依赖：cd ~/afg/mcp-server && npm install',
+        '4) 取得绝对路径：cd ~/afg/mcp-server && pwd  → 配置里要填 <这个路径>/server.js',
+        '5) 把 MCP 服务器写进你自己的 MCP 配置文件：',
+        '   {"mcpServers":{"afg-charts":{"command":"node","args":["<绝对路径>/server.js"]}}}',
+        '   如果找不到你的配置文件在哪，先告诉我路径并让我确认，再写入。',
+        '6) 重载/重连 MCP，然后列出你有哪些工具，确认能看到 make_chart。',
+        '7) 最后调用一次 make_chart，用一个小测试数据生成图表，把链接发给我。',
+        '',
+        '每完成一步告诉我结果，不要跳步。'
       ].join('\n');
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(prompt).then(function () { toast(T('home.ai.copied')); }, function () { toast('复制失败'); });
