@@ -538,3 +538,10 @@ textarea.csv-area {
 .home-mcp-detail { font-size: 12px; color: var(--muted); }
 .home-mcp-detail summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 .home-mcp-detail ol { padding-left: 20px; margin: 8px 0; line-height: 1.9; }
+
+/* 首页 AI 说明行 */
+.home-mcp-detail-line { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
+/* 语言按钮 */
+#btn-lang { min-width: 46px; font-size: 12px; }
+#btn-feedback { font-size: 12px; }
+#feedback-overlay textarea, #feedback-overlay input[type="text"] { width: 100%; }

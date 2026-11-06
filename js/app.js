@@ -841,45 +841,40 @@
     el('btn-events').style.display = 'none';
     el('btn-table').style.display = 'none';
     el('hint').textContent = '';
+    var T = window.I18N ? window.I18N.t : function (k) { return k; };
     var h = document.createElement('div');
     h.className = 'home-view';
     h.innerHTML =
       '<div class="home-logo">AFG</div>' +
-      '<div class="home-title">智能制图 · 上传即用</div>' +
-      '<div class="home-sub">只需上传数据，工具自动识别结构并推荐图表；你随时可自由切换图表类型、配色与功能。</div>' +
+      '<div class="home-title">' + T('home.title') + '</div>' +
+      '<div class="home-sub">' + T('home.sub') + '</div>' +
       '<div class="home-steps">' +
-        '<div class="home-step"><span class="hs-num">1</span><div><b>上传数据</b><p>支持 Excel（多工作表）/ CSV / JSON，数据仅在本地浏览器处理、不上传。</p></div></div>' +
-        '<div class="home-step"><span class="hs-num">2</span><div><b>选择分析目的</b><p>趋势图 / 业绩评估 / K线 / 机器学习 / 宏观分析，自动推荐并按模块出图。</p></div></div>' +
-        '<div class="home-step"><span class="hs-num">3</span><div><b>自由定制</b><p>切换图表、5 套配色、时间区间、叠加指标、标注、数据变换、世界地图、雷达图等。</p></div></div>' +
+        '<div class="home-step"><span class="hs-num">1</span><div><b>' + T('step1.t') + '</b><p>' + T('step1.d') + '</p></div></div>' +
+        '<div class="home-step"><span class="hs-num">2</span><div><b>' + T('step2.t') + '</b><p>' + T('step2.d') + '</p></div></div>' +
+        '<div class="home-step"><span class="hs-num">3</span><div><b>' + T('step3.t') + '</b><p>' + T('step3.d') + '</p></div></div>' +
       '</div>' +
-      '<button class="btn primary home-cta" id="home-import">＋ 上传数据开始</button>' +
-      '<div class="home-note">想看效果？左侧「中国宏观数据一览」看最新宏观；「参考模板」可预览各图表样式。</div>' +
+      '<button class="btn primary home-cta" id="home-import">' + T('home.cta') + '</button>' +
+      '<div class="home-note">' + T('home.note') + '</div>' +
       '<div class="home-mcp">' +
-        '<h3>🤖 用 AI 一句话画图（Kimi / WorkBuddy / Cursor / Claude 等）</h3>' +
-        '<p>不用学任何语法，直接把数据和需求说给 AI，它会调用 AFG 的 <code>make_chart</code> 工具，返回一个图表链接，点开就能看、能分享、能导出。</p>' +
+        '<h3>' + T('home.ai.title') + '</h3>' +
+        '<p>' + T('home.ai.desc') + '</p>' +
         '<div class="home-ai-examples">' +
-          '<div class="home-ai-q">「用近 5 年沪深300和中证500做一张对比折线图」</div>' +
-          '<div class="home-ai-q">「画一张全球主要经济体近 6 年 GDP 增速的热力图」</div>' +
-          '<div class="home-ai-q">「把这几个月的中美 CPI 画成面积图，用黑金主题」</div>' +
+          '<div class="home-ai-q">' + T('home.ai.ex1') + '</div>' +
+          '<div class="home-ai-q">' + T('home.ai.ex2') + '</div>' +
         '</div>' +
-        '<p class="home-ai-tip">👉 你也可以把 Excel 粘给 AI，再说「用 AFG 画图」，它会自动整理数据并生成图表链接。</p>' +
-        '<div class="home-cta-row">' +
-          '<button class="btn primary" id="home-demo">▶ 看一个 AI 生成的图表示例</button>' +
-        '</div>' +
-        '<details class="home-mcp-detail"><summary>开发者配置（MCP Server）</summary>' +
-          '<ol><li>进入 <code>mcp-server/</code>，运行 <code>npm install</code></li>' +
-          '<li>Agent 的 MCP 设置里添加：Command=<code>node</code>，Args=<code>&lt;项目路径&gt;/mcp-server/server.js</code></li>' +
-          '<li>对 Agent 说「用 AFG 画图」，即可调用 <code>make_chart</code></li></ol>' +
-          '<p>支持折线/面积/柱状/堆叠/雷达 + 5 套配色，详见 <code>mcp-server/README.md</code>。</p>' +
-        '</details>' +
-            '</div>';
+        '<p class="home-ai-tip">' + T('home.ai.tip') + '</p>' +
+        '<div class="home-cta-row"><button class="btn primary" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
+        '<p class="home-mcp-detail-line">' + T('home.ai.detail') + '</p>' +
+      '</div>';
     el('chart-stage').appendChild(h);
-    setHead({ title: 'AFG · 智能制图', subtitle: '上传数据 → 自动识别 → 推荐图表 → 自由定制', unit: '', source: '' });
+    setHead({ title: 'AFG', subtitle: '', unit: '', source: '' });
     h.querySelector('#home-import').addEventListener('click', openModal);
     var demoBtn = h.querySelector('#home-demo');
     if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
+    if (window.I18N) window.I18N.apply();
     syncToolbar();
   }
+
 
   /* ---------- 中国宏观数据一览（真实数据看板） ---------- */
   function renderChinaMacro() {
@@ -1311,46 +1306,47 @@
   function buildSidebar() {
     var sb = el('sidebar');
     sb.innerHTML = '';
+    var T = window.I18N ? window.I18N.t : function (k) { return k; };
 
     // 1. 使用说明
     var home = document.createElement('div');
     home.className = 'nav-item'; home.dataset.id = 'home';
-    home.innerHTML = '<span class="nav-icon">' + ICONS.home + '</span><span>使用说明</span>';
+    home.innerHTML = '<span class="nav-icon">' + ICONS.home + '</span><span>' + T('nav.home') + '</span>';
     home.addEventListener('click', function () { state.overlaySeries = []; renderHome(); closeSidebar(); });
     sb.appendChild(home);
 
     // 2. 中国宏观数据
     var macro = document.createElement('div');
     macro.className = 'nav-item nav-macro'; macro.dataset.id = 'china-macro';
-    macro.innerHTML = '<span class="nav-icon">' + ICONS.macro + '</span><span>中国宏观数据</span>';
+    macro.innerHTML = '<span class="nav-icon">' + ICONS.macro + '</span><span>' + T('nav.china') + '</span>';
     macro.addEventListener('click', function () { state.overlaySeries = []; renderChinaMacro(); closeSidebar(); });
     sb.appendChild(macro);
 
     // 3. 国际宏观数据
     var intl = document.createElement('div');
     intl.className = 'nav-item nav-macro'; intl.dataset.id = 'intl-macro';
-    intl.innerHTML = '<span class="nav-icon">' + ICONS.globe + '</span><span>国际宏观数据</span>';
+    intl.innerHTML = '<span class="nav-icon">' + ICONS.globe + '</span><span>' + T('nav.intl') + '</span>';
     intl.addEventListener('click', function () { state.overlaySeries = []; renderIntlMacro(); closeSidebar(); });
     sb.appendChild(intl);
 
     // 4. 金融数据
     var fin = document.createElement('div');
     fin.className = 'nav-item nav-macro'; fin.dataset.id = 'finance';
-    fin.innerHTML = '<span class="nav-icon">' + ICONS.perf + '</span><span>金融数据</span>';
+    fin.innerHTML = '<span class="nav-icon">' + ICONS.perf + '</span><span>' + T('nav.finance') + '</span>';
     fin.addEventListener('click', function () { state.overlaySeries = []; renderFinance(); closeSidebar(); });
     sb.appendChild(fin);
 
     // 5. 数据探索
     var explore = document.createElement('div');
     explore.className = 'nav-item'; explore.dataset.id = 'explore';
-    explore.innerHTML = '<span class="nav-icon">' + ICONS.ml + '</span><span>数据探索</span>';
+    explore.innerHTML = '<span class="nav-icon">' + ICONS.ml + '</span><span>' + T('nav.explore') + '</span>';
     explore.addEventListener('click', function () { openExplore(); closeSidebar(); });
     sb.appendChild(explore);
 
     // 6. 示例图（可展开子菜单）
     var ex = document.createElement('div');
     ex.className = 'nav-item nav-parent';
-    ex.innerHTML = '<span class="nav-icon">' + ICONS.examples + '</span><span>示例图</span><span class="nav-caret">' + ICONS.caret + '</span>';
+    ex.innerHTML = '<span class="nav-icon">' + ICONS.examples + '</span><span>' + T('nav.examples') + '</span><span class="nav-caret">' + ICONS.caret + '</span>';
     var submenu = document.createElement('div');
     submenu.className = 'nav-submenu';
     ex.addEventListener('click', function () {
@@ -2253,7 +2249,7 @@
     list.innerHTML = '';
     var samples = [
       { label: '时间序列示例（日期 + 多列数值）', csv: '日期,中国GDP增速,美国GDP增速\n2019,6.0,2.5\n2020,2.2,-2.2\n2021,8.4,5.8\n2022,3.0,1.9\n2023,5.2,2.5\n2024,5.0,2.8' },
-      { label: 'K 线示例（日期 + OHLC + 成交量）', csv: '日期,open,high,low,close,volume\n2024-04-01,45.6,46.2,44.9,45.8,1200000\n2024-04-02,45.8,46.5,45.1,46.2,1350000\n2024-04-03,46.2,47.0,45.8,46.6,1100000\n2024-04-04,46.6,46.9,45.4,45.7,980000\n2024-04-05,45.7,46.3,45.2,46.1,1020000' }
+      { label: '截面数据示例（分类 + 数值）', csv: '行业,营收增速\n电子,18.2\n医药,12.5\n汽车,9.8\n食品饮料,6.3\n地产,-8.1' }
     ];
     samples.forEach(function (s) {
       var b = document.createElement('button');
@@ -2563,6 +2559,72 @@
   /* ---------- 事件绑定 ---------- */
   function bindEvents() {
     el('btn-import').addEventListener('click', openModal);
+
+    /* ---------- 语言切换 ---------- */
+    var langBtn = el('btn-lang');
+    if (langBtn) {
+      langBtn.textContent = (window.I18N && window.I18N.getLang() === 'en') ? '中文' : 'EN';
+      langBtn.addEventListener('click', function () {
+        var next = (window.I18N.getLang() === 'en') ? 'zh' : 'en';
+        window.I18N.setLang(next);
+        this.textContent = (next === 'en') ? '中文' : 'EN';
+        buildSidebar();
+        if (state.mode === 'home') renderHome();
+        else if (window.I18N) window.I18N.apply();
+        toast(next === 'en' ? 'Switched to English' : '已切换为中文');
+      });
+    }
+
+    /* ---------- 用户反馈 ---------- */
+    var fbOverlay = el('feedback-overlay');
+    function closeFeedback() { fbOverlay.classList.remove('open'); }
+    function feedbackText() {
+      var type = el('fb-type').value;
+      var content = (el('fb-content').value || '').trim();
+      var contact = (el('fb-contact').value || '').trim();
+      var T = window.I18N ? window.I18N.t : function (k) { return k; };
+      var typeLabel = type === 'idea' ? T('fb.type.idea') : T('fb.type.bug');
+      var view = state.viewKey || state.mode || '-';
+      return { type: type, typeLabel: typeLabel, content: content, contact: contact, view: view };
+    }
+    if (fbOverlay) {
+      el('btn-feedback').addEventListener('click', function () { fbOverlay.classList.add('open'); });
+      el('feedback-close').addEventListener('click', closeFeedback);
+      el('feedback-cancel').addEventListener('click', closeFeedback);
+      fbOverlay.addEventListener('click', function (e) { if (e.target === fbOverlay) closeFeedback(); });
+      el('fb-copy').addEventListener('click', function () {
+        var f = feedbackText();
+        if (!f.content) { toast('请先填写内容'); return; }
+        var txt = '【' + f.typeLabel + '】\n' + f.content + (f.contact ? ('\n联系方式：' + f.contact) : '') + '\n页面：' + f.view + '\n时间：' + new Date().toLocaleString();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(function () {
+            toast(window.I18N.t('fb.done.copy'));
+          }, function () { toast('复制失败，请手动选择'); });
+        } else {
+          var ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); toast(window.I18N.t('fb.done.copy')); } catch (e) {}
+          ta.remove();
+        }
+      });
+      el('fb-submit').addEventListener('click', function () {
+        var f = feedbackText();
+        if (!f.content) { toast('请先填写内容'); return; }
+        var body = f.content + '\n\n---\n' + (f.contact ? ('联系方式：' + f.contact + '\n') : '') + '页面：' + f.view + '\n时间：' + new Date().toLocaleString() + '\n语言：' + (window.I18N ? window.I18N.getLang() : 'zh');
+        var title = '[' + f.typeLabel + '] ' + f.content.slice(0, 40);
+        var url = 'https://github.com/saviorbill/afg/issues/new?labels=feedback&title=' +
+          encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
+        // 本地留档（便于同一浏览器复看）
+        try {
+          var hist = JSON.parse(localStorage.getItem('afg_feedback') || '[]');
+          hist.push({ type: f.type, content: f.content, contact: f.contact, view: f.view, at: new Date().toISOString() });
+          localStorage.setItem('afg_feedback', JSON.stringify(hist.slice(-50)));
+        } catch (e) {}
+        window.open(url, '_blank');
+        toast(window.I18N.t('fb.done.github'));
+        el('fb-content').value = ''; el('fb-contact').value = '';
+        closeFeedback();
+      });
+    }
     el('btn-more').addEventListener('click', function (e) {
       e.stopPropagation();
       el('tb-menu').classList.toggle('open');
@@ -3823,6 +3885,11 @@
   function init() {
     var q = {};
     try { new URLSearchParams(location.search).forEach(function (v, k) { q[k] = v; }); } catch (e) {}
+    // 语言：URL 参数 > 本地存储 > 默认中文
+    if (window.I18N) {
+      var initLang = q.lang || (function () { try { return localStorage.getItem('afg_lang'); } catch (e) { return null; } })();
+      window.I18N.setLang(initLang === 'en' ? 'en' : 'zh');
+    }
     if (q.theme && Themes.getTheme(q.theme)) state.theme = q.theme;
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) state.currentTemplate = q.tpl;
     Themes.applyTheme(state.theme);

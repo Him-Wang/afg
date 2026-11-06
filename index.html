@@ -18,7 +18,9 @@
       </div>
     </div>
     <div class="header-actions">
-      <button class="btn ghost" id="btn-import">＋ 导入数据</button>
+      <button class="btn ghost" id="btn-feedback" data-i18n="app.feedback">反馈</button>
+      <button class="btn ghost" id="btn-lang" title="Language">EN</button>
+      <button class="btn ghost" id="btn-import" data-i18n="app.import">＋ 导入数据</button>
       <select id="theme-select" title="切换配色"></select>
     </div>
   </header>
@@ -45,7 +47,7 @@
         </div>
       </div>
       <div class="chart-toolbar" id="chart-toolbar">
-        <label class="tb-label">图表</label>
+        <label class="tb-label" data-i18n="tb.chart">图表</label>
         <select id="toolbar-chart-type">
           <option value="line">折线图</option>
           <option value="area">面积图</option>
@@ -57,21 +59,21 @@
           <option value="radar">雷达图</option>
           <option value="rank">横向排名</option>
         </select>
-        <label class="tb-label">区间</label>
+        <label class="tb-label" data-i18n="tb.range">区间</label>
         <select id="toolbar-range">
-          <option value="all">全部</option>
-          <option value="1y">近1年</option>
-          <option value="5y">近5年</option>
-          <option value="10y">近10年</option>
+          <option value="all" data-i18n="range.all">全部</option>
+          <option value="1y" data-i18n="range.1y">近1年</option>
+          <option value="5y" data-i18n="range.5y">近5年</option>
+          <option value="10y" data-i18n="range.10y">近10年</option>
         </select>
-        <button class="btn sm" id="btn-add-indicator" title="叠加对比指标">＋ 指标</button>
-        <button class="btn sm" id="btn-labels" title="标注可视区间内最高/最低/最新值">极值标注</button>
+        <button class="btn sm" id="btn-add-indicator" title="叠加对比指标" data-i18n="tb.add">＋ 指标</button>
+        <button class="btn sm" id="btn-labels" title="标注最高/最低" data-i18n="tb.labels">极值标注</button>
         <div class="stat-badge" id="stat-badge"></div>
         <span class="tb-spacer"></span>
-        <button class="btn sm" id="btn-export">⇩ 导出图片</button>
-        <button class="btn sm" id="btn-share-link">🔗 复制链接</button>
+        <button class="btn sm" id="btn-export" data-i18n="tb.export">⇩ 导出图片</button>
+        <button class="btn sm" id="btn-share-link" data-i18n="tb.share">🔗 复制链接</button>
         <div class="tb-more">
-          <button class="btn sm" id="btn-more">⚙ 更多</button>
+          <button class="btn sm" id="btn-more" data-i18n="tb.more">⚙ 更多</button>
           <div class="tb-menu" id="tb-menu">
             <button class="btn sm" id="btn-series-color">🎨 单条颜色</button>
             <button class="btn sm" id="tb-swapxy" title="交换 X/Y 轴方向">⇅ 交换 X/Y</button>
@@ -91,6 +93,37 @@
       <div class="analysis" id="analysis"></div>
       <footer class="app-footer"><span id="footer-note">—</span></footer>
     </main>
+  </div>
+
+
+  <!-- 反馈弹层 -->
+  <div class="overlay" id="feedback-overlay">
+    <div class="modal" style="width:min(520px,94vw)">
+      <div class="modal-head">
+        <div><h2 data-i18n="fb.title">反馈与建议</h2><div class="sub" data-i18n="fb.sub"></div></div>
+        <button class="modal-close" id="feedback-close">×</button>
+      </div>
+      <div class="field-row">
+        <label data-i18n="fb.type">类型</label>
+        <select id="fb-type">
+          <option value="bug" data-i18n="fb.type.bug">问题反馈</option>
+          <option value="idea" data-i18n="fb.type.idea">功能建议</option>
+        </select>
+      </div>
+      <div class="field-row" style="align-items:flex-start">
+        <label data-i18n="fb.content">具体内容</label>
+        <textarea id="fb-content" rows="5" data-i18n="fb.content.ph" placeholder="描述你遇到的问题，或想要的功能…" style="flex:1;resize:vertical"></textarea>
+      </div>
+      <div class="field-row">
+        <label data-i18n="fb.contact">联系方式（可选）</label>
+        <input type="text" id="fb-contact" data-i18n="fb.contact.ph" placeholder="邮箱 / 微信，方便我回复你" style="flex:1" />
+      </div>
+      <div class="field-row" style="margin-top:14px;gap:8px">
+        <button class="btn primary" id="fb-submit" data-i18n="fb.submit">提交到 GitHub</button>
+        <button class="btn" id="fb-copy" data-i18n="fb.copy">复制内容</button>
+        <button class="btn" id="feedback-cancel" data-i18n="fb.cancel">取消</button>
+      </div>
+    </div>
   </div>
 
   <!-- 数据变换弹层 -->
@@ -311,6 +344,7 @@
   <script src="vendor/xlsx.full.min.js"></script>
   <!-- 业务模块 -->
   <script src="js/themes.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/data-loader.js"></script>
   <script src="js/china-macro.js"></script>
   <script src="js/finance-data.js"></script>
