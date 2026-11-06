@@ -1,0 +1,136 @@
+/* AFG · AI 绘图使用指南（完整版，中英双语） */
+(function (global) {
+  'use strict';
+
+  var REPO = 'https://github.com/saviorbill/afg';
+
+  var ZH = [
+    '<div class="guide-sec">',
+    '<h4>第 1 步 · 确认电脑有 Node.js</h4>',
+    '<p>打开「终端」（Mac：启动台搜「终端」；Windows：开始菜单搜 PowerShell），输入下面命令后回车：</p>',
+    '<pre class="guide-code">node -v</pre>',
+    '<p>显示类似 <code>v20.11.0</code> 的版本号 → 已装好，继续下一步。<br>',
+    '提示「command not found / 不是内部或外部命令」→ 去 <a href="https://nodejs.org/" target="_blank" rel="noopener">nodejs.org</a> 下载 LTS 版安装，装完<b>重新开一个终端窗口</b>再试。</p>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>第 2 步 · 把项目下载到本地并安装依赖</h4>',
+    '<p>方式一（有 git）：在终端逐行执行：</p>',
+    '<pre class="guide-code">git clone ' + REPO + '.git\ncd afg/mcp-server\nnpm install</pre>',
+    '<p>方式二（没有 git）：浏览器打开 <a href="' + REPO + '" target="_blank" rel="noopener">' + REPO + '</a> → 点绿色 <b>Code</b> → <b>Download ZIP</b> → 解压。',
+    '然后终端进入解压出来的 <code>afg/mcp-server</code> 文件夹，执行：</p>',
+    '<pre class="guide-code">npm install</pre>',
+    '<p>看到 <code>added N packages</code> 就成功了。</p>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>第 3 步 · 拿到 server.js 的完整路径</h4>',
+    '<p>仍然在 <code>mcp-server</code> 文件夹里，执行：</p>',
+    '<pre class="guide-code">pwd</pre>',
+    '<p>把输出的路径后面接上 <code>/server.js</code>，就是第 4 步要填的路径。例如输出是 <code>/Users/xiaoming/afg/mcp-server</code>，',
+    '那么完整路径就是：</p>',
+    '<pre class="guide-code">/Users/xiaoming/afg/mcp-server/server.js</pre>',
+    '<p>Windows 的路径长这样（注意是反斜杠）：</p>',
+    '<pre class="guide-code">C:\\Users\\xiaoming\\afg\\mcp-server\\server.js</pre>',
+    '<p class="guide-tip">提示：可以直接把这个文件从访达/资源管理器拖进终端，它会自动补出完整路径。</p>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>第 4 步 · 把配置写进 AI 客户端</h4>',
+    '<p>绝大多数客户端都用同一段 JSON，把它填进对应位置（把路径换成你第 3 步拿到的）：</p>',
+    '<pre class="guide-code">{\n  "mcpServers": {\n    "afg-charts": {\n      "command": "node",\n      "args": ["/Users/xiaoming/afg/mcp-server/server.js"]\n    }\n  }\n}</pre>',
+    '<table class="guide-table">',
+    '<tr><th>客户端</th><th>配置位置 / 操作</th></tr>',
+    '<tr><td><b>Cursor</b></td><td>设置 → <b>Features</b> → <b>MCP</b> → <b>+ Add new MCP server</b>：<br>Name 填 <code>afg-charts</code>，Type 选 <code>command</code>，Command 填 <code>node /完整路径/mcp-server/server.js</code>。<br>或在项目根目录新建 <code>.cursor/mcp.json</code>，粘贴上面 JSON。</td></tr>',
+    '<tr><td><b>Claude Code</b></td><td>终端执行一行命令：<br><code>claude mcp add afg-charts -- node /完整路径/mcp-server/server.js</code></td></tr>',
+    '<tr><td><b>Claude Desktop</b></td><td>编辑配置文件后<b>完全退出</b>再打开：<br>Mac：<code>~/Library/Application Support/Claude/claude_desktop_config.json</code><br>Windows：<code>%APPDATA%\\Claude\\claude_desktop_config.json</code></td></tr>',
+    '<tr><td><b>Kimi / WorkBuddy</b></td><td>设置里的 <b>MCP</b>（或「工具」）页面 → 添加服务器 → 类型选 <code>stdio</code> → 命令 <code>node</code> → 参数 <code>/完整路径/mcp-server/server.js</code></td></tr>',
+    '<tr><td><b>DeepSeek Harness</b></td><td>MCP 配置里加入上面那段 JSON 即可。</td></tr>',
+    '</table>',
+    '<p class="guide-tip">找不到入口？在客户端里直接问 AI：「怎么在你这配置 MCP 服务器？」它通常能告诉你具体路径。</p>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>第 5 步 · 重启并验证</h4>',
+    '<p><b>完全退出</b>客户端再打开（不是关窗口，要退出程序，Mac 用 Cmd+Q）。然后问 AI：</p>',
+    '<pre class="guide-code">你现在有哪些工具？有没有 make_chart？</pre>',
+    '<p>如果它列出 <code>make_chart</code> → 配置成功。之后直接用自然语言：</p>',
+    '<pre class="guide-code">用 AFG 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题</pre>',
+    '<p>AI 会返回一个 <code>https://saviorbill.github.io/afg/?chart=...</code> 链接，点开就是图。</p>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>配置不成功？逐条排查</h4>',
+    '<ul>',
+    '<li><b>提示 node 找不到</b>：Node.js 没装好或没进 PATH。重装 Node.js，<b>重启终端</b>。Windows 可在命令行先试 <code>where node</code>。</li>',
+    '<li><b>路径有空格</b>：JSON 里不用转义，直接写；但终端命令里要加引号，如 <code>"node" "/My Folder/afg/mcp-server/server.js"</code>。</li>',
+    '<li><b>客户端列表里没有 afg-charts</b>：JSON 格式错了（多了/少了逗号）。把 JSON 贴到 jsonlint.com 校验一下。</li>',
+    '<li><b>想确认服务器本身能跑</b>：终端执行 <code>node /完整路径/mcp-server/server.js</code>，如果光标停住不返回（没有报错），说明服务正常——它靠标准输入输出通信，这样是正常的。</li>',
+    '<li><b>改了配置还是不行</b>：完全退出客户端（Mac 用 Cmd+Q / 活动监视器确认进程已结束）再启动。</li>',
+    '</ul>',
+    '</div>'
+  ].join('\n');
+
+  var EN = [
+    '<div class="guide-sec">',
+    '<h4>Step 1 · Check Node.js</h4>',
+    '<p>Open Terminal (macOS) or PowerShell (Windows) and run:</p>',
+    '<pre class="guide-code">node -v</pre>',
+    '<p>If you see a version like <code>v20.11.0</code>, continue. If it says "command not found", install the LTS build from ',
+    '<a href="https://nodejs.org/" target="_blank" rel="noopener">nodejs.org</a>, then <b>open a new terminal window</b>.</p>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>Step 2 · Download the project and install dependencies</h4>',
+    '<p>With git:</p>',
+    '<pre class="guide-code">git clone ' + REPO + '.git\ncd afg/mcp-server\nnpm install</pre>',
+    '<p>Without git: open <a href="' + REPO + '" target="_blank" rel="noopener">' + REPO + '</a> → <b>Code</b> → <b>Download ZIP</b> → unzip.',
+    'Then enter the unzipped <code>afg/mcp-server</code> folder and run:</p>',
+    '<pre class="guide-code">npm install</pre>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>Step 3 · Get the absolute path to server.js</h4>',
+    '<p>Inside <code>mcp-server</code>, run:</p>',
+    '<pre class="guide-code">pwd</pre>',
+    '<p>Append <code>/server.js</code> to the output. Example: <code>/Users/you/afg/mcp-server</code> →</p>',
+    '<pre class="guide-code">/Users/you/afg/mcp-server/server.js</pre>',
+    '<p>On Windows it looks like:</p>',
+    '<pre class="guide-code">C:\\Users\\you\\afg\\mcp-server\\server.js</pre>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>Step 4 · Add the config to your AI client</h4>',
+    '<pre class="guide-code">{\n  "mcpServers": {\n    "afg-charts": {\n      "command": "node",\n      "args": ["/path/to/mcp-server/server.js"]\n    }\n  }\n}</pre>',
+    '<table class="guide-table">',
+    '<tr><th>Client</th><th>Where to put it</th></tr>',
+    '<tr><td><b>Cursor</b></td><td>Settings → <b>Features</b> → <b>MCP</b> → <b>+ Add new MCP server</b>: Name <code>afg-charts</code>, Type <code>command</code>, Command <code>node /path/server.js</code>. Or create <code>.cursor/mcp.json</code>.</td></tr>',
+    '<tr><td><b>Claude Code</b></td><td><code>claude mcp add afg-charts -- node /path/server.js</code></td></tr>',
+    '<tr><td><b>Claude Desktop</b></td><td>Edit then restart fully:<br>macOS <code>~/Library/Application Support/Claude/claude_desktop_config.json</code><br>Windows <code>%APPDATA%\\Claude\\claude_desktop_config.json</code></td></tr>',
+    '<tr><td><b>Kimi / WorkBuddy</b></td><td>MCP (or Tools) settings → add stdio server → command <code>node</code> → args <code>/path/server.js</code></td></tr>',
+    '<tr><td><b>DeepSeek Harness</b></td><td>Add the JSON above to your MCP config.</td></tr>',
+    '</table>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>Step 5 · Restart and verify</h4>',
+    '<p>Quit the client <b>completely</b> (not just close the window) and reopen. Then ask:</p>',
+    '<pre class="guide-code">What tools do you have? Is make_chart available?</pre>',
+    '<p>If it lists <code>make_chart</code>, it works. Then just say:</p>',
+    '<pre class="guide-code">Chart CSI300 vs CSI500 over the last 5 years with AFG, paper theme</pre>',
+    '</div>',
+
+    '<div class="guide-sec">',
+    '<h4>Troubleshooting</h4>',
+    '<ul>',
+    '<li><b>node not found</b> — reinstall Node.js and restart the terminal.</li>',
+    '<li><b>Paths with spaces</b> — quote them in shell commands.</li>',
+    '<li><b>Server not listed</b> — validate your JSON (commas!) at jsonlint.com.</li>',
+    '<li><b>Test the server</b> — <code>node /path/server.js</code> should just hang silently (stdio server). That is normal.</li>',
+    '<li><b>Still failing</b> — fully quit and restart the client.</li>',
+    '</ul>',
+    '</div>'
+  ].join('\n');
+
+  global.AFG_AI_GUIDE = { zh: ZH, en: EN };
+})(window);

@@ -865,13 +865,21 @@
           '<div class="home-ai-way">' +
             '<div class="haw-badge">' + T('home.ai.wayA') + '</div>' +
             '<p class="haw-desc">' + T('home.ai.wayA.desc') + '</p>' +
+            '<ol class="home-ai-steps">' +
+              '<li>' + T('home.ai.a1') + '</li>' +
+              '<li>' + T('home.ai.a2') + '</li>' +
+              '<li>' + T('home.ai.a3') + '</li>' +
+            '</ol>' +
             '<div class="home-cta-row"><button class="btn primary" id="home-ai-copy">' + T('home.ai.copy') + '</button>' +
             '<button class="btn" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
           '</div>' +
           '<div class="home-ai-way">' +
             '<div class="haw-badge">' + T('home.ai.wayB') + '</div>' +
             '<p class="haw-desc">' + T('home.ai.wayB.desc') + '</p>' +
-            '<p class="home-mcp-detail-line">' + T('home.ai.detail') + '</p>' +
+            '<details class="home-guide-details">' +
+              '<summary>' + T('home.ai.guideToggle') + '</summary>' +
+              '<div class="home-guide-body">' + ((window.AFG_AI_GUIDE && window.AFG_AI_GUIDE[(window.I18N && window.I18N.getLang()) || 'zh']) || '') + '</div>' +
+            '</details>' +
           '</div>' +
         '</div>' +
       '</div>' +
