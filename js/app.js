@@ -844,33 +844,54 @@
     var T = window.I18N ? window.I18N.t : function (k) { return k; };
     var h = document.createElement('div');
     h.className = 'home-view';
+    var fbCount = 0;
+    try { fbCount = (JSON.parse(localStorage.getItem('afg_feedback') || '[]') || []).length; } catch (e) {}
     h.innerHTML =
-      '<div class="home-logo">AFG</div>' +
-      '<div class="home-title">' + T('home.title') + '</div>' +
-      '<div class="home-sub">' + T('home.sub') + '</div>' +
-      '<div class="home-steps">' +
-        '<div class="home-step"><span class="hs-num">1</span><div><b>' + T('step1.t') + '</b><p>' + T('step1.d') + '</p></div></div>' +
-        '<div class="home-step"><span class="hs-num">2</span><div><b>' + T('step2.t') + '</b><p>' + T('step2.d') + '</p></div></div>' +
-        '<div class="home-step"><span class="hs-num">3</span><div><b>' + T('step3.t') + '</b><p>' + T('step3.d') + '</p></div></div>' +
-      '</div>' +
-      '<button class="btn primary home-cta" id="home-import">' + T('home.cta') + '</button>' +
-      '<div class="home-note">' + T('home.note') + '</div>' +
-      '<div class="home-mcp">' +
-        '<h3>' + T('home.ai.title') + '</h3>' +
-        '<p>' + T('home.ai.desc') + '</p>' +
-        '<div class="home-ai-examples">' +
-          '<div class="home-ai-q">' + T('home.ai.ex1') + '</div>' +
-          '<div class="home-ai-q">' + T('home.ai.ex2') + '</div>' +
+      '<div class="home-layout">' +
+      '<div class="home-main">' +
+        '<div class="home-logo">AFG</div>' +
+        '<div class="home-title">' + T('home.title') + '</div>' +
+        '<div class="home-sub">' + T('home.sub') + '</div>' +
+        '<div class="home-steps">' +
+          '<div class="home-step"><span class="hs-num">1</span><div><b>' + T('step1.t') + '</b><p>' + T('step1.d') + '</p></div></div>' +
+          '<div class="home-step"><span class="hs-num">2</span><div><b>' + T('step2.t') + '</b><p>' + T('step2.d') + '</p></div></div>' +
+          '<div class="home-step"><span class="hs-num">3</span><div><b>' + T('step3.t') + '</b><p>' + T('step3.d') + '</p></div></div>' +
         '</div>' +
-        '<p class="home-ai-tip">' + T('home.ai.tip') + '</p>' +
-        '<div class="home-cta-row"><button class="btn primary" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
-        '<p class="home-mcp-detail-line">' + T('home.ai.detail') + '</p>' +
+        '<button class="btn primary home-cta" id="home-import">' + T('home.cta') + '</button>' +
+        '<div class="home-note">' + T('home.note') + '</div>' +
+        '<div class="home-mcp">' +
+          '<h3>' + T('home.ai.title') + '</h3>' +
+          '<p>' + T('home.ai.desc') + '</p>' +
+          '<div class="home-ai-examples">' +
+            '<div class="home-ai-q">' + T('home.ai.ex1') + '</div>' +
+            '<div class="home-ai-q">' + T('home.ai.ex2') + '</div>' +
+          '</div>' +
+          '<div class="home-cta-row"><button class="btn" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
+          '<p class="home-mcp-detail-line">' + T('home.ai.detail') + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<aside class="home-fb">' +
+        '<h3>' + T('home.fb.title') + '</h3>' +
+        '<p>' + T('home.fb.desc') + '</p>' +
+        '<ul>' +
+          '<li>' + T('home.fb.li1') + '</li>' +
+          '<li>' + T('home.fb.li2') + '</li>' +
+          '<li>' + T('home.fb.li3') + '</li>' +
+        '</ul>' +
+        '<button class="btn primary home-fb-cta" id="home-fb-btn">' + T('home.fb.cta') + '</button>' +
+        '<div class="home-fb-count">' + T('home.fb.count').replace('{n}', fbCount) + '</div>' +
+      '</aside>' +
       '</div>';
     el('chart-stage').appendChild(h);
     setHead({ title: 'AFG', subtitle: '', unit: '', source: '' });
     h.querySelector('#home-import').addEventListener('click', openModal);
     var demoBtn = h.querySelector('#home-demo');
     if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
+    var fbBtn = h.querySelector('#home-fb-btn');
+    if (fbBtn) fbBtn.addEventListener('click', function () {
+      var ov = el('feedback-overlay');
+      if (ov) ov.classList.add('open');
+    });
     if (window.I18N) window.I18N.apply();
     syncToolbar();
   }
@@ -2282,6 +2303,7 @@
   }
 
   function syncToolbar() {
+    document.body.classList.toggle('is-home', state.mode === 'home');
     var tb = el('chart-toolbar');
     if (tb) tb.style.display = (state.mode === 'home' || state.mode === 'macro') ? 'none' : '';
     syncExtremeBtn();
@@ -2588,7 +2610,8 @@
       return { type: type, typeLabel: typeLabel, content: content, contact: contact, view: view };
     }
     if (fbOverlay) {
-      el('btn-feedback').addEventListener('click', function () { fbOverlay.classList.add('open'); });
+      var fbTrigger = el('btn-feedback');
+      if (fbTrigger) fbTrigger.addEventListener('click', function () { fbOverlay.classList.add('open'); });
       el('feedback-close').addEventListener('click', closeFeedback);
       el('feedback-cancel').addEventListener('click', closeFeedback);
       fbOverlay.addEventListener('click', function (e) { if (e.target === fbOverlay) closeFeedback(); });

@@ -381,7 +381,7 @@ textarea.csv-area {
 
 /* 首页 / 使用说明 */
 .home-view { min-height: 560px; padding: 42px 52px; display: flex; flex-direction: column; gap: 20px; }
-.home-logo { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.home-logo { font-size: 20px; letter-spacing: 0.3px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 .home-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.2; }
 .home-sub { font-size: 15px; color: var(--muted); max-width: 660px; line-height: 1.75; }
 .home-steps { display: flex; flex-direction: column; gap: 16px; max-width: 660px; }
@@ -545,3 +545,23 @@ textarea.csv-area {
 #btn-lang { min-width: 46px; font-size: 12px; }
 #btn-feedback { font-size: 12px; }
 #feedback-overlay textarea, #feedback-overlay input[type="text"] { width: 100%; }
+
+/* 首页两栏：左内容 + 右反馈 */
+body.is-home .chart-head { display: none; }
+.home-layout { display: flex; gap: 34px; align-items: flex-start; }
+.home-main { flex: 1 1 auto; min-width: 0; max-width: 700px; display: flex; flex-direction: column; gap: 18px; }
+.home-fb {
+  flex: 0 0 300px; width: 300px; position: sticky; top: 12px;
+  padding: 20px; border: 1px solid var(--border); border-radius: 14px;
+  background: linear-gradient(180deg, rgba(201,169,106,0.07), transparent 60%), var(--panel);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.home-fb h3 { margin: 0; font-size: 15px; }
+.home-fb p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+.home-fb ul { margin: 2px 0 4px; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.9; }
+.home-fb-cta { align-self: flex-start; padding: 9px 16px; }
+.home-fb-count { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 1080px) {
+  .home-layout { flex-direction: column; }
+  .home-fb { width: 100%; flex: 1 1 auto; position: static; }
+}
