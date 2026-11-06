@@ -862,12 +862,17 @@
         '<div class="home-mcp">' +
           '<h3>' + T('home.ai.title') + '</h3>' +
           '<p>' + T('home.ai.desc') + '</p>' +
-          '<div class="home-ai-examples">' +
-            '<div class="home-ai-q">' + T('home.ai.ex1') + '</div>' +
-            '<div class="home-ai-q">' + T('home.ai.ex2') + '</div>' +
+          '<div class="home-ai-way">' +
+            '<div class="haw-badge">' + T('home.ai.wayA') + '</div>' +
+            '<p class="haw-desc">' + T('home.ai.wayA.desc') + '</p>' +
+            '<div class="home-cta-row"><button class="btn primary" id="home-ai-copy">' + T('home.ai.copy') + '</button>' +
+            '<button class="btn" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
           '</div>' +
-          '<div class="home-cta-row"><button class="btn" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
-          '<p class="home-mcp-detail-line">' + T('home.ai.detail') + '</p>' +
+          '<div class="home-ai-way">' +
+            '<div class="haw-badge">' + T('home.ai.wayB') + '</div>' +
+            '<p class="haw-desc">' + T('home.ai.wayB.desc') + '</p>' +
+            '<p class="home-mcp-detail-line">' + T('home.ai.detail') + '</p>' +
+          '</div>' +
         '</div>' +
       '</div>' +
       '<aside class="home-fb">' +
@@ -887,6 +892,31 @@
     h.querySelector('#home-import').addEventListener('click', openModal);
     var demoBtn = h.querySelector('#home-demo');
     if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
+    var copyBtn = h.querySelector('#home-ai-copy');
+    if (copyBtn) copyBtn.addEventListener('click', function () {
+      var prompt = [
+        '请用 AFG（Advanced-Financial-Graph）帮我做一张图，直接输出一个可点击的图表链接。',
+        '',
+        '链接格式：https://saviorbill.github.io/afg/?chart=<把 JSON 做 base64url 编码>',
+        'JSON 结构：',
+        '{"type":"area","title":"图表标题","theme":"paper","labels":["2021","2022","2023"],',
+        ' "series":[{"name":"沪深300","values":[1,2,3]},{"name":"中证500","values":[4,5,6]}]}',
+        '',
+        '说明：',
+        '- type 可选：line 折线 / area 面积 / bar 柱状 / stacked 堆叠面积 / stackedBar 堆叠柱状 / radar 雷达 / scatterMatrix 相关系数矩阵 / heatmap 热力矩阵 / donut 环形 / treemap 树图',
+        '- theme 可选：paper 象牙白（适合文档）/ midnight-gold 黑金（适合路演）/ tradingview-dark / emerald / graphite',
+        '- labels 与每个 series 的 values 长度必须一致',
+        '',
+        '请把我的数据整理成上面的 JSON，并生成完整链接。'
+      ].join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(prompt).then(function () { toast(T('home.ai.copied')); }, function () { toast('复制失败'); });
+      } else {
+        var ta = document.createElement('textarea'); ta.value = prompt; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); toast(T('home.ai.copied')); } catch (e) {}
+        ta.remove();
+      }
+    });
     var fbBtn = h.querySelector('#home-fb-btn');
     if (fbBtn) fbBtn.addEventListener('click', function () {
       var ov = el('feedback-overlay');
@@ -3245,10 +3275,12 @@
       if (ts) ts.value = cfg.theme;
     }
     var data = {};
-    if (cfg.labels !== undefined && cfg.series !== undefined) data = { labels: cfg.labels, series: cfg.series };
+    if (cfg.data) data = cfg.data;
+    else if (cfg.labels !== undefined && cfg.series !== undefined) data = { labels: cfg.labels, series: cfg.series };
     else if (cfg.indicators !== undefined && cfg.series !== undefined) data = { indicators: cfg.indicators, series: cfg.series };
-    else if (cfg.data) data = cfg.data;
-    else { toast('JSON 缺少 labels/series 或 indicators/series'); return; }
+    else if (cfg.series !== undefined) data = { series: cfg.series };            // 散点矩阵 / 相关性等无时间轴图表
+    else if (cfg.names !== undefined && cfg.matrix !== undefined) data = { names: cfg.names, matrix: cfg.matrix };
+    else { toast('JSON 缺少 data / series 数据'); return; }
     if (data.labels !== undefined && data.series !== undefined) {
       if (type === 'season') {
         data.maxYears = ({ '1y': 1, '5y': 5, '10y': 10 })[state.timeRange] || undefined;
