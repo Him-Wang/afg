@@ -87,21 +87,21 @@
     ]
   };
 
-  /* 中国宏观历史事件（用于在宏观图表上标注） */
+  /* 中国宏观历史事件（区间标注：start~end） */
   var CN_EVENTS = [
-    { d: '2008-11', label: '四万亿刺激', desc: '国际金融危机后推出四万亿投资计划，基建与信贷大幅扩张。' },
-    { d: '2015-06', label: 'A股异常波动', desc: '股市大幅回撤，监管出手救市，金融条件阶段性收紧。' },
-    { d: '2018-03', label: '中美贸易摩擦', desc: '美国对华加征关税，出口与制造业预期承压。' },
-    { d: '2020-02', label: '新冠疫情', desc: '疫情爆发、经济活动停摆，GDP 同比创历史最大降幅。' },
-    { d: '2021-01', label: '低基数反弹', desc: '低基数叠加复工复产，读数普遍冲高。' },
-    { d: '2022-04', label: '上海封控', desc: '长三角供应链受阻，消费、工业生产明显走弱。' },
-    { d: '2023-07', label: '政治局会议', desc: '提出活跃资本市场、调整优化房地产政策。' },
-    { d: '2024-09', label: '一揽子增量政策', desc: '降准降息 + 地产松绑 + 资本市场支持，预期扭转。' },
-    { d: '2025-05', label: '降准降息', desc: '政策利率下调、降准落地，稳增长加力。' },
-    { d: '2026-11', label: '政策利率换锚', desc: '隔夜逆回购成为主政策利率，形成 1.00%~1.50% 走廊。' }
+    { start: '2008-11', end: '2010-12', label: '四万亿刺激', desc: '国际金融危机后推出四万亿投资计划，基建与信贷大幅扩张。' },
+    { start: '2015-06', end: '2016-02', label: 'A股异常波动', desc: '股市大幅回撤，监管出手救市，金融条件阶段性收紧。' },
+    { start: '2018-03', end: '2020-01', label: '中美贸易战', desc: '美国对华加征关税，出口与制造业预期承压。' },
+    { start: '2020-01', end: '2020-06', label: '新冠疫情', desc: '疫情爆发、经济活动停摆，GDP 同比创历史最大降幅。' },
+    { start: '2020-07', end: '2021-06', label: '低基数', desc: '低基数叠加复工复产，读数普遍冲高。' },
+    { start: '2022-03', end: '2022-06', label: '上海封控', desc: '长三角供应链受阻，消费、工业生产明显走弱。' },
+    { start: '2023-07', end: '2023-12', label: '政治局会议', desc: '提出活跃资本市场、调整优化房地产政策。' },
+    { start: '2024-09', end: '2025-03', label: '一揽子政策', desc: '降准降息 + 地产松绑 + 资本市场支持，预期扭转。' },
+    { start: '2025-05', end: '2025-12', label: '降准降息', desc: '政策利率下调、降准落地，稳增长加力。' },
+    { start: '2026-11', end: '2026-12', label: '政策利率换锚', desc: '隔夜逆回购成为主政策利率，形成 1.00%~1.50% 走廊。' }
   ];
 
-  /* 按图表时间范围筛选事件 */
+  /* 按图表时间范围筛选事件（区间有交集才显示） */
   function cnEventsForLabels(labels) {
     if (!labels || labels.length < 2) return [];
     function toMonth(v) {
@@ -112,8 +112,10 @@
     var a = toMonth(labels[0]), b = toMonth(labels[labels.length - 1]);
     if (a === null || b === null) return [];
     return CN_EVENTS.filter(function (e) {
-      var t = toMonth(e.d);
-      return t !== null && t >= a - 1 && t <= b + 1;
+      var s = toMonth(e.start), en = toMonth(e.end);
+      if (s === null) return false;
+      if (en === null) en = s;
+      return en >= a - 1 && s <= b + 1;
     });
   }
 
@@ -187,7 +189,12 @@
     return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
 
-  function getChartTheme() { return Themes.active().chart; }
+  function getChartTheme() {
+    var t = Themes.active();
+    var c = Object.assign({}, t.chart);
+    c.id = t.id;
+    return c;
+  }
 
   function currentSeriesNames() {
     // 优先从已渲染图表读取（适配宏观/金融/国际等所有视图）
@@ -1739,9 +1746,19 @@
     if (!box) return;
     if (!events || !events.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
     box.style.display = '';
+    function shortDate(v) {
+      var m = String(v === undefined || v === null ? '' : v).match(/(\d{4})\D+(\d{1,2})/);
+      return m ? (m[1] + '.' + String(m[2]).padStart(2, '0')) : String(v || '');
+    }
     var html = '<div class="en-title">事件标注</div>';
     events.forEach(function (e) {
-      html += '<div class="en-item"><span class="en-dot"></span><span class="en-time">' + e.x + '</span><b>' + e.label + '</b><span class="en-desc">' + (e.desc || '') + '</span></div>';
+      var no = e.no ? '<span class="en-no">' + e.no + '</span>' : '<span class="en-dot"></span>';
+      var s = (e.start !== undefined) ? e.start : e.x;
+      var en = e.end;
+      var time = en ? (shortDate(s) + ' ~ ' + shortDate(en)) : shortDate(s);
+      html += '<div class="en-item">' + no + '<b>' + e.label + '</b>' +
+        '<span class="en-time">' + time + '</span>' +
+        '<span class="en-desc">' + (e.desc || '') + '</span></div>';
     });
     box.innerHTML = html;
   }
@@ -3536,6 +3553,13 @@
     var theme = getChartTheme();
     var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
     var ci = renderAutoDual(c, type, data, theme);
+    if (cfgEvents && state.showEvents) {
+      var order = null;
+      try { order = ci.getOption()._eventOrder; } catch (e9) {}
+      renderEventNotes(order || cfgEvents);
+    } else {
+      renderEventNotes(null);
+    }
     attachAnnotationHandler(ci);
     attachExtremeLabels(ci);
     state.echartsEl = c;

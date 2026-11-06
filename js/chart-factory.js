@@ -618,22 +618,38 @@
   /* ============================================================
    * 事件标注 & 水印（通用后处理）
    * ============================================================ */
+  /* 事件标注配色：浅色底用深色字，深色底用白色字，黑金主题保留金色 */
+  function eventStyle(theme) {
+    var id = theme && theme.id;
+    if (id === 'midnight-gold') {
+      return { band: hexToRgba(theme.accent, 0.10), label: theme.accent };
+    }
+    var bg = (theme && theme.bg) || '#000000';
+    var light = false;
+    var m = String(bg).match(/^#?([0-9a-f]{6})$/i);
+    if (m) {
+      var v = m[1];
+      var r = parseInt(v.slice(0, 2), 16), g = parseInt(v.slice(2, 4), 16), b = parseInt(v.slice(4, 6), 16);
+      light = (0.299 * r + 0.587 * g + 0.114 * b) > 150;
+    }
+    return light
+      ? { band: 'rgba(20,20,35,0.07)', label: '#1A1A2E' }
+      : { band: 'rgba(255,255,255,0.09)', label: '#FFFFFF' };
+  }
+
+  /* 事件标注：区间色带 + 横向文字 */
   function applyEvents(option, events, theme) {
     if (!option.series || !option.series.length || !events || !events.length) return;
-    var color = theme.accent;
     var xa = option.xAxis && (Array.isArray(option.xAxis) ? option.xAxis[0] : option.xAxis);
     var labels = (xa && xa.data) || [];
+    if (!labels.length) return;
     function toMonth(s) {
       var m = String(s === undefined || s === null ? '' : s).match(/(\d{4})\D+(\d{1,2})/);
       if (!m) return null;
       return parseInt(m[1], 10) * 12 + (parseInt(m[2] || '1', 10) - 1);
     }
-    // 把事件日期吸附到最近的实际标签上（兼容月/季/年等不同频率）
-    var seen = {};
-    var marks = [];
-    events.forEach(function (e) {
-      var target = toMonth(e.x !== undefined ? e.x : e.d);
-      if (target === null) return;
+    function snapMonth(target) {
+      if (target === null) return null;
       var best = null, bestDiff = Infinity;
       labels.forEach(function (l) {
         var lm = toMonth(l);
@@ -641,24 +657,48 @@
         var diff = Math.abs(lm - target);
         if (diff < bestDiff) { bestDiff = diff; best = l; }
       });
-      if (best === null || bestDiff > 6) return;   // 超出数据范围不标
-      if (seen[best]) return;                       // 同一位置只标一次
-      seen[best] = true;
-      marks.push({ xAxis: best, label: { formatter: e.label }, _desc: e.desc });
+      return bestDiff <= 12 ? best : null;      // 超出范围不标
+    }
+    var st = eventStyle(theme);
+    // 先算出每个事件吸附后的起止标签
+    var list = [];
+    var used = {};
+    events.forEach(function (e) {
+      var rawS = (e.start !== undefined) ? e.start : ((e.x !== undefined) ? e.x : e.d);
+      var rawE = (e.end !== undefined) ? e.end : rawS;
+      var s = toMonth(rawS), en = toMonth(rawE);
+      if (s === null) return;
+      if (en === null || en < s) en = s;
+      var ls = snapMonth(s), le = snapMonth(en);
+      if (!ls) return;
+      if (!le) le = ls;
+      if (toMonth(le) < toMonth(ls)) le = ls;
+      var key = ls + '|' + le + '|' + e.label;
+      if (used[key]) return;
+      used[key] = true;
+      list.push({ ls: ls, le: le, label: e.label, desc: e.desc, si: labels.indexOf(ls) });
     });
-    if (!marks.length) return;
-    option.series[0].markLine = {
+    if (!list.length) return;
+    list.sort(function (a, b) { return a.si - b.si; });
+    var NUMS = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮'];
+    option.series[0].markArea = {
       silent: true,
-      symbol: ['none', 'none'],
-      lineStyle: { color: color, width: 1, type: 'dashed', opacity: 0.7 },
+      itemStyle: { color: st.band },
       label: {
-        show: true, position: 'insideEndTop', rotate: 90,
-        color: color, fontSize: 9, fontWeight: 600, distance: 3,
-        textAlign: 'left', verticalAlign: 'bottom',
-        backgroundColor: theme.panel, padding: [2, 3], borderRadius: 2
+        show: true, position: 'insideTop', color: st.label,
+        fontSize: 11, fontWeight: 700, distance: 4, rotate: 0
       },
-      data: marks
+      data: list.map(function (it, i) {
+        return [
+          { xAxis: it.ls, name: NUMS[i] || String(i + 1) },
+          { xAxis: it.le }
+        ];
+      })
     };
+    // 记录事件顺序，供图下说明使用
+    option._eventOrder = list.map(function (it, i) {
+      return { no: NUMS[i] || String(i + 1), label: it.label, desc: it.desc, start: it.ls, end: it.le };
+    });
   }
 
   /* 图上说明标注（markPoint） */
