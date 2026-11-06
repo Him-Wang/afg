@@ -937,51 +937,35 @@
         '<div class="home-logo">AFG</div>' +
         '<div class="home-title">' + T('home.title') + '</div>' +
         '<div class="home-sub">' + T('home.sub') + '</div>' +
-        '<div class="home-steps">' +
-          '<div class="home-step"><span class="hs-num">1</span><div><b>' + T('step1.t') + '</b><p>' + T('step1.d') + '</p></div></div>' +
-          '<div class="home-step"><span class="hs-num">2</span><div><b>' + T('step2.t') + '</b><p>' + T('step2.d') + '</p></div></div>' +
-          '<div class="home-step"><span class="hs-num">3</span><div><b>' + T('step3.t') + '</b><p>' + T('step3.d') + '</p></div></div>' +
+        '<div class="home-cta-row" style="margin-top:6px">' +
+          '<button class="btn primary home-cta" id="home-import">' + T('home.cta') + '</button>' +
+          '<button class="btn" id="home-demo">' + T('home.ai.demo') + '</button>' +
         '</div>' +
-        '<button class="btn primary home-cta" id="home-import">' + T('home.cta') + '</button>' +
         '<div class="home-note">' + T('home.note') + '</div>' +
-        '<div class="home-mcp">' +
+        '<div class="home-mcp home-mcp-simple">' +
           '<h3>' + T('home.ai.title') + '</h3>' +
           '<p>' + T('home.ai.desc') + '</p>' +
-          '<div class="home-ai-way">' +
-            '<div class="haw-badge">' + T('home.ai.wayA') + '</div>' +
-            '<p class="haw-desc">' + T('home.ai.wayA.desc') + '</p>' +
-            '<ol class="home-ai-steps">' +
-              '<li>' + T('home.ai.a1') + '</li>' +
-              '<li>' + T('home.ai.a2') + '</li>' +
-              '<li>' + T('home.ai.a3') + '</li>' +
-            '</ol>' +
-            '<div class="home-cta-row"><button class="btn primary" id="home-ai-copy">' + T('home.ai.copy') + '</button>' +
-            '<button class="btn" id="home-demo">' + T('home.ai.demo') + '</button></div>' +
-          '</div>' +
-          '<div class="home-ai-way">' +
-            '<div class="haw-badge">' + T('home.ai.wayC') + '</div>' +
-            '<p class="haw-desc">' + T('home.ai.wayC.desc') + '</p>' +
-            '<div class="home-cta-row"><button class="btn primary" id="home-ai-selfinstall">' + T('home.ai.copyC') + '</button></div>' +
-            '<p class="home-mcp-detail-line">' + T('home.ai.wayC.warn') + '</p>' +
-          '</div>' +
-          '<div class="home-ai-way">' +
-            '<div class="haw-badge">' + T('home.ai.wayB') + '</div>' +
-            '<p class="haw-desc">' + T('home.ai.wayB.desc') + '</p>' +
-            '<details class="home-guide-details">' +
-              '<summary>' + T('home.ai.guideToggle') + '</summary>' +
-              '<div class="home-guide-body">' + ((window.AFG_AI_GUIDE && window.AFG_AI_GUIDE[(window.I18N && window.I18N.getLang()) || 'zh']) || '') + '</div>' +
-            '</details>' +
-          '</div>' +
+          '<div class="home-cta-row"><button class="btn primary" id="home-ai-copy">' + T('home.ai.copy') + '</button></div>' +
+          '<details class="home-guide-details">' +
+            '<summary>' + T('home.ai.adv') + '</summary>' +
+            '<div class="home-guide-body">' +
+              '<div class="home-ai-way">' +
+                '<div class="haw-badge">' + T('home.ai.wayC') + '</div>' +
+                '<p class="haw-desc">' + T('home.ai.wayC.desc') + '</p>' +
+                '<div class="home-cta-row"><button class="btn" id="home-ai-selfinstall">' + T('home.ai.copyC') + '</button></div>' +
+              '</div>' +
+              '<div class="home-ai-way">' +
+                '<div class="haw-badge">' + T('home.ai.wayB') + '</div>' +
+                '<p class="haw-desc">' + T('home.ai.wayB.desc') + '</p>' +
+                '<div class="home-guide-inner">' + ((window.AFG_AI_GUIDE && window.AFG_AI_GUIDE[(window.I18N && window.I18N.getLang()) || 'zh']) || '') + '</div>' +
+              '</div>' +
+            '</div>' +
+          '</details>' +
         '</div>' +
       '</div>' +
       '<aside class="home-fb">' +
         '<h3>' + T('home.fb.title') + '</h3>' +
         '<p>' + T('home.fb.desc') + '</p>' +
-        '<ul>' +
-          '<li>' + T('home.fb.li1') + '</li>' +
-          '<li>' + T('home.fb.li2') + '</li>' +
-          '<li>' + T('home.fb.li3') + '</li>' +
-        '</ul>' +
         '<button class="btn primary home-fb-cta" id="home-fb-btn">' + T('home.fb.cta') + '</button>' +
         '<div class="home-fb-count">' + T('home.fb.count').replace('{n}', fbCount) + '</div>' +
       '</aside>' +
