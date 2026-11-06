@@ -3661,6 +3661,72 @@
     }
   }
 
+  /* 事件标注跟随真实数据：从数据自动生成高点/低点/变动点 */
+  function hydrateEvents() {
+    function seriesOf(id) {
+      var smp = DataLoader.SAMPLES[id];
+      if (!smp || !smp.data) return null;
+      var d = smp.data;
+      var meta = smp.meta || {};
+      if (d.labels && d.series && d.series.length) return { labels: d.labels, values: d.series[0].values, unit: meta.unit || '', title: meta.title || id };
+      if (d.labels && d.values) return { labels: d.labels, values: d.values, unit: meta.unit || '', title: meta.title || id };
+      if (d.labels && d.bars && d.bars.length) return { labels: d.labels, values: d.bars[0].values, unit: meta.unit || '', title: (meta.title || id) };
+      if (d.labels && d.lines && d.lines.length) return { labels: d.labels, values: d.lines[0].values, unit: meta.unit || '', title: (meta.title || id) };
+      if (d.nav && d.nav.length) return { labels: d.nav.map(function (p) { return String(p.date); }), values: d.nav.map(function (p) { return p.value; }), unit: meta.unit || '', title: (meta.title || id) };
+      return null;
+    }
+    function validPoints(ser) {
+      var out = [];
+      for (var i = 0; i < ser.labels.length; i++) {
+        var v = ser.values[i];
+        if (v !== null && v !== undefined && !isNaN(v)) out.push({ i: i, v: Number(v) });
+      }
+      return out;
+    }
+    function fmtV(v, unit) { return fmtNum(v) + (unit ? (' ' + unit) : ''); }
+    function extremes(ser) {
+      var pts = validPoints(ser);
+      if (pts.length < 5) return [];
+      var maxP = pts[0], minP = pts[0];
+      pts.forEach(function (p) { if (p.v > maxP.v) maxP = p; if (p.v < minP.v) minP = p; });
+      var out = [];
+      out.push({ x: String(ser.labels[maxP.i]), label: '高点 ' + fmtNum(maxP.v),
+        desc: (ser.title || '指标') + ' 于 ' + ser.labels[maxP.i] + ' 达到区间最高 ' + fmtV(maxP.v, ser.unit) + '。' });
+      if (minP.i !== maxP.i) {
+        out.push({ x: String(ser.labels[minP.i]), label: '低点 ' + fmtNum(minP.v),
+          desc: (ser.title || '指标') + ' 于 ' + ser.labels[minP.i] + ' 录得区间最低 ' + fmtV(minP.v, ser.unit) + '。' });
+      }
+      return out;
+    }
+    function changePoints(ser, n) {
+      var pts = validPoints(ser);
+      var changes = [];
+      for (var k = 1; k < pts.length; k++) {
+        if (Math.abs(pts[k].v - pts[k - 1].v) > 1e-9) changes.push({ i: pts[k].i, from: pts[k - 1].v, to: pts[k].v });
+      }
+      changes = changes.slice(-(n || 2));
+      return changes.map(function (c) {
+        return { x: String(ser.labels[c.i]), label: (c.to > c.from ? '上调 ' : '下调 ') + fmtNum(Math.abs(c.to - c.from)),
+          desc: ser.labels[c.i] + '：' + (ser.title || '指标') + ' 由 ' + fmtV(c.from, ser.unit) + ' 调整为 ' + fmtV(c.to, ser.unit) + '。' };
+      });
+    }
+    function setEvents(id, list) {
+      if (!list || !list.length) { delete EVENTS[id]; return; }
+      // 去重（同一 x 只保留一个）
+      var seen = {};
+      EVENTS[id] = list.filter(function (e) { if (seen[e.x]) return false; seen[e.x] = 1; return true; });
+    }
+    var gdp = seriesOf('macro-gdp-area'); if (gdp) setEvents('macro-gdp-area', extremes(gdp));
+    var dual = seriesOf('macro-dual'); if (dual) setEvents('macro-dual', extremes(dual).slice(0, 2));
+    var lpr = seriesOf('macro-step'); if (lpr) setEvents('macro-step', changePoints(lpr, 2));
+    var seirong = seriesOf('macro-sheirong-stack'); if (seirong) setEvents('macro-sheirong-stack', extremes(seirong));
+    var pmiRadar = seriesOf('macro-pmi-radar'); // radar 无 x 轴，跳过
+    var cpiT = seriesOf('macro-cpi'); if (cpiT) setEvents('macro-cpi', extremes(cpiT));
+    var m2T = seriesOf('macro-m2'); if (m2T) setEvents('macro-m2', extremes(m2T));
+    var hsT = seriesOf('fund-perf');
+    if (hsT) setEvents('fund-perf', extremes(hsT));
+  }
+
   /* ---------- 启动 ---------- */
   function init() {
     var q = {};
@@ -3673,6 +3739,7 @@
     normalizeSeriesData(window.INTL_MACRO);
     normalizeSeriesData(window.FINANCE_DATA);
     hydrateSamples();
+    hydrateEvents();
     buildThemeSelect();
     buildSidebar();
     buildTabs();
