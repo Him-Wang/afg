@@ -39,7 +39,10 @@
             <span id="chart-source"></span>
           </div>
         </div>
-        <span class="meta" style="color:var(--muted);font-size:11px" id="hint"></span>
+        <div class="head-right">
+          <button class="btn sm" id="back-btn" style="display:none">← 返回</button>
+          <span class="meta" style="color:var(--muted);font-size:11px" id="hint"></span>
+        </div>
       </div>
       <div class="chart-toolbar" id="chart-toolbar">
         <label class="tb-label">图表</label>
@@ -84,7 +87,6 @@
       <div class="chart-stage" id="chart-stage">
         <div class="empty-state">正在加载…</div>
       </div>
-      <button class="btn sm back-float" id="back-btn" style="display:none">← 返回</button>
       <div class="event-notes" id="event-notes"></div>
       <div class="analysis" id="analysis"></div>
       <footer class="app-footer"><span id="footer-note">—</span></footer>

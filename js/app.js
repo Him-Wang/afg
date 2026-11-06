@@ -2016,8 +2016,20 @@
       } else if (state.echartsEl) {
         var inst = echarts.getInstanceByDom(state.echartsEl);
         if (inst) {
+          // 导出时隐藏坐标轴标签与悬浮提示（导出的图不带坐标）
+          try { inst.dispatchAction({ type: 'hideTip' }); } catch (e1) {}
+          var opt = inst.getOption();
+          function hideAxis(a) {
+            if (!a) return null;
+            return a.map(function (ax) {
+              return { axisLabel: { show: false }, axisTick: { show: false }, name: '' };
+            });
+          }
+          inst.setOption({ xAxis: hideAxis(opt.xAxis), yAxis: hideAxis(opt.yAxis), tooltip: { show: false } }, false);
           imgSrc = inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: theme.bg });
           w = state.echartsEl.clientWidth * 2; h = state.echartsEl.clientHeight * 2;
+          // 恢复原状
+          inst.setOption({ xAxis: opt.xAxis, yAxis: opt.yAxis, tooltip: opt.tooltip }, false);
         }
       }
       if (!imgSrc) { toast('当前模版暂不支持导出图片'); return; }
@@ -3079,6 +3091,279 @@
     return D;
   }
 
+  /* 用真实最新数据填充示例模板 */
+  function hydrateSamples() {
+    var S = DataLoader.SAMPLES;
+    if (!S) return;
+    function each(D, cb) { ((D && D.sections) || []).forEach(function (s) { (s.items || []).forEach(cb); }); }
+    function mFind(t) { var r = null; each(window.CHINA_MACRO, function (i) { if (!r && i.title === t) r = i; }); return r; }
+    function iFind(t) { var r = null; each(window.INTL_MACRO, function (i) { if (!r && i.title === t) r = i; }); return r; }
+    function fFind(t) { var r = null; each(window.FINANCE_DATA, function (i) { if (!r && i.title === t) r = i; }); return r; }
+    function tailOf(item, n) {
+      if (!item || !item.series || !item.series.length) return null;
+      var L = item.labels, V = item.series[0].values;
+      var k = Math.max(0, L.length - n);
+      return { labels: L.slice(k), values: V.slice(k) };
+    }
+    function alignTo(baseItem, item) {
+      return alignSeriesToBase(baseItem.labels, item.labels, item.series[0].values);
+    }
+    function multi(base, items) {
+      if (!base) return null;
+      var labels = base.labels, series = [{ name: base._name || '指标', values: base.series[0].values }];
+      (items || []).forEach(function (it) {
+        if (!it) return;
+        series.push({ name: it.title, values: alignTo(base, it) });
+      });
+      return { labels: labels, series: series };
+    }
+    function setSample(key, data, meta) {
+      if (!S[key] || !data) return;
+      S[key].data = data;
+      if (meta) S[key].meta = Object.assign({}, S[key].meta, meta);
+    }
+    function lastN(arr, n) { return arr.slice(Math.max(0, arr.length - n)); }
+    function pctChange(item, n) {
+      var t = tailOf(item, n + 1);
+      if (!t) return null;
+      var v = t.values, out = [];
+      for (var i = 0; i < v.length; i++) out.push(v[i]);
+      return { labels: t.labels, values: out };
+    }
+
+    /* 1. 渐变面积 · GDP 增速 → 中国 GDP + 工业增加值 + 社零 */
+    var gdp = mFind('GDP 当季同比');
+    if (gdp) {
+      var d = multi({ labels: gdp.labels, series: gdp.series, _name: gdp.title }, [mFind('规模以上工业增加值'), mFind('社会消费品零售总额')]);
+      d.labels = d.labels.slice(-12); d.series.forEach(function (s) { s.values = s.values.slice(-12); });
+      setSample('macro-gdp-area', d, { title: '中国 GDP 增速（最新）', subtitle: 'GDP 当季同比 · 工业增加值 · 社零', unit: '%', source: '国家统计局 · akshare 实时' });
+    }
+
+    /* 2. 双轴组合 · 社零总额 → 社零(柱) + CPI(线) */
+    var retail = mFind('社会消费品零售总额'), cpi = mFind('CPI 整体');
+    if (retail && cpi) {
+      var base2 = tailOf(retail, 24), cpi2 = alignTo({ labels: base2.labels, series: [{ values: base2.values }] }, cpi).slice(-24);
+      setSample('macro-dual', { labels: base2.labels, bars: [{ name: '社会消费品零售总额', values: base2.values }], lines: [{ name: 'CPI 整体', values: cpi2 }] },
+        { title: '社零总额 与 CPI（最新）', subtitle: '柱：社零同比 · 线：CPI', unit: '%', source: '国家统计局 · akshare 实时' });
+    }
+
+    /* 3. 阶梯线 · 政策利率 → LPR 1年/5年 */
+    var lpr1 = mFind('LPR 1年'), lpr5 = mFind('LPR 5年');
+    if (lpr1 && lpr5) {
+      var t1 = tailOf(lpr1, 60), t5 = alignTo({ labels: t1.labels, series: [{ values: t1.values }] }, lpr5).slice(-60);
+      setSample('macro-step', { labels: t1.labels, series: [{ name: 'LPR 1年', values: t1.values }, { name: 'LPR 5年', values: t5 }] },
+        { title: 'LPR 走势（最新）', subtitle: '贷款市场报价利率', unit: '%', source: '全国银行间同业拆借中心 · akshare 实时' });
+    }
+
+    /* 4. 热力矩阵 → 各国 GDP 增速（统一季度 + 前向填充） */
+    var gdpItems = ['欧元区GDP同比', '美国GDP', '英国GDP同比', '德国GDP同比'].map(iFind).filter(Boolean);
+    if (gdpItems.length >= 2) {
+      function periodOrd(l) {
+        var s = String(l);
+        var m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m1) { var q = Math.ceil(parseInt(m1[2], 10) / 3); return parseInt(m1[1], 10) * 4 + q; }
+        var m2 = s.match(/^(\d{4})年(\d{2})月/);
+        if (m2) return parseInt(m2[1], 10) * 4 + Math.ceil(parseInt(m2[2], 10) / 3);
+        var m3 = s.match(/^(\d{4})第(\d)季度/);
+        if (m3) return parseInt(m3[1], 10) * 4 + parseInt(m3[2], 10);
+        return null;
+      }
+      function ordLabel(ord) { var y = Math.floor((ord - 1) / 4), q = ((ord - 1) % 4) + 1; return y + '-Q' + q; }
+      var ordSet = {};
+      gdpItems.forEach(function (it) { it.labels.forEach(function (l) { var o = periodOrd(l); if (o) ordSet[o] = true; }); });
+      var ords = Object.keys(ordSet).map(Number).sort(function (a, b) { return a - b; }).slice(-8);
+      var gdpMaps = gdpItems.map(function (it) {
+        var m = {};
+        it.labels.forEach(function (l, k) { var o = periodOrd(l); if (o) m[o] = it.series[0].values[k]; });
+        return m;
+      });
+      var vals = [];
+      gdpItems.forEach(function (it, ri) {
+        ords.forEach(function (ord, ci) {
+          // 前向填充：找 <= ord 的最近一期
+          var v = null;
+          for (var oo = ord; oo >= ord - 4; oo--) { if (gdpMaps[ri][oo] !== undefined) { v = gdpMaps[ri][oo]; break; } }
+          if (v !== null && v !== undefined && !isNaN(v)) vals.push([ci, ri, Math.round(v * 100) / 100]);
+        });
+      });
+      setSample('macro-heatmap', {
+        xLabels: ords.map(ordLabel),
+        yLabels: gdpItems.map(function (i) { return i.title.replace('GDP同比', '').replace('GDP', '').trim() || i.title; }),
+        values: vals
+      }, { title: '全球主要经济体 GDP 增速矩阵（最新）', subtitle: '季度同比（%）', unit: '%', source: '各国统计局 · akshare 实时' });
+    }
+
+    /* 5. 横向排名 → 全球股指近1年涨幅 */
+    var stocks = ['沪深300', '中证500', '日经225', '德国DAX', '纳斯达克', '标普500', '英国富时100', '法国CAC40'].map(fFind).filter(Boolean);
+    if (stocks.length >= 3) {
+      var cats = [], vs = [];
+      stocks.forEach(function (it) {
+        var t = tailOf(it, 53); if (!t || t.values.length < 2) return;
+        var a = t.values[0], b = t.values[t.values.length - 1];
+        if (a > 0) { cats.push(it.title); vs.push(Math.round(((b / a - 1) * 100) * 100) / 100); }
+      });
+      setSample('industry-rank', { categories: cats, values: vs },
+        { title: '全球股指近一年涨幅排名', subtitle: '涨幅（%）', unit: '%', source: '公开行情 · 实时' });
+    }
+
+    /* 6. 气泡矩阵 → PMI vs GDP */
+    var pmi = mFind('制造业 PMI');
+    if (pmi && gdp) {
+      var baseP = { labels: gdp.labels, series: [{ values: gdp.series[0].values }] };
+      var pmiAligned = alignSeriesToBase(gdp.labels, pmi.labels, pmi.series[0].values);
+      var pts = [];
+      for (var i = 0; i < gdp.labels.length; i++) if (pmiAligned[i] != null && gdp.series[0].values[i] != null) pts.push([pmiAligned[i], gdp.series[0].values[i], Math.abs(gdp.series[0].values[i]) + 1, gdp.labels[i]]);
+      if (pts.length > 4) setSample('industry-bubble', { xName: '制造业 PMI', yName: 'GDP 当季同比', sizeName: '量级', data: pts.slice(-40) },
+        { title: 'PMI 与 GDP 关系（最新）', subtitle: '每个点 = 一个季度', unit: '', source: '国家统计局 · akshare 实时' });
+    }
+
+    /* 7. 板块热力/树图 → 全球股指最新点位 */
+    if (stocks.length >= 3) {
+      var td = stocks.slice(0, 8).map(function (it) { var v = it.series[0].values; return { name: it.title, value: Math.round(v[v.length - 1]) }; });
+      setSample('industry-treemap', { data: td }, { title: '全球股指体量分布', subtitle: '按最新点位', unit: '点', source: '公开行情 · 实时' });
+    }
+
+    /* 8. 堆叠面积 · 产业结构 → 社融结构 */
+    var shRong = mFind('社融结构（人民币贷款/企业债/政府债）');
+    if (shRong) {
+      var sr = shRong; var k0 = Math.max(0, sr.labels.length - 24);
+      setSample('industry-stacked', { labels: sr.labels.slice(k0), series: sr.series.map(function (s) { return { name: s.name, values: s.values.slice(k0) }; }) },
+        { title: '社融结构（最新）', subtitle: '人民币贷款 / 企业债 / 政府债', unit: '亿元', source: '中国人民银行 · akshare 实时' });
+      setSample('macro-sheirong-stack', { labels: sr.labels.slice(k0), series: sr.series.map(function (s) { return { name: s.name, values: s.values.slice(k0) }; }) },
+        { title: '社融月度结构（最新）', subtitle: '堆叠柱 · 亿元', unit: '亿元', source: '中国人民银行 · akshare 实时' });
+    }
+    if (shRong) {
+      setSample('fin-sankey', {
+        nodes: [{ name: '社融增量' }, { name: '人民币贷款' }, { name: '企业债券' }, { name: '政府债券' }],
+        links: [
+          { source: '人民币贷款', target: '社融增量', value: Math.abs(shRong.series[0].values[shRong.series[0].values.length - 1]) || 1 },
+          { source: '企业债券', target: '社融增量', value: Math.abs(shRong.series[1].values[shRong.series[1].values.length - 1]) || 1 },
+          { source: '政府债券', target: '社融增量', value: Math.abs(shRong.series[2].values[shRong.series[2].values.length - 1]) || 1 }
+        ]
+      }, { title: '社融结构流向（最新月度）', subtitle: '人民币贷款 / 企业债 / 政府债', unit: '亿元', source: '中国人民银行 · akshare 实时' });
+    }
+
+    /* 9. 双轴组合 · 收入毛利 → 沪深300(柱) + VIX(线) */
+    var hs300 = fFind('沪深300'), vix = fFind('标普500波动率(VIX)');
+    if (hs300 && vix) {
+      var h1 = tailOf(hs300, 60), v1 = alignTo({ labels: h1.labels, series: [{ values: h1.values }] }, vix).slice(-60);
+      setSample('fin-combo', { labels: h1.labels, bars: [{ name: '沪深300', values: h1.values }], lines: [{ name: 'VIX 波动率', values: v1 }] },
+        { title: '沪深300 与 VIX（最新）', subtitle: '柱：沪深300 · 线：VIX', unit: '', source: '公开行情 · 实时' });
+    }
+
+    /* 10. 环形图 → 全球股指近一年涨幅占比（绝对值） */
+    if (stocks.length >= 3) {
+      var donutData = [];
+      stocks.slice(0, 6).forEach(function (it) {
+        var t = tailOf(it, 53); if (!t || t.values.length < 2) return;
+        var ch = t.values[t.values.length - 1] / t.values[0] - 1;
+        donutData.push({ name: it.title, value: Math.abs(Math.round(ch * 10000) / 100) || 0.01 });
+      });
+      setSample('fin-donut', { data: donutData }, { title: '主要股指近一年涨幅强度', subtitle: '绝对值占比', unit: '%', source: '公开行情 · 实时' });
+    }
+
+    /* 11. 指标卡 → 金融最新值 */
+    var kpiItems = [fFind('沪深300'), fFind('COMEX黄金'), fFind('美元指数'), fFind('WTI原油'), fFind('中国10年期国债')].filter(Boolean);
+    if (kpiItems.length) {
+      var cards = kpiItems.map(function (it) {
+        var v = it.series[0].values; var last = v[v.length - 1], prev = v.length > 1 ? v[v.length - 2] : null;
+        var chg = (prev != null && prev !== 0) ? (last - prev) / Math.abs(prev) * 100 : 0;
+        return { label: it.title, value: fmtNum(last), delta: (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%', dir: chg >= 0 ? 'pos' : 'neg', spark: v.slice(-12) };
+      });
+      setSample('fin-kpi', { cards: cards }, { title: '金融核心指标（最新）', subtitle: '一键看盘', unit: '', source: '公开行情 · 实时' });
+    }
+
+    /* 12. ML 趋势/预测/聚类/相关性/分布 → 真实数据 */
+    if (hs300) {
+      var t2 = tailOf(hs300, 60);
+      setSample('ml-trend', { labels: t2.labels, values: t2.values },
+        { title: '沪深300 趋势拟合（最新）', subtitle: '线性趋势', unit: '点', source: '公开行情 · 实时' });
+      var fcLabels = []; (function(){ var d0 = new Date(); for (var q=1;q<=6;q++){ var dd=new Date(d0.getTime()); dd.setMonth(dd.getMonth()+q*3); fcLabels.push(dd.getFullYear()+'Q'+(Math.floor(dd.getMonth()/3)+1)); } })();
+      setSample('ml-forecast', { labels: t2.labels, values: t2.values, horizon: 6, forecastLabels: fcLabels },
+        { title: '沪深300 走势与预测（最新）', subtitle: '未来 6 期', unit: '点', source: '公开行情 · 实时' });
+      setSample('ml-dist', { values: (function () { var r = []; for (var i = 1; i < t2.values.length; i++) r.push(t2.values[i] / t2.values[i - 1] - 1); return r; })() },
+        { title: '沪深300 收益分布（最新）', subtitle: '日收益直方图', unit: '', source: '公开行情 · 实时' });
+    }
+    if (gdp && pmi) {
+      var pmiAl = alignSeriesToBase(gdp.labels, pmi.labels, pmi.series[0].values);
+      var cl = [];
+      for (var j = 0; j < gdp.labels.length; j++) if (pmiAl[j] != null && gdp.series[0].values[j] != null) cl.push([pmiAl[j], gdp.series[0].values[j], gdp.labels[j]]);
+      if (cl.length > 6) {
+        setSample('ml-cluster', { xName: '制造业 PMI', yName: 'GDP 同比', k: 3, data: cl.slice(-40) },
+          { title: 'PMI 与 GDP 聚类（最新）', subtitle: 'K-means 分 3 类', unit: '', source: '国家统计局 · akshare 实时' });
+        setSample('macro-corr-explore', { series: [{ name: '制造业 PMI', values: pmiAl }, { name: 'GDP 当季同比', values: gdp.series[0].values }] },
+          { title: 'PMI 与 GDP 相关性（最新）', subtitle: '散点矩阵', unit: '', source: '国家统计局 · akshare 实时' });
+      }
+    }
+    /* 相关性热力图：用经济活动核心指标 */
+    var corrItems = ['GDP 当季同比', '制造业 PMI', '规模以上工业增加值', '社会消费品零售总额', 'CPI 整体', 'PPI（出厂）'].map(mFind).filter(Boolean);
+    if (corrItems.length >= 3) {
+      var baseC = corrItems[0];
+      var serC = corrItems.map(function (it) { return { name: it.title, values: alignSeriesToBase(baseC.labels, it.labels, it.series[0].values) }; });
+      setSample('ml-corr', { series: serC }, { title: '宏观指标相关性（最新）', subtitle: '相关系数矩阵', unit: '', source: '国家统计局 · akshare 实时' });
+    }
+
+    /* 13. 雷达图 → 中国宏观最新景气 */
+    var radarItems = ['制造业 PMI', '服务业 PMI', '规模以上工业增加值', '社会消费品零售总额', '出口（美元计）', '固定资产投资'].map(mFind).filter(Boolean);
+    if (radarItems.length >= 3) {
+      var ind = radarItems.map(function (it) { return { name: it.title }; });
+      var vals = radarItems.map(function (it) { var v = it.series[0].values; return v[v.length - 1]; });
+      setSample('macro-pmi-radar', { indicators: ind, series: [{ name: '最新值', values: vals }] },
+        { title: '中国宏观景气雷达（最新）', subtitle: '各指标最新值', unit: '%', source: '国家统计局 · akshare 实时' });
+    }
+
+    /* 14. 业绩评估 → 沪深300 净值 */
+    if (hs300) {
+      var nav = [];
+      hs300.labels.forEach(function (l, i) { var v = hs300.series[0].values[i]; if (v > 0) nav.push({ date: l, value: v }); });
+      setSample('fund-perf', { name: '沪深300', nav: nav.slice(-250) }, { title: '沪深300 业绩评估（最新）', subtitle: '净值 · 回撤 · 指标', unit: '点', source: '公开行情 · 实时' });
+    }
+
+    /* 15. 世界地图 → 各国 GDP 最新同比 */
+    if (gdpItems.length >= 2) {
+      var mapVals = [];
+      gdpItems.forEach(function (it) {
+        var v = it.series[0].values; var last = v[v.length - 1];
+        var nm = it.title.replace('GDP同比', '').replace('GDP', '').trim();
+        var zh = { '欧元区': '欧元区', '美国': '美国', '英国': '英国', '德国': '德国', '加拿大': '加拿大' }[nm] || nm;
+        mapVals.push({ name: zh, value: Math.round(last * 100) / 100 });
+      });
+      setSample('macro-world-map', { values: mapVals }, { title: '主要经济体 GDP 增速（最新）', subtitle: '地图着色', unit: '%', source: '各国统计局 · akshare 实时' });
+    }
+
+    /* 16. 多国对比线 → 全球 GDP 增速 */
+    if (gdpItems.length >= 2) {
+      var baseG = gdpItems[0];
+      var serG = gdpItems.map(function (it) { return { name: it.title, values: alignSeriesToBase(baseG.labels, it.labels, it.series[0].values) }; });
+      var kk = Math.max(0, baseG.labels.length - 24);
+      setSample('macro-country-groups', { labels: baseG.labels.slice(kk), series: serG.map(function (s) { return { name: s.name, values: s.values.slice(kk) }; }) },
+        { title: '全球主要经济体 GDP 增速（最新）', subtitle: '季度同比', unit: '%', source: '各国统计局 · akshare 实时' });
+    }
+
+    /* 17. CPI / M2 / PMI 单指标 */
+    if (cpi) { var tc = tailOf(cpi, 60); setSample('macro-cpi', { labels: tc.labels, series: [{ name: 'CPI 整体', values: tc.values }] }, { title: '中国 CPI（最新）', subtitle: '当月同比', unit: '%', source: '国家统计局 · akshare 实时' }); }
+    var m2 = mFind('M2 同比');
+    if (m2) { var tm = tailOf(m2, 60); setSample('macro-m2', { labels: tm.labels, series: [{ name: 'M2 同比', values: tm.values }] }, { title: '中国 M2 增速（最新）', subtitle: '同比', unit: '%', source: '中国人民银行 · akshare 实时' }); }
+    var pmiS = mFind('服务业 PMI');
+    if (pmi && pmiS) {
+      var tp = tailOf(pmi, 36), tsp = alignSeriesToBase({ labels: tp.labels, series: [{ values: tp.values }] }, pmiS).slice(-36);
+      setSample('macro-pmi-monthly', { labels: tp.labels, series: [{ name: '制造业 PMI', values: tp.values }, { name: '服务业 PMI', values: tsp }] },
+        { title: '中国 PMI（最新）', subtitle: '制造业 / 服务业', unit: '', source: '国家统计局 · akshare 实时' });
+    }
+
+    /* 18. 瀑布图 → 用社融三项构成 */
+    if (shRong) {
+      var names = ['人民币贷款', '企业债券', '政府债券', '合计'];
+      var vv = [shRong.series[0].values[shRong.series[0].values.length - 1], shRong.series[1].values[shRong.series[1].values.length - 1], shRong.series[2].values[shRong.series[2].values.length - 1]];
+      var total = vv.reduce(function (a, b) { return a + (b || 0); }, 0);
+      setSample('fin-waterfall', { labels: names.concat(['社融合计']), values: vv.concat([Math.round(total)]) },
+        { title: '社融增量构成（最新月度）', subtitle: '瀑布图 · 亿元', unit: '亿元', source: '中国人民银行 · akshare 实时' });
+    }
+
+    /* 去重：更新模板列表里重复/过时的标题 */
+    if (S['macro-heatmap'] && !S['macro-heatmap'].data.xLabels) { /* noop */ }
+  }
+
   /* ---------- 启动 ---------- */
   function init() {
     var q = {};
@@ -3090,6 +3375,7 @@
     normalizeSeriesData(window.CHINA_MACRO);
     normalizeSeriesData(window.INTL_MACRO);
     normalizeSeriesData(window.FINANCE_DATA);
+    hydrateSamples();
     buildThemeSelect();
     buildSidebar();
     buildTabs();

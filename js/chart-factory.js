@@ -260,7 +260,16 @@
     data.values.forEach(function (v) { max = Math.max(max, v[2]); min = Math.min(min, v[2]); });
     var option = {
       backgroundColor: theme.bg,
-      tooltip: Object.assign({}, tooltip(theme), { position: 'top', formatter: function (p) { return p.value[2] + '%'; } }),
+      tooltip: Object.assign({}, tooltip(theme), {
+        trigger: 'item',
+        axisPointer: null,
+        position: 'top',
+        formatter: function (p) {
+          var yy = (data.yLabels && data.yLabels[p.value[1]]) || '';
+          var xx = (data.xLabels && data.xLabels[p.value[0]]) || '';
+          return yy + ' · ' + xx + '：' + p.value[2] + '%';
+        }
+      }),
       grid: { top: 46, left: 12, right: 74, bottom: 8, containLabel: true },
       xAxis: [Object.assign({ type: 'category', data: data.xLabels, splitArea: { show: true } }, axisCommon(theme))],
       yAxis: [Object.assign({ type: 'category', data: data.yLabels, splitArea: { show: true } }, axisCommon(theme))],
