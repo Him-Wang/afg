@@ -53,6 +53,7 @@
       { id: 'fin-combo', label: '双轴组合 · 阳光电源营收/净利率' },
       { id: 'fin-donut', label: '环形图 · 阳光电源收入结构' },
       { id: 'fin-sankey', label: '桑基图 · 阳光电源收入流向' },
+      { id: 'apple-sankey', label: '桑基图 · 苹果产品营收拆解' },
       { id: 'fin-kpi', label: '指标卡 · 经营概览' }
     ]},
     { category: '金融资产', items: [
@@ -3660,6 +3661,31 @@
         setSample('fin-kpi', { cards: cards2 }, { title: co.name + ' 经营概览（' + period + '）', subtitle: '营收 / 净利润 / 毛利率 / ROE', unit: '', source: '公司财报 · akshare 实时' });
       }
     }
+
+    /* ========== 21.4 苹果产品营收桑基图（真实财报 TTM） ========== */
+    var APPLE = [
+      { name: 'iPhone', value: 254.10, icon: '📱', color: '#C9A96A' },
+      { name: '服务', value: 123.30, icon: '☁️', color: '#5FA8C9' },
+      { name: 'Mac', value: 37.93, icon: '💻', color: '#C08484' },
+      { name: '可穿戴/家居', value: 35.58, icon: '⌚', color: '#7FA06F' },
+      { name: 'iPad', value: 27.93, icon: '📲', color: '#9B7FB5' }
+    ];
+    var appleTotal = APPLE.reduce(function (a, b) { return a + b.value; }, 0);
+    var S5 = S['apple-sankey'] || (S['apple-sankey'] = { meta: {}, type: 'sankey', data: {} });
+    S5.type = 'sankey';
+    S5.data = {
+      total: appleTotal,
+      nodes: [{ name: '苹果总营收', icon: '🍎', color: '#F2EFE6', depth: 0 }].concat(
+        APPLE.map(function (p) { return { name: p.name, icon: p.icon, color: p.color, depth: 1,
+          displayLabel: p.icon + '  ' + p.name + '   ' + (p.value / appleTotal * 100).toFixed(1) + '%' }; })
+      ),
+      links: APPLE.map(function (p) { return { source: '苹果总营收', target: p.name, value: p.value }; })
+    };
+    S5.meta = Object.assign({}, S5.meta, {
+      title: '苹果公司 · 营收来自哪块业务（TTM 2026Q3）',
+      subtitle: '近 12 个月营收拆解 · 合计 478.8 十亿美元（约 3.4 万亿元）',
+      unit: '十亿美元', source: 'Apple 财报 · 实时'
+    });
 
     /* ========== 21.5 美债收益率曲线 ========== */
     if (AK && AK.ustCurve && AK.ustCurve.curves && AK.ustCurve.curves.length) {

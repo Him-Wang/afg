@@ -551,18 +551,51 @@
 
   /* ---------- 桑基图（公司财务资金流向） ---------- */
   function sankey(el, data, theme) {
+    var total = data.total || 0;
+    var nodes = (data.nodes || []).map(function (n) {
+      return {
+        name: n.name, value: n.value, depth: n.depth, icon: n.icon, displayLabel: n.displayLabel,
+        itemStyle: { color: n.color || theme.accent, borderColor: theme.bg, borderWidth: 1 },
+        label: n.hideLabel ? { show: false } : undefined
+      };
+    });
     return {
       backgroundColor: theme.bg,
-      tooltip: { trigger: 'item', triggerOn: 'mousemove', backgroundColor: theme.panel, borderColor: theme.accent + '55', textStyle: { color: theme.text, fontSize: 12 } },
+      tooltip: {
+        trigger: 'item', triggerOn: 'mousemove|click',
+        backgroundColor: theme.panel, borderColor: theme.accent + '55', borderWidth: 1,
+        textStyle: { color: theme.text, fontSize: 12 },
+        formatter: function (p) {
+          if (p.dataType === 'edge') {
+            var v = p.data.value;
+            var pc = total ? '（' + (v / total * 100).toFixed(1) + '%）' : '';
+            return p.data.source + ' → ' + p.data.target + '<br/>' + fmt(v) + ' 十亿美元' + pc;
+          }
+          var d = p.data;
+          var pp = total && d.value ? (d.value / total * 100).toFixed(1) + '%' : '';
+          return '<b>' + (d.icon ? d.icon + ' ' : '') + d.name + '</b><br/>' +
+            (d.value ? fmt(d.value) + ' 十亿美元' + (pp ? '（' + pp + '）' : '') : '');
+        }
+      },
       series: [{
         type: 'sankey',
-        left: 8, right: 60, top: 24, bottom: 24,
-        data: data.nodes,
+        left: 14, right: 150, top: 24, bottom: 24,
+        nodeWidth: 18, nodeGap: 16,
+        data: nodes,
         links: data.links,
         emphasis: { focus: 'adjacency' },
-        lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.35 },
-        itemStyle: { color: theme.accent, borderColor: theme.bg },
-        label: { color: theme.text, fontSize: 12 }
+        lineStyle: { color: 'gradient', curveness: 0.55, opacity: 0.4 },
+        itemStyle: { borderColor: theme.bg, borderWidth: 1 },
+        label: {
+          color: theme.text, fontSize: 12,
+          formatter: function (p) {
+            var d = p.data;
+            if (d.displayLabel) return d.displayLabel;
+            var icon = d.icon ? d.icon + '  ' : '';
+            if (d.icon && total && d.value) return icon + d.name + '   ' + (d.value / total * 100).toFixed(1) + '%';
+            return icon + d.name;
+          }
+        }
       }]
     };
   }
