@@ -615,9 +615,8 @@
       }
       var name = series.name || ('指标' + (si + 1));
       var items = [];
+      // 「最新值」已在右侧用固定标签展示，这里只标最高/最低，避免重叠
       if (maxI !== minI) { items.push({ i: maxI, kind: '最高', color: t.up }); items.push({ i: minI, kind: '最低', color: t.down }); }
-      else items.push({ i: maxI, kind: '最新', color: t.accent });
-      if (lastI >= s && lastI !== maxI && lastI !== minI) items.push({ i: lastI, kind: '最新', color: t.accent });
       items.forEach(function (it) {
         var p = pxOf(it.i);
         if (!p) return;
@@ -693,8 +692,10 @@
         var dx = ev.clientX - sx, dy = ev.clientY - sy;
         label.style.left = (ox + dx) + 'px';
         label.style.top = (oy + dy) + 'px';
-        line.setAttribute('x2', ox + dx + 3);
-        line.setAttribute('y2', oy + dy + 10);
+        if (line) {
+          line.setAttribute('x2', ox + dx + 3);
+          line.setAttribute('y2', oy + dy + 10);
+        }
       }
       function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
       document.addEventListener('mousemove', onMove);
@@ -702,12 +703,59 @@
     });
   }
 
+  /* 最新值标签：固定在图表右缘内、不越界、可拖动 */
+  function applyLastValueTag(inst) {
+    if (!inst) return;
+    var container = inst.getDom && inst.getDom();
+    if (!container) return;
+    var old = container.querySelector('.last-tag');
+    if (old) old.remove();
+    var opt = inst.getOption();
+    var s0 = opt.series && opt.series[0];
+    if (!s0 || !s0.data || !s0.data.length) return;
+    if ((opt.series || []).length > 1) return; // 多系列时易混乱，不显示
+    if (s0.type !== 'line' && s0.type !== 'bar') return;
+    var data = s0.data, li = -1, lv = null;
+    for (var i = data.length - 1; i >= 0; i--) {
+      var v = data[i];
+      if (v === null || v === undefined || isNaN(v)) continue;
+      li = i; lv = v; break;
+    }
+    if (li < 0) return;
+    var p = null;
+    try { p = inst.convertToPixel({ seriesIndex: 0 }, [li, lv]); } catch (e) { return; }
+    if (!p) return;
+    var theme = Themes.active().chart;
+    var color = (s0.itemStyle && s0.itemStyle.color) || s0.color || theme.accent;
+    if (typeof color !== 'string') color = theme.accent;
+    var tag = document.createElement('div');
+    tag.className = 'last-tag';
+    tag.title = '最新值（可拖动）';
+    tag.style.cssText = 'position:absolute;pointer-events:auto;cursor:move;background:' + color +
+      ';color:' + pickTextColor(color) + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:21;';
+    tag.textContent = fmtNum(lv);
+    container.appendChild(tag);
+    var cw = container.clientWidth, chh = container.clientHeight;
+    var tw = tag.offsetWidth || 54, th = tag.offsetHeight || 18;
+    var tx = p[0] - tw - 8;
+    if (tx < 6) tx = p[0] + 8;
+    if (tx + tw > cw - 6) tx = cw - tw - 6;
+    if (tx < 6) tx = 6;
+    var ty = p[1] - th / 2;
+    if (ty < 6) ty = 6;
+    if (ty + th > chh - 6) ty = chh - th - 6;
+    tag.style.left = tx + 'px';
+    tag.style.top = ty + 'px';
+    makeExtLabelDraggable(tag, null);
+  }
+
   function attachExtremeLabels(inst) {
     if (!inst) return;
     applyExtremeLabels(inst);
+    applyLastValueTag(inst);
     if (inst._extBound) return;
     inst._extBound = true;
-    inst.on('datazoom', function () { applyExtremeLabels(inst); });
+    inst.on('datazoom', function () { applyExtremeLabels(inst); applyLastValueTag(inst); });
   }
 
   function attachPriceAnnotationHandler(inst, container) {

@@ -919,10 +919,9 @@
   function axisNum(v) {
     if (v === null || v === undefined || isNaN(v)) return '';
     var a = Math.abs(v);
-    if (a >= 1e8) return (v / 1e8).toFixed(a >= 1e9 ? 0 : 1) + '亿';
-    if (a >= 1e4) return (v / 1e4).toFixed(a >= 1e5 ? 0 : 1) + '万';
     if (a >= 1000) return v.toLocaleString('en-US', { maximumFractionDigits: 0 });
     if (a >= 1) return String(Number(v.toFixed(2)));
+    if (a === 0) return '0';
     return String(Number(v.toFixed(3)));
   }
 
@@ -990,11 +989,7 @@
         s0.markLine = {
           silent: true, symbol: 'none',
           lineStyle: { color: hexToRgba(col, 0.5), type: 'dashed', width: 1 },
-          label: {
-            show: true, position: 'end', formatter: fmt(lastVal),
-            color: contrastOn(col), backgroundColor: col,
-            padding: [3, 6], borderRadius: 3, fontSize: 10, fontWeight: 'bold'
-          },
+          label: { show: false },
           data: [{ yAxis: lastVal }]
         };
       }
