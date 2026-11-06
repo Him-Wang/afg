@@ -2032,6 +2032,9 @@
   function updateStatBadge(sample) {
     var badge = el('stat-badge');
     if (!badge) return;
+    // 非时间序列类图表不显示「最新值/变动」角标（避免 489→-410 = -183% 这种无意义读数）
+    var noStat = { waterfall: 1, donut: 1, sankey: 1, kpi: 1, treemap: 1, rank: 1, bubble: 1, radar: 1, worldMap: 1, heatmap: 1, perf: 1 };
+    if (sample && noStat[sample.type]) { badge.style.display = 'none'; return; }
     var d = sample.data;
     var value = null, delta = null;
     if (d && d.ohlc && d.ohlc.length) {
@@ -3597,13 +3600,28 @@
         if (prevIdx >= 0 && rev[prevIdx] > 0) yoy = rev[lastIdx] / rev[prevIdx] - 1;
         var yoyTxt = (yoy !== null && isFinite(yoy)) ? (' · 营收同比 ' + (yoy >= 0 ? '+' : '') + (yoy * 100).toFixed(1) + '%') : '';
         var E8 = 1e8;
+        var rvY = rv / E8, csY = cs / E8, feeY = (rv - cs - np) / E8, npY = np / E8;
+        var pc = function (v) { return rvY > 0 ? (Math.abs(v) / rvY * 100).toFixed(1) + '%' : '—'; };
         setSample('fin-waterfall', {
-          labels: ['营业总收入', '营业成本', '期间费用等', '净利润'],
-          values: [Math.round(rv / E8), -Math.round(cs / E8), -Math.round((rv - cs - np) / E8), Math.round(np / E8)]
-        }, { title: co.name + ' 利润桥接 · ' + period, subtitle: '营业总收入 → 减成本 → 减费用 → 净利润（亿元）' + yoyTxt, unit: '亿元', source: '公司财报 · akshare 实时' });
+          labels: ['营业总收入', '减：营业成本', '减：期间费用', '净利润'],
+          values: [Math.round(rvY), -Math.round(csY), -Math.round(feeY), Math.round(npY)],
+          totalFromZero: true
+        }, {
+          title: co.name + ' · 一块钱收入最后剩多少（' + period + '）',
+          subtitle: '收入 ' + rvY.toFixed(0) + ' 亿，扣成本 ' + csY.toFixed(0) + ' 亿（' + pc(csY) + '）、费用 ' + feeY.toFixed(0) + ' 亿（' + pc(feeY) + '），净赚 ' + npY.toFixed(0) + ' 亿（' + pc(npY) + '）' + yoyTxt,
+          unit: '亿元', source: '公司财报 · akshare 实时'
+        });
         // 环形：成本/费用/净利
-        var donutV = [{ name: '营业成本', value: Math.round(cs / 1e8) }, { name: '期间费用等', value: Math.round((rv - cs - np) / 1e8) }, { name: '净利润', value: Math.round(np / 1e8) }];
-        setSample('fin-donut', { data: donutV }, { title: co.name + ' 收入结构（' + period + '）', subtitle: '成本 / 费用 / 净利（亿元）', unit: '亿元', source: '公司财报 · akshare 实时' });
+        var donutV = [
+          { name: '营业成本', value: Math.round(cs / 1e8) },
+          { name: '期间费用', value: Math.round((rv - cs - np) / 1e8) },
+          { name: '净利润', value: Math.round(np / 1e8) }
+        ];
+        setSample('fin-donut', { data: donutV, unit: ' 亿元', centerLabel: '营业总收入' }, {
+          title: co.name + ' · 收入都去哪了（' + period + '）',
+          subtitle: '每 100 元收入里：成本、费用、净赚各占多少',
+          unit: '亿元', source: '公司财报 · akshare 实时'
+        });
         // 桑基
         setSample('fin-sankey', {
           nodes: [{ name: '营业总收入' }, { name: '营业成本' }, { name: '毛利' }, { name: '期间费用' }, { name: '净利润' }],

@@ -467,10 +467,15 @@
     values.forEach(function (v, i) {
       if (i === 0) { base.push('-'); positive.push(v); negative.push('-'); sum = v; cum.push(v); }
       else if (i === last) {
-        base.push(sum); cum.push(values[last]);
-        var d = values[last] - sum;
-        if (d >= 0) { positive.push(d); negative.push('-'); }
-        else { positive.push('-'); negative.push(-d); }
+        if (data.totalFromZero) {
+          // 末项作为「结果/总额」从 0 起画，避免柱高为 0 让人看不懂
+          base.push('-'); positive.push(values[last]); negative.push('-'); cum.push(values[last]);
+        } else {
+          base.push(sum); cum.push(values[last]);
+          var d = values[last] - sum;
+          if (d >= 0) { positive.push(d); negative.push('-'); }
+          else { positive.push('-'); negative.push(-d); }
+        }
       } else {
         if (v >= 0) { base.push(sum); positive.push(v); negative.push('-'); sum += v; }
         else { base.push(sum + v); positive.push('-'); negative.push(-v); sum += v; }
@@ -507,10 +512,23 @@
   /* ---------- 环形图 ---------- */
   function donut(el, data, theme) {
     var total = data.data.reduce(function (s, d) { return s + d.value; }, 0);
+    var isPct = Math.abs(total - 100) < 2;            // 传入值本身就是百分比
+    function pctOf(v) { return isPct ? v : (total > 0 ? v / total * 100 : 0); }
+    var centerMain = isPct ? '100%' : fmt(total);
+    var centerSub = data.centerLabel
+      ? (data.centerLabel + (data.unit ? '（' + String(data.unit).trim() + '）' : ''))
+      : (isPct ? '合计占比' : '合计');
     var option = {
       backgroundColor: theme.bg,
-      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) { return p.name + '：' + p.value + '%'; } }),
-      legend: Object.assign(legend(theme), { orient: 'vertical', right: 12, top: 'center', itemWidth: 10, itemHeight: 10 }),
+      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) {
+        if (isPct) return p.name + '：' + p.value + '%';
+        return p.name + '<br/>' + (data.unit || '') + ' ' + fmt(p.value) + '（占 ' + pctOf(p.value).toFixed(1) + '%）';
+      } }),
+      legend: Object.assign(legend(theme), { orient: 'vertical', right: 12, top: 'center', itemWidth: 10, itemHeight: 10,
+        formatter: function (nm) {
+          var it = data.data.filter(function (d) { return d.name === nm; })[0];
+          return it ? (nm + '  ' + pctOf(it.value).toFixed(1) + '%') : nm;
+        } }),
       series: [{
         type: 'pie', radius: ['58%', '80%'], center: ['38%', '50%'],
         avoidLabelOverlap: true,
@@ -521,11 +539,11 @@
         emphasis: { scale: true, scaleSize: 6 }
       }],
       graphic: [{
-        type: 'text', left: '34%', top: '44%',
-        style: { text: total + '%', fill: theme.text, fontSize: 26, fontWeight: 700, textAlign: 'center' }
+        type: 'text', left: '38%', top: '42%',
+        style: { text: centerMain, fill: theme.text, fontSize: 20, fontWeight: 700, textAlign: 'center' }
       }, {
-        type: 'text', left: '35%', top: '56%',
-        style: { text: '合计占比', fill: theme.muted, fontSize: 12, textAlign: 'center' }
+        type: 'text', left: '38%', top: '53%',
+        style: { text: centerSub, fill: theme.muted, fontSize: 12, textAlign: 'center' }
       }]
     };
     return option;
@@ -606,7 +624,7 @@
     else option.series[0].markPoint.data = (option.series[0].markPoint.data || []).concat(mp.data);
   }
 
-  function addWatermark(option, theme) {
+  function addWatermark(option, theme, chartType) {
     var wm = {
       type: 'text', left: 'center', top: 'middle', z: 0, silent: true,
       style: {
@@ -614,6 +632,11 @@
         font: '800 44px Inter, sans-serif', letterSpacing: 6, textAlign: 'center'
       }
     };
+    if (chartType === 'donut' || chartType === 'treemap' || chartType === 'sankey') {
+      wm.left = 'right'; wm.top = 'bottom';
+      wm.style.textAlign = 'right';
+      wm.style.font = '800 30px Inter, sans-serif';
+    }
     if (option.graphic == null) option.graphic = [];
     if (!Array.isArray(option.graphic)) option.graphic = [option.graphic];
     option.graphic.push(wm);
@@ -1018,7 +1041,7 @@
         }
       });
     }
-    if (watermarkOn) addWatermark(option, theme);
+    if (watermarkOn) addWatermark(option, theme, type);
     option = polishOption(option, theme, type);
     // 大数据量不播放入场动画（专业终端习惯，且避免导出时截到半张图）
     var maxPoints = 0;
