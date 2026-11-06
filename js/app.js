@@ -520,6 +520,22 @@
 
   /* 极值标注：标注可视区间内最高 / 最低 / 最新，随缩放更新 */
   /* 极值标注：标注可视区间内各指标的最高/最低/最新，可拖动、带箭头指向 */
+  /* 根据背景色自动选择深色/浅色文字 */
+  function pickTextColor(bg) {
+    if (!bg) return '#FFFFFF';
+    var r = 255, g = 255, b = 255;
+    if (bg.charAt(0) === '#') {
+      var hex = bg.slice(1);
+      if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+      r = parseInt(hex.slice(0, 2), 16); g = parseInt(hex.slice(2, 4), 16); b = parseInt(hex.slice(4, 6), 16);
+    } else {
+      var m = bg.match(/rgba?\(([^)]+)\)/);
+      if (m) { var p = m[1].split(',').map(Number); r = p[0]; g = p[1]; b = p[2]; }
+    }
+    var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.6 ? '#0E0F12' : '#FFFFFF';
+  }
+
   function applyExtremeLabels(inst) {
     if (!inst) return;
     var container = inst.getDom && inst.getDom();
@@ -643,7 +659,8 @@
       var m = info.m, lx = info.lx, ly = info.ly;
       var label = document.createElement('div');
       label.className = 'ext-label';
-      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:#0E0F12;font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
+      var txtColor = pickTextColor(m.color);
+      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:' + txtColor + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
       label.textContent = fmtNum(m.val);
       overlay.appendChild(label);
       // 边界收敛：保证标签完整显示在图表内
@@ -2030,48 +2047,94 @@
   }
 
   /* ---------- 导出 ---------- */
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
   function exportImage() {
     var theme = getChartTheme();
     try {
-      var imgSrc = null, w = 0, h = 0;
+      var imgSrc = null, cw = 0, chh = 0, inst = null;
       if (state.priceEl) {
-        var canvas = state.priceEl.querySelector('canvas');
-        if (canvas) { imgSrc = canvas.toDataURL('image/png'); w = canvas.width; h = canvas.height; }
+        var pc = state.priceEl.querySelector('canvas');
+        if (pc) { imgSrc = pc.toDataURL('image/png'); cw = pc.width / 2; chh = pc.height / 2; }
       } else if (state.echartsEl) {
-        var inst = echarts.getInstanceByDom(state.echartsEl);
+        inst = echarts.getInstanceByDom(state.echartsEl);
         if (inst) {
-          // 导出时隐藏坐标轴标签与悬浮提示（导出的图不带坐标）
           try { inst.dispatchAction({ type: 'hideTip' }); } catch (e1) {}
-          var opt = inst.getOption();
-          function hideAxis(a) {
-            if (!a) return null;
-            return a.map(function (ax) {
-              return { axisLabel: { show: false }, axisTick: { show: false }, name: '' };
-            });
-          }
-          inst.setOption({ xAxis: hideAxis(opt.xAxis), yAxis: hideAxis(opt.yAxis), tooltip: { show: false } }, false);
           imgSrc = inst.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: theme.bg });
-          w = state.echartsEl.clientWidth * 2; h = state.echartsEl.clientHeight * 2;
-          // 恢复原状
-          inst.setOption({ xAxis: opt.xAxis, yAxis: opt.yAxis, tooltip: opt.tooltip }, false);
+          cw = state.echartsEl.clientWidth; chh = state.echartsEl.clientHeight;
         }
       }
       if (!imgSrc) { toast('当前模版暂不支持导出图片'); return; }
+
+      var W = cw * 2, H = chh * 2;
       var title = (el('chart-title').textContent || '').trim();
-      var titleH = title ? 46 : 0;
-      var c = document.createElement('canvas');
-      c.width = w; c.height = h + titleH;
-      var ctx = c.getContext('2d');
-      ctx.fillStyle = theme.bg; ctx.fillRect(0, 0, c.width, c.height);
+      var sub = (el('chart-subtitle').textContent || '').trim();
+      var unitEl = el('chart-unit');
+      var unit = (unitEl && unitEl.style.display !== 'none' && unitEl.textContent) ? unitEl.textContent.trim() : '';
+      var xs = [];
+      if (inst) { var o0 = inst.getOption(); xs = (o0.xAxis && o0.xAxis[0] && o0.xAxis[0].data) || []; }
+      var rangeTxt = xs.length ? (String(xs[0]) + ' → ' + String(xs[xs.length - 1])) : '';
+      var metaParts = [];
+      if (sub) metaParts.push(sub);
+      if (unit) metaParts.push('单位：' + unit);
+      if (rangeTxt) metaParts.push('时间：' + rangeTxt);
+      var meta = metaParts.join('    ·    ');
+
+      var pad = 28;
+      var titleH = title ? 38 : 0;
+      var metaH = meta ? 26 : 0;
+      var canvas = document.createElement('canvas');
+      canvas.width = W + pad * 2;
+      canvas.height = pad + titleH + metaH + H + pad;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = theme.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      var yy = pad;
       if (title) {
-        ctx.fillStyle = theme.text; ctx.font = 'bold 26px Inter, -apple-system, sans-serif'; ctx.textBaseline = 'top';
-        ctx.fillText(title, 24, 14);
+        ctx.fillStyle = theme.text;
+        ctx.font = 'bold 30px Inter, -apple-system, "PingFang SC", sans-serif';
+        ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+        ctx.fillText(title, pad, yy);
+        yy += titleH;
       }
+      if (meta) {
+        ctx.fillStyle = theme.muted || '#8A8578';
+        ctx.font = '15px Inter, -apple-system, "PingFang SC", sans-serif';
+        ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+        ctx.fillText(meta, pad, yy);
+        yy += metaH;
+      }
+      var contRect = state.echartsEl ? state.echartsEl.getBoundingClientRect() : null;
+      var extLabels = state.echartsEl ? state.echartsEl.querySelectorAll('.ext-label') : [];
       var img = new Image();
       img.onload = function () {
-        ctx.drawImage(img, 0, titleH, w, h);
+        ctx.drawImage(img, pad, yy, W, H);
+        // 把极值标注也画进图片
+        if (contRect && extLabels.length) {
+          extLabels.forEach(function (lb) {
+            var r = lb.getBoundingClientRect();
+            var lx = pad + (r.left - contRect.left) * 2;
+            var ly = yy + (r.top - contRect.top) * 2;
+            var lw = r.width * 2, lh = r.height * 2;
+            ctx.fillStyle = lb.style.backgroundColor || theme.accent;
+            roundRectPath(ctx, lx, ly, lw, lh, 6);
+            ctx.fill();
+            ctx.fillStyle = lb.style.color || '#FFFFFF';
+            ctx.font = 'bold 20px Inter, -apple-system, "PingFang SC", sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(lb.textContent, lx + lw / 2, ly + lh / 2);
+            ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+          });
+        }
         var a = document.createElement('a');
-        a.href = c.toDataURL('image/png'); a.download = 'chart.png'; a.click();
+        a.href = canvas.toDataURL('image/png'); a.download = 'chart.png'; a.click();
         toast('图片已导出');
       };
       img.src = imgSrc;
