@@ -339,8 +339,9 @@
         data: data.data.map(function (d) { return { name: d.name, value: [d.x, d.y, d.size] }; }),
         symbolSize: function (v) { return sizeMin + (v[2] / maxSize) * (sizeMax - sizeMin); },
         itemStyle: { color: hexToRgba(theme.accent, 0.65), borderColor: theme.accent, borderWidth: 1 },
-        label: { show: true, position: 'top', color: theme.text, fontSize: 11,
+        label: { show: true, position: 'top', color: theme.text, fontSize: 10,
           formatter: function (p) { return p.data.name; } },
+        labelLayout: { hideOverlap: true },
         emphasis: { itemStyle: { color: theme.accent, opacity: 1 } }
       }]
     };

@@ -46,13 +46,13 @@
       { id: 'industry-rank', label: '横向排名 · 行业涨幅榜' },
       { id: 'industry-bubble', label: '气泡矩阵 · 行业景气' },
       { id: 'industry-treemap', label: '板块热力 · 行业市值' },
-      { id: 'industry-stacked', label: '堆叠面积 · 社融结构' }
+      { id: 'industry-stacked', label: '堆叠面积 · 行业成交额' }
     ]},
     { category: '公司财务', items: [
-      { id: 'fin-waterfall', label: '瀑布图 · 茅台营收桥接' },
-      { id: 'fin-combo', label: '双轴组合 · 营收与净利率' },
-      { id: 'fin-donut', label: '环形图 · 收入结构' },
-      { id: 'fin-sankey', label: '桑基图 · 收入流向' },
+      { id: 'fin-waterfall', label: '瀑布图 · 阳光电源利润桥接' },
+      { id: 'fin-combo', label: '双轴组合 · 阳光电源营收/净利率' },
+      { id: 'fin-donut', label: '环形图 · 阳光电源收入结构' },
+      { id: 'fin-sankey', label: '桑基图 · 阳光电源收入流向' },
       { id: 'fin-kpi', label: '指标卡 · 经营概览' }
     ]},
     { category: '金融资产', items: [
@@ -1376,12 +1376,23 @@
     } else if (sample.type === 'kpi') {
       renderKpi(sample.data);
     } else if (sample.type === 'perf') {
+      var perfData = sample.data;
+      if (perfData && perfData.nav && perfData.nav.length) {
+        var navL = perfData.nav.map(function (p) { return String(p.date); });
+        var navV = perfData.nav.map(function (p) { return p.value; });
+        var rr = applyTimeRange(navL, [{ name: 'nav', values: navV }]);
+        if (rr.labels.length !== navL.length) {
+          perfData = Object.assign({}, perfData, {
+            nav: rr.labels.map(function (l, i) { return { date: l, value: rr.series[0].values[i] }; })
+          });
+        }
+      }
       var c = document.createElement('div'); c.className = 'chart-canvas'; stage.appendChild(c);
-      var ci = ChartFactory.render(c, sample.type, sample.data, theme);
+      var ci = ChartFactory.render(c, sample.type, perfData, theme);
       attachAnnotationHandler(ci);
       attachExtremeLabels(ci);
       state.echartsEl = c;
-      renderPerfMetrics(sample.data, ci);
+      renderPerfMetrics(perfData, ci);
     } else if (sample.type === 'worldMap' && state.tableView) {
       renderWorldTable(sample.data);
     } else {
@@ -1399,7 +1410,9 @@
       }
       if (renderData.labels !== undefined && renderData.series !== undefined) {
         var ranged2 = applyTimeRange(renderData.labels, renderData.series);
-        renderData.labels = ranged2.labels; renderData.series = ranged2.series;
+        if (ranged2.labels !== renderData.labels) {
+          renderData = Object.assign({}, renderData, { labels: ranged2.labels, series: ranged2.series });
+        }
       }
       var ci2 = ChartFactory.render(c2, renderType, renderData, theme);
       attachAnnotationHandler(ci2);
@@ -3334,10 +3347,8 @@
       setSample('macro-sheirong-stack', { labels: seasonLabels, series: [{ name: '社融·人民币贷款', values: sr.series[0].values }], maxYears: 4 },
         { title: '社融人民币贷款 · 近4年季节性对比', subtitle: '各年同期月度走势（亿元）', unit: '亿元', source: '中国人民银行 · akshare 实时' });
       if (S['macro-sheirong-stack']) S['macro-sheirong-stack'].type = 'season';
-      // 产业结构：保持堆叠面积
-      var k0 = Math.max(0, sr.labels.length - 24);
-      setSample('industry-stacked', { labels: sr.labels.slice(k0), series: sr.series.map(function (s) { return { name: s.name, values: s.values.slice(k0) }; }) },
-        { title: '社融结构（最新）', subtitle: '人民币贷款 / 企业债 / 政府债', unit: '亿元', source: '中国人民银行 · akshare 实时' });
+      // 行业成交额堆叠（真实行业数据，替代社融）
+      // 由下方 20.x 段落用 AK.industryTurnover 填充
     }
     if (shRong) {
       setSample('fin-sankey', {
@@ -3492,15 +3503,15 @@
     /* ========== 20. 行业数据（akshare 行业板块） ========== */
     var AK = window.AKSHARE_DATA;
     if (AK && AK.industries && AK.industries.length) {
-      var inds2 = AK.industries.slice().filter(function (x) { return isFinite(x.change); });
+      var inds2 = AK.industries.slice().filter(function (x) { return isFinite(x.change) && !/[ⅡⅢ]/.test(x.name); });
       inds2.sort(function (a, b) { return b.change - a.change; });
       // 排名
       var topR = inds2.slice(0, 15);
       setSample('industry-rank', { categories: topR.map(function (x) { return x.name; }), values: topR.map(function (x) { return Math.round(x.change * 100) / 100; }) },
         { title: '行业板块涨幅榜（最新）', subtitle: '申万行业 · 涨跌幅（%）', unit: '%', source: '东方财富 · akshare 实时' });
       // 气泡：换手率 vs 涨跌幅，大小=市值
-      var bubbleData = inds2.filter(function (x) { return Math.abs(x.change) < 30 && x.mcap > 0; }).slice(0, 80)
-        .map(function (x) { return { name: x.name, value: [Math.round(x.turnover * 100) / 100, Math.round(x.change * 100) / 100, Math.round(x.mcap / 1e8) / 100] }; });
+      var bubbleData = inds2.filter(function (x) { return Math.abs(x.change) < 30 && x.mcap > 0 && isFinite(x.turnover); }).sort(function (a, b) { return b.mcap - a.mcap; }).slice(0, 30)
+        .map(function (x) { return { name: x.name, x: Math.round(x.turnover * 100) / 100, y: Math.round(x.change * 100) / 100, size: Math.round(x.mcap / 1e8) }; });
       if (bubbleData.length >= 10) {
         setSample('industry-bubble', { xName: '换手率', yName: '涨跌幅', sizeName: '总市值', data: bubbleData },
           { title: '行业景气气泡图（最新）', subtitle: '换手率 vs 涨跌幅 · 气泡=市值', unit: '%', source: '东方财富 · akshare 实时' });
@@ -3511,7 +3522,17 @@
         { title: '行业市值分布（最新）', subtitle: '前 20 大行业 · 单位：亿元', unit: '亿元', source: '东方财富 · akshare 实时' });
     }
 
-    /* ========== 21. 公司财务（贵州茅台，akshare） ========== */
+    /* ========== 20.5 行业成交额堆叠 ========== */
+    var AKi = window.AKSHARE_DATA;
+    if (AKi && AKi.industryTurnover && AKi.industryTurnover.series && AKi.industryTurnover.series.length >= 2) {
+      var it = AKi.industryTurnover;
+      var itSeries = it.series.filter(function (x) { return !/[ⅡⅢ]/.test(x.name); });
+      if (itSeries.length < 2) itSeries = it.series;
+      setSample('industry-stacked', { labels: it.labels, series: itSeries.map(function (x) { return { name: x.name, values: x.values }; }) },
+        { title: '行业成交额堆叠（近45个交易日）', subtitle: '市值前 8 大行业 · 成交额（亿元）', unit: '亿元', source: '东方财富 · akshare 实时' });
+    }
+
+    /* ========== 21. 公司财务（阳光电源 300274，akshare 真实财报） ========== */
     if (AK && AK.company) {
       var co = AK.company;
       var L = co.labels || [];
@@ -3520,8 +3541,18 @@
       var rv = rev[lastIdx], cs = cost[lastIdx], np = net[lastIdx];
       if (rv && cs && np) {
         var period = L[lastIdx] + '（累计）';
-        setSample('fin-waterfall', { labels: ['营业总收入', '营业成本', '期间费用等', '净利润'], values: [rv, -cs, -(rv - cs - np), np] },
-          { title: co.name + ' 营收桥接（' + period + '）', subtitle: '营业总收入 → 成本 → 费用 → 净利润', unit: '元', source: '公司财报 · akshare 实时' });
+        // 同比（与去年同期比）
+        var yoy = null;
+        var prevIdx = -1;
+        for (var pi = lastIdx - 1; pi >= 0; pi--) { if (L[pi] === String(parseInt(L[lastIdx], 10) - 1) + L[lastIdx].slice(4)) { prevIdx = pi; break; } }
+        if (prevIdx < 0 && lastIdx - 2 >= 0) prevIdx = lastIdx - 2;
+        if (prevIdx >= 0 && rev[prevIdx] > 0) yoy = rev[lastIdx] / rev[prevIdx] - 1;
+        var yoyTxt = (yoy !== null && isFinite(yoy)) ? (' · 营收同比 ' + (yoy >= 0 ? '+' : '') + (yoy * 100).toFixed(1) + '%') : '';
+        var E8 = 1e8;
+        setSample('fin-waterfall', {
+          labels: ['营业总收入', '营业成本', '期间费用等', '净利润'],
+          values: [Math.round(rv / E8), -Math.round(cs / E8), -Math.round((rv - cs - np) / E8), Math.round(np / E8)]
+        }, { title: co.name + ' 利润桥接 · ' + period, subtitle: '营业总收入 → 减成本 → 减费用 → 净利润（亿元）' + yoyTxt, unit: '亿元', source: '公司财报 · akshare 实时' });
         // 环形：成本/费用/净利
         var donutV = [{ name: '营业成本', value: Math.round(cs / 1e8) }, { name: '期间费用等', value: Math.round((rv - cs - np) / 1e8) }, { name: '净利润', value: Math.round(np / 1e8) }];
         setSample('fin-donut', { data: donutV }, { title: co.name + ' 收入结构（' + period + '）', subtitle: '成本 / 费用 / 净利（亿元）', unit: '亿元', source: '公司财报 · akshare 实时' });
@@ -3550,9 +3581,13 @@
       var roeLast = roe[lastIdx];
       var gm = rv ? (rv - cs) / rv * 100 : null;
       if (rv && np) {
+        var prevNet = (prevIdx >= 0) ? net[prevIdx] : null;
+        var netYoy = (prevNet && prevNet !== 0) ? (np / prevNet - 1) : null;
+        var revYoy = yoy;
+        function pctStr(v) { return v === null || !isFinite(v) ? '—' : ((v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%'); }
         var cards2 = [
-          { label: '营业总收入', value: (rv / 1e8).toFixed(1) + ' 亿', delta: '', dir: 'pos', spark: rev.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
-          { label: '净利润', value: (np / 1e8).toFixed(1) + ' 亿', delta: '', dir: 'pos', spark: net.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
+          { label: '营业总收入', value: (rv / 1e8).toFixed(1) + ' 亿', delta: pctStr(revYoy), dir: (revYoy >= 0 ? 'pos' : 'neg'), spark: rev.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
+          { label: '净利润', value: (np / 1e8).toFixed(1) + ' 亿', delta: pctStr(netYoy), dir: (netYoy >= 0 ? 'pos' : 'neg'), spark: net.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
           { label: '毛利率', value: gm !== null ? gm.toFixed(1) + '%' : '—', delta: '', dir: 'pos', spark: [] },
           { label: 'ROE', value: roeLast !== null && roeLast !== undefined ? roeLast.toFixed(1) + '%' : '—', delta: '', dir: 'pos', spark: roe.filter(function (x) { return x !== null && x !== undefined; }).slice(-12) }
         ];
