@@ -119,6 +119,14 @@
     });
   }
 
+  function isEn() { return !!(window.I18N && window.I18N.getLang() === 'en'); }
+  function tr(zh, en) { return isEn() ? en : zh; }
+
+  /* 数据层文案翻译（英文模式） */
+  function DT(zh) {
+    return (window.DATA_I18N && window.DATA_I18N.t) ? window.DATA_I18N.t(zh) : zh;
+  }
+
   var state = {
     theme: 'paper',
     currentTemplate: 'macro-gdp-area',
@@ -256,7 +264,7 @@
         sec.items.forEach(function (item) {
           if (!item.series || !item.series.length) return;
           if (item.title === state.macroItem.title) return;
-          options.push({ key: 'macro:' + item.title, name: item.title, labels: item.labels, values: item.series[0].values });
+          options.push({ key: 'macro:' + item.title, name: DT(item.title), labels: item.labels, values: item.series[0].values });
         });
       });
     } else if (state.finItem) {
@@ -264,7 +272,7 @@
         sec.items.forEach(function (item) {
           if (!item.series || !item.series.length) return;
           if (item.title === state.finItem.title) return;
-          options.push({ key: 'fin:' + item.title, name: item.title, labels: item.labels, values: item.series[0].values });
+          options.push({ key: 'fin:' + item.title, name: DT(item.title), labels: item.labels, values: item.series[0].values });
         });
       });
     } else if (state.intlItem) {
@@ -273,13 +281,13 @@
         sec.items.forEach(function (item) {
           if (!item.series || !item.series.length) return;
           if (item.title === state.intlItem.title) return;
-          options.push({ key: 'intl:' + item.title, name: item.title, labels: item.labels, values: item.series[0].values });
+          options.push({ key: 'intl:' + item.title, name: DT(item.title), labels: item.labels, values: item.series[0].values });
         });
       });
       (window.CHINA_MACRO && window.CHINA_MACRO.sections || []).forEach(function (sec) {
         sec.items.forEach(function (item) {
           if (!item.series || !item.series.length) return;
-          options.push({ key: 'cn:' + item.title, name: '【中国】' + item.title, labels: item.labels, values: item.series[0].values });
+          options.push({ key: 'cn:' + item.title, name: (isEn() ? '[China] ' : '【中国】') + DT(item.title), labels: item.labels, values: item.series[0].values });
         });
       });
     } else if (state.chartConfig) {
@@ -503,12 +511,12 @@
 
   function setHead(meta) {
     state.currentMeta = meta;
-    el('chart-title').textContent = state.customTitles[state.viewKey] || meta.title;
-    el('chart-subtitle').textContent = meta.subtitle || '';
+    el('chart-title').textContent = state.customTitles[state.viewKey] || DT(meta.title);
+    el('chart-subtitle').textContent = DT(meta.subtitle || '');
     var unit = el('chart-unit');
-    if (meta.unit) { unit.style.display = ''; unit.textContent = meta.unit; }
+    if (meta.unit) { unit.style.display = ''; unit.textContent = DT(meta.unit); }
     else unit.style.display = 'none';
-    el('chart-source').textContent = meta.source || '';
+    el('chart-source').textContent = DT(meta.source || '');
   }
 
   function clearStage() {
@@ -1088,6 +1096,13 @@
     showBack(function () { renderHome(); });
   }
 
+  /* 同步 <select> 里带 data-i18n-opt 的选项文字 */
+  function syncSelectI18n() {
+    document.querySelectorAll('option[data-i18n-opt]').forEach(function (op) {
+      op.textContent = DT(op.getAttribute('data-i18n-opt'));
+    });
+  }
+
   function renderHome() {
     clearStage();
     state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
@@ -1210,8 +1225,8 @@
     var M = window.CHINA_MACRO || { sections: [] };
     setHead({
       title: '中国宏观数据一览',
-      subtitle: (M.updated ? '数据更新到 ' + M.updated : '暂无数据') + ' · 点击任意卡片查看完整图表',
-      unit: '', source: 'Wind / 国家统计局 · 手工整理'
+      subtitle: (M.updated ? DT('数据更新到') + ' ' + M.updated : DT('暂无数据')) + ' · ' + tr('点击任意卡片查看完整图表','click any card for the full chart'),
+      unit: '', source: tr('Wind / 国家统计局 · 手工整理','Wind / NBS · compiled')
     });
 
     var wrap = document.createElement('div');
@@ -1224,7 +1239,7 @@
       secEl.className = 'macro-section';
       var hd = document.createElement('div');
       hd.className = 'macro-cat';
-      hd.textContent = sec.name;
+      hd.textContent = DT(sec.name);
       secEl.appendChild(hd);
       var grid = document.createElement('div');
       grid.className = 'macro-grid';
@@ -1239,11 +1254,11 @@
         var multi = item.series.length > 1;
         var card = document.createElement('div');
         card.className = 'macro-card';
-        card.title = '点击查看完整图表';
+        card.title = DT('点击查看完整图表');
         card.innerHTML =
-          '<div class="mc-name">' + item.title + (multi ? '（' + item.series.length + '条）' : '') + '</div>' +
+          '<div class="mc-name">' + DT(item.title) + (multi ? (isEn() ? ' (' + item.series.length + ' series)' : '（' + item.series.length + '条）') : '') + '</div>' +
           '<div class="mc-val">' + fmtNum(latest) + '</div>' +
-          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
+          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' ' + DT('较上期')) + '</div>' +
           '<div class="mc-chart"></div>';
         card.addEventListener('click', function () { openMacroItem(item, false); });
         grid.appendChild(card);
@@ -1315,8 +1330,8 @@
     var F = window.FINANCE_DATA || { sections: [] };
     setHead({
       title: '金融数据一览',
-      subtitle: (F.updated ? '数据更新到 ' + F.updated : '暂无数据') + ' · 股票/商品/外汇用业绩模版，债券/VIX 用收益率折线',
-      unit: '', source: 'Wind / 交易所 · 手工整理'
+      subtitle: (F.updated ? DT('数据更新到') + ' ' + F.updated : DT('暂无数据')) + ' · ' + tr('股票/商品/外汇用业绩模版，债券/VIX 用收益率折线','equities / commodities / FX use performance template; bonds / VIX use yield lines'),
+      unit: '', source: tr('Wind / 交易所 · 手工整理','Wind / exchanges · compiled')
     });
 
     var wrap = document.createElement('div');
@@ -1329,7 +1344,7 @@
       secEl.className = 'macro-section';
       var hd = document.createElement('div');
       hd.className = 'macro-cat';
-      hd.textContent = sec.name;
+      hd.textContent = DT(sec.name);
       secEl.appendChild(hd);
       var grid = document.createElement('div');
       grid.className = 'macro-grid';
@@ -1346,11 +1361,11 @@
         var arrow = delta === null ? '' : (delta >= 0 ? '▲' : '▼');
         var card = document.createElement('div');
         card.className = 'macro-card';
-        card.title = fi.type === 'line' ? '点击查看走势' : '点击查看业绩';
+        card.title = DT(fi.type === 'line' ? '点击查看走势' : '点击查看业绩');
         card.innerHTML =
-          '<div class="mc-name">' + fi.title + '</div>' +
+          '<div class="mc-name">' + DT(fi.title) + '</div>' +
           '<div class="mc-val">' + fmtNum(latest) + '</div>' +
-          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
+          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' ' + DT('较上期')) + '</div>' +
           '<div class="mc-chart"></div>';
         card.addEventListener('click', function () { openFinItem(fi); });
         grid.appendChild(card);
@@ -1389,7 +1404,7 @@
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
         renderFinanceMetricsTable(merged.labels, merged.series, item.type === 'fund', item.unit === '%');
         setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '', unit: item.unit || '', source: '公开数据' });
-        el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势';
+        el('hint').textContent = DT(state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势');
       } else {
         // 业绩评估：净值 + 回撤 + 指标
         var nav = merged.labels.map(function (d, i) { return { date: d, value: merged.series[0].values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
@@ -1418,9 +1433,9 @@
     el('hint').textContent = '';
     var M = window.INTL_MACRO || { sections: [] };
     setHead({
-      title: '国际宏观数据',
-      subtitle: (M.updated ? '数据更新到 ' + M.updated : '暂无数据') + ' · 主流国家 GDP/CPI/PPI/PMI/基准利率',
-      unit: '', source: 'akshare · 公开数据'
+      title: DT('国际宏观数据'),
+      subtitle: (M.updated ? DT('数据更新到') + ' ' + M.updated : DT('暂无数据')) + ' · ' + tr('主流国家 GDP/CPI/PPI/PMI/基准利率','major economies: GDP / CPI / PPI / PMI / policy rates'),
+      unit: '', source: tr('akshare · 公开数据','akshare · public data')
     });
 
     var wrap = document.createElement('div');
@@ -1433,7 +1448,7 @@
       secEl.className = 'macro-section';
       var hd = document.createElement('div');
       hd.className = 'macro-cat';
-      hd.textContent = sec.name;
+      hd.textContent = DT(sec.name);
       secEl.appendChild(hd);
       var grid = document.createElement('div');
       grid.className = 'macro-grid';
@@ -1448,11 +1463,11 @@
         var arrow = delta === null ? '' : (delta >= 0 ? '▲' : '▼');
         var card = document.createElement('div');
         card.className = 'macro-card';
-        card.title = '点击查看走势';
+        card.title = DT('点击查看走势');
         card.innerHTML =
-          '<div class="mc-name">' + item.title + '</div>' +
+          '<div class="mc-name">' + DT(item.title) + '</div>' +
           '<div class="mc-val">' + fmtNum(latest) + '</div>' +
-          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' 较上期') + '</div>' +
+          '<div class="mc-delta ' + upCls + '">' + (delta === null ? '—' : arrow + ' ' + fmtNum(Math.abs(delta)) + ' ' + DT('较上期')) + '</div>' +
           '<div class="mc-chart"></div>';
         card.addEventListener('click', function () { openIntlItem(item); });
         grid.appendChild(card);
@@ -1488,7 +1503,7 @@
       state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
       if (state.overlaySeries.length) renderPeriodTable(merged.labels, merged.series);
       setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '走势 · 可直接叠加中国宏观等指标', unit: item.unit || '', source: '公开数据' });
-      el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '单个指标走势';
+      el('hint').textContent = DT(state.overlaySeries.length ? '多指标对比' : '单个指标走势');
       syncToolbar();
     } catch (e) { toast('打开图表失败'); }
   }
@@ -1506,7 +1521,7 @@
     exploreSel.length = 0;
     box.innerHTML = '';
     var sources = (source === 'all') ? ['china', 'intl', 'finance'] : [source];
-    var labelMap = { china: '中国宏观', intl: '国际宏观', finance: '金融数据' };
+    var labelMap = { china: DT('中国宏观'), intl: DT('国际宏观'), finance: DT('金融数据') };
     sources.forEach(function (src) {
       var D = exploreData(src) || { sections: [] };
       // 该数据源有指标才加分组标题
@@ -1523,7 +1538,7 @@
           var key = src + ':' + item.title;
           var chip = document.createElement('div');
           chip.className = 'col-chip';
-          chip.textContent = item.title;
+          chip.textContent = DT(item.title);
           chip.dataset.key = key;
           chip.addEventListener('click', function () {
             var i = exploreSel.indexOf(key);
@@ -1620,7 +1635,7 @@
       setHead({ title: '横向排名 · 最新值', subtitle: title, unit: '', source: '已有数据' });
     }
     state.echartsEl = c;
-    el('hint').textContent = '数据探索 · 共 ' + items.length + ' 个指标';
+    el('hint').textContent = tr('数据探索 · 共 ','Explore · ') + items.length + tr(' 个指标',' indicators');
     syncToolbar();
   }
 
@@ -1680,13 +1695,13 @@
     TEMPLATES.forEach(function (group) {
       var label = document.createElement('div');
       label.className = 'nav-group-label';
-      label.textContent = group.category;
+      label.textContent = DT(group.category);
       submenu.appendChild(label);
       group.items.forEach(function (item) {
         var nav = document.createElement('div');
         nav.className = 'nav-item nav-sub';
         nav.dataset.id = item.id;
-        nav.innerHTML = '<span>' + item.label + '</span>';
+        nav.innerHTML = '<span>' + DT(item.label) + '</span>';
         nav.addEventListener('click', function () { state.overrideType = null; state.overlaySeries = []; renderTemplate(item.id); closeSidebar(); });
         submenu.appendChild(nav);
       });
@@ -1712,7 +1727,8 @@
     state.currentTemplate = id;
     state.viewKey = 'tpl:' + id;
     highlightNav(id);
-    setHead(sample.meta);
+    var _tm = (window.DATA_I18N && window.DATA_I18N.tMeta) ? window.DATA_I18N.tMeta(id) : null;
+    setHead(_tm ? Object.assign({}, sample.meta, { title: _tm.title, subtitle: _tm.subtitle }) : sample.meta);
 
     // 注入单位、事件标注、图上说明
     if (sample.data) sample.data.unit = sample.meta.unit;
@@ -1791,7 +1807,7 @@
     renderEventNotes(hasEvents && state.showEvents ? EVENTS[id] : []);
     var anTypes = { area: 1, step: 1, dual: 1, stacked: 1, stackedBar: 1, line: 1 };
     if (anTypes[sample.type]) analysisFromSample(sample);
-    el('hint').textContent = '内置示例 · 数据仅本地处理';
+    el('hint').textContent = tr('内置示例 · 数据仅本地处理','built-in sample · processed locally');
     syncToolbar();
   }
 
@@ -1816,15 +1832,15 @@
       var m = String(v === undefined || v === null ? '' : v).match(/(\d{4})\D+(\d{1,2})/);
       return m ? (m[1] + '.' + String(m[2]).padStart(2, '0')) : String(v || '');
     }
-    var html = '<div class="en-title">事件标注</div>';
+    var html = '<div class="en-title">' + DT('事件标注') + '</div>';
     events.forEach(function (e) {
       var no = e.no ? '<span class="en-no">' + e.no + '</span>' : '<span class="en-dot"></span>';
       var s = (e.start !== undefined) ? e.start : e.x;
       var en = e.end;
       var time = en ? (shortDate(s) + ' ~ ' + shortDate(en)) : shortDate(s);
-      html += '<div class="en-item">' + no + '<b>' + e.label + '</b>' +
+      html += '<div class="en-item">' + no + '<b>' + DT(e.label) + '</b>' +
         '<span class="en-time">' + time + '</span>' +
-        '<span class="en-desc">' + (e.desc || '') + '</span></div>';
+        '<span class="en-desc">' + DT(e.desc || '') + '</span></div>';
     });
     box.innerHTML = html;
   }
@@ -1870,9 +1886,9 @@
     if (!rows.length) { clearAnalysis(); return; }
 
     var isPMI = rows.some(function (r) { return r.cat !== '其他'; });
-    var html = '<div class="an-title">数据变动分析<span class="an-sub">（最新值 · 环比 · 同比）</span></div>';
+    var html = '<div class="an-title">' + DT('数据变动分析') + '<span class="an-sub">' + tr('（最新值 · 环比 · 同比）',' (latest · MoM · YoY)') + '</span></div>';
     if (isPMI) {
-      var cats = ['需求', '生产', '采购库存', '就业', '供应商', '价格', '其他'];
+      var cats = isEn() ? ['Demand','Output','Inventory','Employment','Suppliers','Prices','Other'] : ['需求', '生产', '采购库存', '就业', '供应商', '价格', '其他'];
       cats.forEach(function (cat) {
         var items = rows.filter(function (r) { return r.cat === cat; });
         if (!items.length) return;
@@ -1880,7 +1896,7 @@
         items.forEach(function (r) { html += anRow(r, fmtV, fmtD); });
       });
     } else {
-      html += '<div class="an-cat">全部指标</div>';
+      html += '<div class="an-cat">' + tr('全部指标','All series') + '</div>';
       rows.forEach(function (r) { html += anRow(r, fmtV, fmtD); });
     }
     box.innerHTML = html;
@@ -1888,10 +1904,10 @@
   }
 
   function anRow(r, fmtV, fmtD) {
-    return '<div class="an-row"><span class="an-name">' + r.name + '</span>' +
+    return '<div class="an-row"><span class="an-name">' + DT(r.name) + '</span>' +
       '<span class="an-last">' + fmtV(r.last) + '</span>' +
-      '<span class="an-delta">环比 ' + fmtD(r.mom) + '</span>' +
-      '<span class="an-delta">同比 ' + fmtD(r.yoy) + '</span></div>';
+      '<span class="an-delta">' + DT('环比') + ' ' + fmtD(r.mom) + '</span>' +
+      '<span class="an-delta">' + DT('同比') + ' ' + fmtD(r.yoy) + '</span></div>';
   }
 
   function buildPerfMetricsHtml(nav, slice) {
@@ -2071,8 +2087,8 @@
       return s;
     }
     var statsArr = series.map(function (s) { return stats(s.values); });
-    var html = '<div class="an-head">多资产对比</div><table class="preview-table"><thead><tr><th>指标</th>';
-    series.forEach(function (s) { html += '<th>' + s.name + '</th>'; });
+    var html = '<div class="an-head">' + tr('多资产对比','Multi-asset comparison') + '</div><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
+    series.forEach(function (s) { html += '<th>' + DT(s.name) + '</th>'; });
     html += '</tr></thead><tbody>';
     rows.forEach(function (k) {
       html += '<tr><td>' + rowNames[k] + '</td>';
@@ -2101,7 +2117,7 @@
     if (!series || series.length < 2) return null;
     var html = '<div class="an-head">分期数据</div>';
     html += '<div style="max-height:340px;overflow:auto"><table class="preview-table"><thead><tr><th>时间</th>';
-    series.forEach(function (s) { html += '<th>' + s.name + '</th>'; });
+    series.forEach(function (s) { html += '<th>' + DT(s.name) + '</th>'; });
     html += '</tr></thead><tbody>';
     for (var i = labels.length - 1; i >= 0; i--) {
       html += '<tr><td>' + labels[i] + '</td>';
@@ -2146,22 +2162,22 @@
         };
       }
       metrics = series.map(function (s) { return lv(s.values); });
-      rows = [['latest', '最新值'], ['mean', '平均值'], ['max', '最高'], ['min', '最低'], ['change', '区间变化'], ['std', '标准差']];
+      rows = [['latest', DT('最新值')], ['mean', tr('平均值','Mean')], ['max', DT('最高')], ['min', DT('最低')], ['change', tr('区间变化','Change')], ['std', tr('标准差','Std Dev')]];
       pctRows = [];
-      head = '水平统计（利率/点位 · 不适用收益率指标）';
+      head = tr('水平统计（利率/点位 · 不适用收益率指标）','Level statistics (rates / points — return metrics not applicable)');
     } else {
       var bench = isFund ? financeBenchmark() : null;
       var benchVals = bench ? alignSeriesToBase(labels, bench.labels, bench.series[0].values) : null;
       metrics = series.map(function (s) { return ML.perfMetrics(s.values, benchVals, labels); });
-      rows = [['annReturn', '年化回报'], ['annVol', '年化波动（标准差）'], ['maxDD', '最大回撤'], ['sharp', '夏普比率']];
-      if (isFund) rows = rows.concat([['sortino', '索提诺比率'], ['m2', 'M²'], ['alpha', '詹森 alpha'], ['beta', 'Beta']]);
-      rows = rows.concat([['calmar', '卡玛比率'], ['var95', 'VaR 95%'], ['totalReturn', '累计收益']]);
+      rows = [['annReturn', DT('年化回报')], ['annVol', DT('年化波动（标准差）')], ['maxDD', DT('最大回撤')], ['sharp', DT('夏普比率')]];
+      if (isFund) rows = rows.concat([['sortino', tr('索提诺比率','Sortino')], ['m2', 'M²'], ['alpha', tr('詹森 alpha','Jensen alpha')], ['beta', 'Beta']]);
+      rows = rows.concat([['calmar', DT('卡玛比率')], ['var95', 'VaR 95%'], ['totalReturn', DT('累计收益')]]);
       pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
-      head = '业绩指标' + (isFund ? '（基金 · 基准：沪深300 · 无风险利率 2%）' : '（无风险利率 2%）');
+      head = tr('业绩指标','Performance') + (isFund ? tr('（基金 · 基准：沪深300 · 无风险利率 2%）',' (fund · benchmark: CSI 300 · risk-free 2%)') : tr('（无风险利率 2%）',' (risk-free 2%)'));
     }
     var html = '<div class="an-head">' + head + '</div>';
-    html += '<div style="overflow:auto"><table class="preview-table"><thead><tr><th>指标</th>';
-    series.forEach(function (s) { html += '<th>' + s.name + '</th>'; });
+    html += '<div style="overflow:auto"><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
+    series.forEach(function (s) { html += '<th>' + DT(s.name) + '</th>'; });
     html += '</tr></thead><tbody>';
     rows.forEach(function (r) {
       html += '<tr><td>' + r[1] + '</td>';
@@ -2194,8 +2210,8 @@
       return ML.perfMetrics(nav.map(function (p) { return p.value; }), null, nav.map(function (p) { return p.date; }));
     }
     var metrics = navs.map(metricsOf);
-    var html = '<div class="an-head">业绩指标（基于所选价格/净值列）</div><table class="preview-table"><thead><tr><th>指标</th>';
-    navs.forEach(function (x) { html += '<th>' + x.name + '</th>'; });
+    var html = '<div class="an-head">' + tr('业绩指标（基于所选价格/净值列）','Performance (based on selected price / NAV columns)') + '</div><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
+    navs.forEach(function (x) { html += '<th>' + DT(x.name) + '</th>'; });
     html += '</tr></thead><tbody>';
     rows.forEach(function (k) {
       html += '<tr><td>' + labels2[k] + '</td>';
@@ -2236,8 +2252,8 @@
     var labels2 = { annReturn: '年化收益', annVol: '年化波动', maxDD: '最大回撤', sharp: '夏普比率', var95: 'VaR(95%)', totalReturn: '累计收益' };
     function pct(v) { return (v * 100).toFixed(2) + '%'; }
     var metrics = navs.map(function (x) { var nav = slice ? slice(x.nav) : x.nav; return ML.perfMetrics(nav.map(function (p) { return p.value; }), null, nav.map(function (p) { return p.date; })); });
-    var html = '<div class="an-head">业绩指标（基于所选价格/净值列）</div><table class="preview-table"><thead><tr><th>指标</th>';
-    navs.forEach(function (x) { html += '<th>' + x.name + '</th>'; });
+    var html = '<div class="an-head">' + tr('业绩指标（基于所选价格/净值列）','Performance (based on selected price / NAV columns)') + '</div><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
+    navs.forEach(function (x) { html += '<th>' + DT(x.name) + '</th>'; });
     html += '</tr></thead><tbody>';
     rows.forEach(function (k) {
       html += '<tr><td>' + labels2[k] + '</td>';
@@ -2938,9 +2954,11 @@
         var next = (window.I18N.getLang() === 'en') ? 'zh' : 'en';
         window.I18N.setLang(next);
         this.textContent = (next === 'en') ? '中文' : 'EN';
+        syncSelectI18n();
         buildSidebar();
         if (state.mode === 'home') renderHome();
-        else if (window.I18N) window.I18N.apply();
+        else { try { rerender(); } catch (e) { if (window.I18N) window.I18N.apply(); } }
+        if (window.I18N) window.I18N.apply();
         toast(next === 'en' ? 'Switched to English' : '已切换为中文');
       });
     }
@@ -3682,7 +3700,7 @@
     attachExtremeLabels(ci);
     state.echartsEl = c;
     setHead({ title: cfg.title || '图表', subtitle: '', unit: cfg.unit || '', source: '' });
-    el('hint').textContent = 'AI 生成 · 可编辑图表类型/区间/＋指标后导出';
+    el('hint').textContent = tr('AI 生成 · 可编辑图表类型/区间/＋指标后导出','AI generated · edit type / range / overlays, then export');
     if (data.labels && data.series) renderAnalysis(data.labels, data.series);
     syncToolbar();
   }
@@ -4334,7 +4352,7 @@
     buildGoalCards();
     bindEvents();
     if (el('btn-watermark')) el('btn-watermark').classList.add('active');
-    el('footer-note').textContent = 'Advanced-Financial-Graph (AFG) · 数据仅本地处理 · 生成于 ' + new Date().toLocaleDateString('zh-CN');
+    el('footer-note').textContent = 'Advanced-Financial-Graph (AFG) · ' + tr('数据仅本地处理','processed locally') + ' · ' + tr('生成于','generated') + ' ' + new Date().toLocaleDateString(isEn() ? 'en-US' : 'zh-CN');
     if (q.chart) {
       try {
         var cfg = JSON.parse(b64Decode(q.chart));

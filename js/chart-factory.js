@@ -1201,7 +1201,37 @@
         }
       }
     }
+    localizeOption(option);
     return option;
+  }
+
+  /* 英文模式下翻译系列名 / 坐标轴分类 / 图例 */
+  function localizeOption(option) {
+    try {
+      if (!window.DATA_I18N || !window.I18N || window.I18N.getLang() !== 'en') return;
+      var T = window.DATA_I18N.t;
+      (option.series || []).forEach(function (s) {
+        if (s.name) s.name = T(s.name);
+        if (s.data && s.type === 'pie') {
+          s.data = s.data.map(function (d) { return (d && typeof d === 'object' && d.name) ? Object.assign({}, d, { name: T(d.name) }) : d; });
+        }
+      });
+      ['xAxis', 'yAxis'].forEach(function (k) {
+        var axes = option[k];
+        if (!axes) return;
+        (Array.isArray(axes) ? axes : [axes]).forEach(function (ax) {
+          if (ax && Array.isArray(ax.data)) ax.data = ax.data.map(function (v) { return typeof v === 'string' ? T(v) : v; });
+        });
+      });
+      if (option.legend) {
+        var lg = Array.isArray(option.legend) ? option.legend : [option.legend];
+        lg.forEach(function (l) { if (l && Array.isArray(l.data)) l.data = l.data.map(function (n) { return T(n); }); });
+      }
+      if (option.series && option.series[0] && option.series[0].type === 'sankey' && option.series[0].data) {
+        option.series[0].data = option.series[0].data.map(function (n) { return Object.assign({}, n, { name: T(n.name) }); });
+        (option.series[0].links || []).forEach(function (l) { l.source = T(l.source); l.target = T(l.target); });
+      }
+    } catch (e) {}
   }
 
   function render(el, type, data, theme) {

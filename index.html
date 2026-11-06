@@ -41,22 +41,22 @@
           </div>
         </div>
         <div class="head-right">
-          <button class="btn sm" id="back-btn" style="display:none">← 返回</button>
+          <button class="btn sm" id="back-btn" style="display:none" data-i18n="nav.back">← 返回</button>
           <span class="meta" style="color:var(--muted);font-size:11px" id="hint"></span>
         </div>
       </div>
       <div class="chart-toolbar" id="chart-toolbar">
         <label class="tb-label" data-i18n="tb.chart">图表</label>
         <select id="toolbar-chart-type">
-          <option value="line">折线图</option>
-          <option value="area">面积图</option>
-          <option value="bar">柱状图</option>
-          <option value="stacked">堆叠面积</option>
-          <option value="stackedLine">堆叠折线</option>
-          <option value="stackedBar">堆叠柱状</option>
-          <option value="season">季节性对比</option>
-          <option value="radar">雷达图</option>
-          <option value="rank">横向排名</option>
+          <option value="line" data-i18n-opt="折线图">折线图</option>
+          <option value="area" data-i18n-opt="面积图">面积图</option>
+          <option value="bar" data-i18n-opt="柱状图">柱状图</option>
+          <option value="stacked" data-i18n-opt="堆叠面积">堆叠面积</option>
+          <option value="stackedLine" data-i18n-opt="堆叠折线">堆叠折线</option>
+          <option value="stackedBar" data-i18n-opt="堆叠柱状">堆叠柱状</option>
+          <option value="season" data-i18n-opt="季节性对比">季节性对比</option>
+          <option value="radar" data-i18n-opt="雷达图">雷达图</option>
+          <option value="rank" data-i18n-opt="横向排名">横向排名</option>
         </select>
         <label class="tb-label" data-i18n="tb.range">区间</label>
         <select id="toolbar-range">
@@ -66,7 +66,7 @@
           <option value="10y" data-i18n="range.10y">近10年</option>
         </select>
         <button class="btn sm" id="btn-add-indicator" title="叠加对比指标" data-i18n="tb.add">＋ 指标</button>
-        <button class="btn sm" id="btn-events" style="display:none" title="标注重要历史事件">◈ 事件</button>
+        <button class="btn sm" id="btn-events" style="display:none" data-i18n-title="tb.eventsTitle" data-i18n="tb.events">◈ 事件</button>
         <button class="btn sm" id="btn-labels" title="标注最高/最低" data-i18n="tb.labels">极值标注</button>
         <div class="stat-badge" id="stat-badge"></div>
         <span class="tb-spacer"></span>
@@ -215,15 +215,15 @@
         <div class="field-row">
           <label>X / 时间列</label>
           <select id="x-col"></select>
-          <label style="margin-left:12px">图表类型</label>
+          <label style="margin-left:12px" data-i18n="ex.chartType">图表类型</label>
           <select id="chart-type">
-            <option value="line">折线图</option>
-            <option value="area">面积图</option>
-            <option value="bar">柱状图</option>
-            <option value="stacked">堆叠面积</option>
-            <option value="stackedBar">堆叠柱状</option>
-            <option value="radar">雷达图</option>
-            <option value="rank">横向排名</option>
+            <option value="line" data-i18n-opt="折线图">折线图</option>
+            <option value="area" data-i18n-opt="面积图">面积图</option>
+            <option value="bar" data-i18n-opt="柱状图">柱状图</option>
+            <option value="stacked" data-i18n-opt="堆叠面积">堆叠面积</option>
+            <option value="stackedBar" data-i18n-opt="堆叠柱状">堆叠柱状</option>
+            <option value="radar" data-i18n-opt="雷达图">雷达图</option>
+            <option value="rank" data-i18n-opt="横向排名">横向排名</option>
           </select>
           <button class="btn sm" id="btn-swapxy" title="交换 X/Y（转置方向）">⇅ 交换 X/Y</button>
         </div>
@@ -305,31 +305,31 @@
   <div class="overlay" id="explore-overlay">
     <div class="modal" style="width:min(640px,94vw)">
       <div class="modal-head">
-        <div><h2>数据探索</h2><div class="sub">用已有数据自由组合，一键生成热力矩阵 / 散点矩阵 / 雷达图等</div></div>
+        <div><h2 data-i18n="ex.title">数据探索</h2><div class="sub" data-i18n="ex.sub">用已有数据自由组合，一键生成热力矩阵 / 散点矩阵 / 雷达图等</div></div>
         <button class="modal-close" id="explore-close">×</button>
       </div>
       <div class="field-row">
-        <label>数据源</label>
+        <label data-i18n="ex.source">数据源</label>
         <select id="explore-source">
-          <option value="all">全部（宏观+金融）</option>
-          <option value="china">中国宏观</option>
-          <option value="intl">国际宏观</option>
-          <option value="finance">金融数据</option>
+          <option value="all" data-i18n="ex.all">全部（宏观+金融）</option>
+          <option value="china" data-i18n="ex.china">中国宏观</option>
+          <option value="intl" data-i18n="ex.intl">国际宏观</option>
+          <option value="finance" data-i18n="ex.fin">金融数据</option>
         </select>
-        <label style="margin-left:12px">图表类型</label>
+        <label style="margin-left:12px" data-i18n="ex.chartType">图表类型</label>
         <select id="explore-type">
-          <option value="heatmap">热力矩阵（指标×时间）</option>
-          <option value="multi">多线对比</option>
-          <option value="scatter">散点矩阵（关联）</option>
-          <option value="radar">雷达图（最新快照）</option>
-          <option value="rank">横向排名（最新值）</option>
+          <option value="heatmap" data-i18n="ex.tHeat">热力矩阵（指标×时间）</option>
+          <option value="multi" data-i18n="ex.tMulti">多线对比</option>
+          <option value="scatter" data-i18n="ex.tScatter">散点矩阵（关联）</option>
+          <option value="radar" data-i18n="ex.tRadar">雷达图（最新快照）</option>
+          <option value="rank" data-i18n="ex.tRank">横向排名（最新值）</option>
         </select>
       </div>
-      <div class="field-row"><label>选择指标</label><span class="hint" id="explore-hint">可跨板块多选，例如「制造业PMI」+「GDP」做关联</span></div>
+      <div class="field-row"><label data-i18n="ex.pick">选择指标</label><span class="hint" id="explore-hint" data-i18n="ex.hint">可跨板块多选，例如「制造业PMI」+「GDP」做关联</span></div>
       <div class="column-picker" id="explore-items" style="max-height:280px;overflow:auto"></div>
       <div class="field-row" style="margin-top:14px">
-        <button class="btn primary" id="explore-generate">生成图表</button>
-        <button class="btn" id="explore-clear">清空选择</button>
+        <button class="btn primary" id="explore-generate" data-i18n="ex.gen">生成图表</button>
+        <button class="btn" id="explore-clear" data-i18n="ex.clear">清空选择</button>
       </div>
     </div>
   </div>
@@ -344,6 +344,7 @@
   <!-- 业务模块 -->
   <script src="js/themes.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/i18n-data.js"></script>
   <script src="js/ai-guide.js"></script>
   <script src="js/data-loader.js"></script>
   <script src="js/china-macro.js"></script>
