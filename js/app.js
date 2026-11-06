@@ -662,6 +662,7 @@
       var m = info.m, lx = info.lx, ly = info.ly;
       var label = document.createElement('div');
       label.className = 'ext-label';
+      label.dataset.series = m.name || '';
       var txtColor = pickTextColor(m.color);
       label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:' + txtColor + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
       label.textContent = fmtNum(m.val);
@@ -802,6 +803,24 @@
     }, false);
   }
 
+  /* 悬停某条指标时，其他指标的标注（极值/最新值）同步变暗 */
+  function bindAnnoFocus(inst) {
+    if (!inst || inst._annoBound) return;
+    inst._annoBound = true;
+    var container = inst.getDom && inst.getDom();
+    if (!container) return;
+    function dimAll(name) {
+      Array.prototype.forEach.call(container.querySelectorAll('.ext-label, .last-tag'), function (el) {
+        var sname = el.dataset && el.dataset.series;
+        var on = (!name || !sname || sname === name);
+        el.style.opacity = on ? '1' : '0.18';
+        el.style.filter = on ? '' : 'grayscale(0.7)';
+      });
+    }
+    inst.on('mouseover', function (p) { if (p && p.seriesName) dimAll(p.seriesName); });
+    inst.on('globalout', function () { dimAll(null); });
+  }
+
   function bindFocusLegend(inst) {
     if (!inst || inst._focusBound) return;
     inst._focusBound = true;
@@ -819,6 +838,7 @@
     applyExtremeLabels(inst);
     applyLastValueTag(inst);
     bindFocusLegend(inst);
+    bindAnnoFocus(inst);
     if (inst._extBound) return;
     inst._extBound = true;
     inst.on('datazoom', function () { applyExtremeLabels(inst); applyLastValueTag(inst); });
