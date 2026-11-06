@@ -701,6 +701,83 @@
     });
   }
 
+  /* 按当前可见区间重新编号事件标注，返回事件清单（供图下说明/导出使用） */
+  function setEvents(inst, events, theme) {
+    if (!inst || !events || !events.length) return [];
+    var opt = inst.getOption();
+    var xa = opt.xAxis && (Array.isArray(opt.xAxis) ? opt.xAxis[0] : opt.xAxis);
+    var labels = (xa && xa.data) || [];
+    if (!labels.length) return [];
+    // 计算可见索引区间
+    var i0 = 0, i1 = labels.length - 1;
+    var dz = opt.dataZoom && opt.dataZoom[0];
+    if (dz) {
+      if (typeof dz.startValue === 'number') i0 = dz.startValue;
+      else if (typeof dz.start === 'number') i0 = Math.floor(dz.start / 100 * (labels.length - 1));
+      if (typeof dz.endValue === 'number') i1 = dz.endValue;
+      else if (typeof dz.end === 'number') i1 = Math.ceil(dz.end / 100 * (labels.length - 1));
+    }
+    i0 = Math.max(0, Math.min(i0, labels.length - 1));
+    i1 = Math.max(i0, Math.min(i1, labels.length - 1));
+    var visible = labels.slice(i0, i1 + 1);
+    if (!visible.length) return [];
+    function toMonth(s) {
+      var m = String(s === undefined || s === null ? '' : s).match(/(\d{4})\D+(\d{1,2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 12 + (parseInt(m[2] || '1', 10) - 1);
+    }
+    function snapMonth(target) {
+      if (target === null) return null;
+      var best = null, bestDiff = Infinity;
+      visible.forEach(function (l) {
+        var lm = toMonth(l);
+        if (lm === null) return;
+        var diff = Math.abs(lm - target);
+        if (diff < bestDiff) { bestDiff = diff; best = l; }
+      });
+      return bestDiff <= 12 ? best : null;
+    }
+    var st = eventStyle(theme);
+    var list = [];
+    var used = {};
+    events.forEach(function (e) {
+      var rawS = (e.start !== undefined) ? e.start : ((e.x !== undefined) ? e.x : e.d);
+      var rawE = (e.end !== undefined) ? e.end : rawS;
+      var s = toMonth(rawS), en = toMonth(rawE);
+      if (s === null) return;
+      if (en === null || en < s) en = s;
+      var ls = snapMonth(s), le = snapMonth(en);
+      if (!ls) return;
+      if (!le) le = ls;
+      var key = ls + '|' + le + '|' + e.label;
+      if (used[key]) return;
+      used[key] = true;
+      list.push({ ls: ls, le: le, label: e.label, desc: e.desc, si: visible.indexOf(ls) });
+    });
+    list.sort(function (a, b) { return a.si - b.si; });
+    var NUMS = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮'];
+    var order = list.map(function (it, i) {
+      return { no: NUMS[i] || String(i + 1), label: it.label, desc: it.desc, start: it.ls, end: it.le };
+    });
+    inst.setOption({
+      series: [{
+        markArea: {
+          silent: true,
+          itemStyle: { color: st.band },
+          label: {
+            show: true, position: 'insideTop', color: st.label,
+            fontSize: 11, fontWeight: 700, distance: 4, rotate: 0
+          },
+          data: list.map(function (it, i) {
+            return [{ xAxis: it.ls, name: NUMS[i] || String(i + 1) }, { xAxis: it.le }];
+          })
+        }
+      }]
+    }, false);
+    inst._eventOrder = order;
+    return order;
+  }
+
   /* 图上说明标注（markPoint） */
   function applyAnnotations(option, annotations, theme) {
     if (!option.series || !option.series.length || !annotations || !annotations.length) return;
@@ -1183,5 +1260,5 @@
     instances.forEach(function (i) { try { i.resize(); } catch (e) {} });
   }
 
-  global.ChartFactory = { render: render, renderKpiSpark: renderKpiSpark, disposeAll: disposeAll, resizeAll: resizeAll, BUILDERS: BUILDERS, setWatermark: setWatermark, hexToRgba: hexToRgba };
+  global.ChartFactory = { render: render, renderKpiSpark: renderKpiSpark, disposeAll: disposeAll, resizeAll: resizeAll, BUILDERS: BUILDERS, setWatermark: setWatermark, hexToRgba: hexToRgba, setEvents: setEvents, eventStyle: eventStyle };
 })(window);

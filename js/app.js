@@ -714,7 +714,7 @@
       label.className = 'ext-label';
       label.dataset.series = m.name || '';
       var txtColor = pickTextColor(m.color);
-      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:' + txtColor + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
+      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:default;background:' + m.color + ';color:' + txtColor + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
       label.textContent = fmtNum(m.val);
       overlay.appendChild(label);
       // 边界收敛：保证标签完整显示在图表内
@@ -752,6 +752,43 @@
       function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  /* 统一标注布局：限制在图表内 + 两两不重叠（不再允许拖动） */
+  function layoutChartLabels(container) {
+    if (!container) return;
+    var cw = container.clientWidth, ch = container.clientHeight;
+    if (!cw || !ch) return;
+    var els = Array.prototype.slice.call(container.querySelectorAll('.ext-label, .last-tag'));
+    if (!els.length) return;
+    var placed = [];
+    function collides(px, py, w, h) {
+      for (var i = 0; i < placed.length; i++) {
+        var p = placed[i];
+        if (px < p.x + p.w + 3 && px + w + 3 > p.x && py < p.y + p.h + 3 && py + h + 3 > p.y) return true;
+      }
+      return false;
+    }
+    els.sort(function (a, b) { return (a.offsetTop - b.offsetTop) || (a.offsetLeft - b.offsetLeft); });
+    els.forEach(function (el) {
+      var w = el.offsetWidth || 50, h = el.offsetHeight || 18;
+      var x = el.offsetLeft, y = el.offsetTop;
+      x = Math.max(4, Math.min(x, cw - w - 4));
+      y = Math.max(4, Math.min(y, ch - h - 4));
+      var guard = 0;
+      while (collides(x, y, w, h) && guard < 40) {
+        y += h + 3;
+        if (y + h > ch - 4) {
+          y = 4;
+          x = (x + w + 6 + w > cw - 4) ? 4 : x + w + 6;
+        }
+        guard++;
+      }
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.style.cursor = 'default';
+      placed.push({ x: x, y: y, w: w, h: h });
     });
   }
 
@@ -794,7 +831,7 @@
       tag.className = 'last-tag';
       tag.dataset.series = s.name || '';
       tag.title = '最新值（可拖动）';
-      tag.style.cssText = 'position:absolute;pointer-events:auto;cursor:move;background:' + color +
+      tag.style.cssText = 'position:absolute;pointer-events:auto;cursor:default;background:' + color +
         ';color:' + pickTextColor(color) + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:21;';
       tag.textContent = fmtNum(lv);
       container.appendChild(tag);
@@ -811,7 +848,7 @@
       while (overlaps(tx, ty, tw, th) && guard < 24) { ty += th + 3; if (ty + th > chh - 6) { ty = Math.max(6, p[1] - th / 2 - (guard + 1) * (th + 3)); } guard++; }
       tag.style.left = tx + 'px';
       tag.style.top = ty + 'px';
-      makeExtLabelDraggable(tag, null);
+
       placed.push({ x: tx, y: ty, w: tw, h: th });
       count++;
     });
@@ -943,6 +980,7 @@
     if (!inst) return;
     applyExtremeLabels(inst);
     applyLastValueTag(inst);
+    layoutChartLabels(inst.getDom && inst.getDom());
     bindFocusLegend(inst);
     bindAnnoFocus(inst);
     if (inst._extBound) return;
@@ -2421,15 +2459,16 @@
       var metaParts = [];
       if (sub) metaParts.push(sub);
       if (unit) metaParts.push('单位：' + unit);
-      if (rangeTxt) metaParts.push('时间：' + rangeTxt);
       var meta = metaParts.join('    ·    ');
 
       var pad = 28;
       var titleH = title ? 38 : 0;
       var metaH = meta ? 26 : 0;
+      var evList = (inst && inst._eventOrder) ? inst._eventOrder : [];
+      var evLineH = 24, evH = evList.length ? (26 + evList.length * evLineH + 6) : 0;
       var canvas = document.createElement('canvas');
       canvas.width = W + pad * 2;
-      canvas.height = pad + titleH + metaH + H + pad;
+      canvas.height = pad + titleH + metaH + H + pad + evH;
       var ctx = canvas.getContext('2d');
       ctx.fillStyle = theme.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
       var yy = pad;
@@ -2467,6 +2506,36 @@
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(lb.textContent, lx + lw / 2, ly + lh / 2);
             ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+          });
+        }
+        // 事件说明（跟随图片导出）
+        if (evList.length) {
+          function sd(v) {
+            var m = String(v === undefined || v === null ? '' : v).match(/(\d{4})\D+(\d{1,2})/);
+            return m ? (m[1] + '.' + String(m[2]).padStart(2, '0')) : String(v || '');
+          }
+          var ey = yy + H + 18;
+          ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+          ctx.fillStyle = theme.muted;
+          ctx.font = 'bold 13px Inter, -apple-system, "PingFang SC", sans-serif';
+          ctx.fillText('事件标注', pad, ey);
+          ey += 26;
+          evList.forEach(function (ev) {
+            ctx.fillStyle = theme.accent;
+            ctx.font = 'bold 15px Inter, -apple-system, "PingFang SC", sans-serif';
+            ctx.fillText(ev.no || '', pad, ey);
+            ctx.fillStyle = theme.text;
+            ctx.font = '14px Inter, -apple-system, "PingFang SC", sans-serif';
+            var head = ev.label + '   ' + sd(ev.start) + ' ~ ' + sd(ev.end);
+            ctx.fillText(head, pad + 26, ey);
+            var hw = ctx.measureText(head).width;
+            if (ev.desc) {
+              ctx.fillStyle = theme.muted;
+              ctx.font = '13px Inter, -apple-system, "PingFang SC", sans-serif';
+              var dx = pad + 26 + hw + 18;
+              ctx.fillText(ev.desc, dx, ey + 1, Math.max(60, canvas.width - dx - pad));
+            }
+            ey += evLineH;
           });
         }
         var a = document.createElement('a');
@@ -3501,6 +3570,18 @@
    * ============================================================ */
 
   /* ---------- 图表配置 JSON（大模型输出 / 分享链接） ---------- */
+  /* 缩放后：按可见区间重新编号事件标注，并同步图下说明 */
+  function bindEventZoom(inst, events, theme) {
+    if (!inst || inst._evZoomBound) return;
+    inst._evZoomBound = true;
+    inst.on('datazoom', function () {
+      try {
+        var order = ChartFactory.setEvents(inst, events, getChartTheme());
+        renderEventNotes(order);
+      } catch (e) {}
+    });
+  }
+
   function applyChartConfig(cfg, skipOverlayMerge) {
     var type = cfg.type || 'area';
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
@@ -3554,10 +3635,15 @@
     var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
     var ci = renderAutoDual(c, type, data, theme);
     if (cfgEvents && state.showEvents) {
+      ci._eventsSource = cfgEvents;
       var order = null;
       try { order = ci.getOption()._eventOrder; } catch (e9) {}
+      if (!order || !order.length) { try { order = ChartFactory.setEvents(ci, cfgEvents, theme); } catch (e10) {} }
+      if (order && order.length) ci._eventOrder = order;      // 供导出时绘制事件说明
       renderEventNotes(order || cfgEvents);
+      bindEventZoom(ci, cfgEvents, theme);
     } else {
+      ci._eventsSource = null;
       renderEventNotes(null);
     }
     attachAnnotationHandler(ci);
