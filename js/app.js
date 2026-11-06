@@ -58,7 +58,8 @@
     { category: '金融资产', items: [
       { id: 'fund-perf', label: '资产净值 · 沪深300' },
       { id: 'asset-rank', label: '全球股指 · 近一年涨幅' },
-      { id: 'asset-heat', label: '股指收益 · 年度热力' }
+      { id: 'asset-heat', label: '股指收益 · 年度热力' },
+      { id: 'fin-yield-curve', label: '收益率曲线 · 美债' }
     ]},
     { category: '机器学习', items: [
       { id: 'ml-trend', label: '回归趋势 · 置信带' },
@@ -3557,6 +3558,15 @@
         ];
         setSample('fin-kpi', { cards: cards2 }, { title: co.name + ' 经营概览（' + period + '）', subtitle: '营收 / 净利润 / 毛利率 / ROE', unit: '', source: '公司财报 · akshare 实时' });
       }
+    }
+
+    /* ========== 21.5 美债收益率曲线 ========== */
+    if (AK && AK.ustCurve && AK.ustCurve.curves && AK.ustCurve.curves.length) {
+      var yc = AK.ustCurve;
+      var S4 = S['fin-yield-curve'] || (S['fin-yield-curve'] = { meta: {}, type: 'line', data: {} });
+      S4.type = 'line';
+      S4.data = { labels: yc.maturities, series: yc.curves.map(function (c) { return { name: c.date, values: c.values }; }) };
+      S4.meta = Object.assign({}, S4.meta, { title: '美国国债收益率曲线', subtitle: '不同期限收益率对比（%）', unit: '%', source: '美国财政部 · Tushare 实时' });
     }
 
     /* ========== 22. 金融资产（新增） ========== */
