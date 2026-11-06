@@ -914,6 +914,93 @@
     'perf': perf, 'scatterMatrix': scatterMatrix, 'worldMap': worldMap
   };
 
+  /* 专业终端化排版：右侧价格轴 / 图例左上 / 底部时间滑块 / 千分位刻度 */
+  function axisNum(v) {
+    if (v === null || v === undefined || isNaN(v)) return '';
+    var a = Math.abs(v);
+    if (a >= 1e8) return (v / 1e8).toFixed(a >= 1e9 ? 0 : 1) + '亿';
+    if (a >= 1e4) return (v / 1e4).toFixed(a >= 1e5 ? 0 : 1) + '万';
+    if (a >= 1000) return v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    if (a >= 1) return String(Number(v.toFixed(2)));
+    return String(Number(v.toFixed(3)));
+  }
+
+  function contrastOn(bg) {
+    if (!bg) return '#0E0F12';
+    var hex = bg.charAt(0) === '#' ? bg.slice(1) : '';
+    if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+    if (hex.length !== 6) return '#0E0F12';
+    var r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.6 ? '#0E0F12' : '#FFFFFF';
+  }
+
+  function polishOption(option, theme, type) {
+    var cartesian = ['line', 'area', 'bar', 'stacked', 'stackedBar', 'stackedLine', 'step', 'dual', 'dualLine', 'bump', 'season'];
+    if (cartesian.indexOf(type) < 0) return option;
+    // 1) 价格轴放右侧（TradingView / Bloomberg 惯例）
+    var yAxes = option.yAxis || [];
+    yAxes.forEach(function (y, yi) {
+      if (!y) return;
+      // 单轴 → 右侧；双轴 → 左(主)+右(次)，避免重叠
+      y.position = (yAxes.length > 1 && yi === 0) ? 'left' : 'right';
+      if (yAxes.length > 1 && yi > 1) y.offset = (yi - 1) * 46;
+      if (y.type === 'value' && !(y.axisLabel && y.axisLabel.formatter)) {
+        y.axisLabel = Object.assign({}, y.axisLabel, { formatter: axisNum, margin: 8 });
+      }
+    });
+    // 2) 图例移到左上
+    if (option.legend) {
+      var lg = Object.assign({}, option.legend);
+      delete lg.right;
+      option.legend = Object.assign(lg, { left: 12, top: 4, itemGap: 14 });
+    }
+    // 3) 底部时间滑块
+    var dz = option.dataZoom || [];
+    var hasSlider = dz.some(function (z) { return z.type === 'slider'; });
+    if (!hasSlider) {
+      dz.push({
+        type: 'slider', height: 16, bottom: 6, left: 12, right: 12,
+        borderColor: 'transparent', backgroundColor: hexToRgba(theme.text, 0.04),
+        fillerColor: hexToRgba(theme.accent, 0.14),
+        dataBackground: { lineStyle: { color: theme.muted, opacity: 0.35 }, areaStyle: { color: theme.muted, opacity: 0.12 } },
+        selectedDataBackground: { lineStyle: { color: theme.accent, opacity: 0.6 }, areaStyle: { color: theme.accent, opacity: 0.18 } },
+        handleStyle: { color: theme.accent, borderColor: theme.accent },
+        moveHandleStyle: { color: theme.accent, opacity: 0.5 },
+        textStyle: { color: theme.muted, fontSize: 10 },
+        brushSelect: false, showDetail: false
+      });
+      option.dataZoom = dz;
+      var grids = Array.isArray(option.grid) ? option.grid : (option.grid ? [option.grid] : []);
+      if (!Array.isArray(option.grid) && option.grid) option.grid = grids;
+      grids.forEach(function (g) { if (g) g.bottom = 26; });
+    }
+    // 4) 最新值参考线 + 轴标签（TradingView 风格）
+    if (option.series && option.series.length === 1 && (type === 'line' || type === 'area' || type === 'step')) {
+      var s0 = option.series[0];
+      var arr = s0.data || [];
+      var lastVal = null;
+      for (var li = arr.length - 1; li >= 0; li--) {
+        var vv = arr[li];
+        if (vv !== null && vv !== undefined && !isNaN(vv)) { lastVal = vv; break; }
+      }
+      if (lastVal !== null && isFinite(lastVal)) {
+        var col = s0.color || theme.accent;
+        s0.markLine = {
+          silent: true, symbol: 'none',
+          lineStyle: { color: hexToRgba(col, 0.5), type: 'dashed', width: 1 },
+          label: {
+            show: true, position: 'end', formatter: fmt(lastVal),
+            color: contrastOn(col), backgroundColor: col,
+            padding: [3, 6], borderRadius: 3, fontSize: 10, fontWeight: 'bold'
+          },
+          data: [{ yAxis: lastVal }]
+        };
+      }
+    }
+    return option;
+  }
+
   function render(el, type, data, theme) {
     var builder = BUILDERS[type];
     if (!builder) throw new Error('未知图表类型: ' + type);
@@ -936,9 +1023,17 @@
       });
     }
     if (watermarkOn) addWatermark(option, theme);
-    option.animationDuration = 900;
-    option.animationEasing = 'cubicOut';
-    option.animationDurationUpdate = 500;
+    option = polishOption(option, theme, type);
+    // 大数据量不播放入场动画（专业终端习惯，且避免导出时截到半张图）
+    var maxPoints = 0;
+    (option.series || []).forEach(function (s) { if (s && s.data && s.data.length) maxPoints = Math.max(maxPoints, s.data.length); });
+    if (maxPoints > 200) {
+      option.animation = false;
+    } else {
+      option.animationDuration = 700;
+      option.animationEasing = 'cubicOut';
+      option.animationDurationUpdate = 400;
+    }
     var inst = echarts.getInstanceByDom(el) || echarts.init(el);
     inst.setOption(option, true);
     instances.push(inst);
