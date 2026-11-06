@@ -146,10 +146,35 @@
     return Math.exp(-0.5 * u * u) / (sigma * Math.sqrt(2 * Math.PI));
   }
 
+  /* 根据日期标签推断每年期数（日/周/月/季/年），用于正确的年化 */
+  function periodsPerYear(labels) {
+    if (!labels || labels.length < 3) return 252;
+    var times = [];
+    for (var i = 0; i < labels.length; i++) {
+      var t = Date.parse(String(labels[i]).replace(/年|月|日/g, '-').replace(/-+$/, ''));
+      if (!isNaN(t)) times.push(t);
+    }
+    if (times.length < 3) return 252;
+    var gaps = [];
+    for (var j = 1; j < times.length; j++) {
+      var g = Math.abs(times[j] - times[j - 1]) / 86400000;
+      if (g > 0) gaps.push(g);
+    }
+    if (!gaps.length) return 252;
+    gaps.sort(function (a, b) { return a - b; });
+    var med = gaps[Math.floor(gaps.length / 2)];
+    if (med <= 1.5) return 252;   // 日
+    if (med <= 10) return 52;     // 周
+    if (med <= 45) return 12;     // 月
+    if (med <= 100) return 4;     // 季
+    return 1;                     // 年
+  }
+
   /* 基金/指数业绩指标：年化收益、年化波动、最大回撤、夏普、索提诺、M²、Jensen-alpha、VaR、卡玛 */
   var RF = 0.02; // 无风险利率
-  function perfMetrics(values, benchmark) {
+  function perfMetrics(values, benchmark, labels) {
     if (!values || values.length < 2) return null;
+    var ppy = periodsPerYear(labels);
     // 剔除空值
     var pts = [];
     for (var k = 0; k < values.length; k++) {
@@ -162,8 +187,8 @@
     var start = pts[0], end = pts[n - 1];
     var rets = [];
     for (var i = 1; i < n; i++) rets.push(pts[i] / pts[i - 1] - 1);
-    var annReturn = Math.pow(end / start, 252 / (n - 1)) - 1;
-    var annVol = std(rets) * Math.sqrt(252);
+    var annReturn = Math.pow(end / start, ppy / (n - 1)) - 1;
+    var annVol = std(rets) * Math.sqrt(ppy);
     var peak = -Infinity, maxDD = 0;
     pts.forEach(function (v) { peak = Math.max(peak, v); var dd = v / peak - 1; if (dd < maxDD) maxDD = dd; });
     var sharp = annVol > 0 ? (annReturn - RF) / annVol : 0;
@@ -171,10 +196,10 @@
     var q = sorted.length ? sorted[Math.floor(sorted.length * 0.05)] : 0;
     var var95 = -q;
     // 索提诺：下行偏差（以无风险日收益率作为最低可接受收益）
-    var mar = RF / 252;
+    var mar = RF / ppy;
     var downSum = 0, downCnt = 0;
     rets.forEach(function (r) { if (r < mar) { downSum += (r - mar) * (r - mar); downCnt++; } });
-    var downDev = Math.sqrt(downSum / Math.max(1, rets.length)) * Math.sqrt(252);
+    var downDev = Math.sqrt(downSum / Math.max(1, rets.length)) * Math.sqrt(ppy);
     var sortino = downDev > 0 ? (annReturn - RF) / downDev : 0;
     var calmar = maxDD < 0 ? annReturn / Math.abs(maxDD) : null;
     // 基准相关：Jensen alpha / beta / M²
@@ -196,23 +221,23 @@
         cov /= ra.length; varb /= ra.length;
         beta = varb > 0 ? cov / varb : null;
         // 基准年化用几何口径，与资产口径一致
-        benchAnn = Math.pow(pb[pb.length - 1] / pb[0], 252 / (pb.length - 1)) - 1;
+        benchAnn = Math.pow(pb[pb.length - 1] / pb[0], ppy / (pb.length - 1)) - 1;
         if (beta !== null) alpha = annReturn - (RF + beta * (benchAnn - RF));
         // M² = Rf + Sharpe × σ_基准
-        var benchVol = Math.sqrt(varb) * Math.sqrt(252);
+        var benchVol = Math.sqrt(varb) * Math.sqrt(ppy);
         m2 = RF + sharp * benchVol;
       }
     }
     return {
       annReturn: annReturn, annVol: annVol, maxDD: maxDD, sharp: sharp, sortino: sortino,
       m2: m2, alpha: alpha, beta: beta, benchAnn: benchAnn, calmar: calmar,
-      var95: var95, totalReturn: end / start - 1, n: n
+      var95: var95, totalReturn: end / start - 1, n: n, ppy: ppy
     };
   }
 
   global.ML = {
     mean: mean, std: std, linearRegression: linearRegression, forecast: forecast,
     kmeans: kmeans, pearson: pearson, correlationMatrix: correlationMatrix,
-    histogram: histogram, kde: kde, normalPdf: normalPdf, rng: rng, perfMetrics: perfMetrics
+    histogram: histogram, kde: kde, normalPdf: normalPdf, rng: rng, perfMetrics: perfMetrics, periodsPerYear: periodsPerYear
   };
 })(window);

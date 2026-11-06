@@ -954,7 +954,7 @@
         attachExtremeLabels(ci);
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
-        renderFinanceMetricsTable(merged.labels, merged.series, item.type === 'fund');
+        renderFinanceMetricsTable(merged.labels, merged.series, item.type === 'fund', item.unit === '%');
         setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '', unit: item.unit || '', source: '公开数据' });
         el('hint').textContent = state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势';
       } else {
@@ -1438,8 +1438,8 @@
   }
 
   function buildPerfMetricsHtml(nav, slice) {
-    var full = ML.perfMetrics(nav.map(function (p) { return p.value; }));
-    var win = (slice && slice.length >= 2) ? ML.perfMetrics(slice.map(function (p) { return p.value; })) : full;
+    var full = ML.perfMetrics(nav.map(function (p) { return p.value; }), null, nav.map(function (p) { return p.date; }));
+    var win = (slice && slice.length >= 2) ? ML.perfMetrics(slice.map(function (p) { return p.value; }), null, slice.map(function (p) { return p.date; })) : full;
     function pct(x) { return (x === null || x === undefined || isNaN(x)) ? '—' : (x >= 0 ? '+' : '') + (x * 100).toFixed(2) + '%'; }
     function num(x) { return (x === null || x === undefined || isNaN(x)) ? '—' : x.toFixed(2); }
     var rows = [
@@ -1668,21 +1668,35 @@
     });
     return found;
   }
-  function renderFinanceMetricsTable(labels, series, isFund) {
+  function renderFinanceMetricsTable(labels, series, isFund, levelMode) {
     if (!series || !series.length) return null;
-    var bench = isFund ? financeBenchmark() : null;
-    var benchVals = bench ? alignSeriesToBase(labels, bench.labels, bench.series[0].values) : null;
-    var metrics = series.map(function (s) { return ML.perfMetrics(s.values, benchVals); });
-    var rows = [
-      ['annReturn', '年化回报'], ['annVol', '年化波动（标准差）'], ['maxDD', '最大回撤'],
-      ['sharp', '夏普比率']
-    ];
-    if (isFund) {
-      rows = rows.concat([['sortino', '索提诺比率'], ['m2', 'M²'], ['alpha', '詹森 alpha'], ['beta', 'Beta']]);
+    var metrics, rows, pctRows, head;
+    if (levelMode) {
+      // 利率/波动率等点位型：不适用收益率指标，用水平统计
+      function lv(values) {
+        var v = values.filter(function (x) { return x !== null && x !== undefined && !isNaN(x); });
+        if (!v.length) return null;
+        return {
+          latest: v[v.length - 1], mean: ML.mean(v),
+          max: Math.max.apply(null, v), min: Math.min.apply(null, v),
+          change: v[v.length - 1] - v[0], std: ML.std(v)
+        };
+      }
+      metrics = series.map(function (s) { return lv(s.values); });
+      rows = [['latest', '最新值'], ['mean', '平均值'], ['max', '最高'], ['min', '最低'], ['change', '区间变化'], ['std', '标准差']];
+      pctRows = [];
+      head = '水平统计（利率/点位 · 不适用收益率指标）';
+    } else {
+      var bench = isFund ? financeBenchmark() : null;
+      var benchVals = bench ? alignSeriesToBase(labels, bench.labels, bench.series[0].values) : null;
+      metrics = series.map(function (s) { return ML.perfMetrics(s.values, benchVals, labels); });
+      rows = [['annReturn', '年化回报'], ['annVol', '年化波动（标准差）'], ['maxDD', '最大回撤'], ['sharp', '夏普比率']];
+      if (isFund) rows = rows.concat([['sortino', '索提诺比率'], ['m2', 'M²'], ['alpha', '詹森 alpha'], ['beta', 'Beta']]);
+      rows = rows.concat([['calmar', '卡玛比率'], ['var95', 'VaR 95%'], ['totalReturn', '累计收益']]);
+      pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
+      head = '业绩指标' + (isFund ? '（基金 · 基准：沪深300 · 无风险利率 2%）' : '（无风险利率 2%）');
     }
-    rows = rows.concat([['calmar', '卡玛比率'], ['var95', 'VaR 95%'], ['totalReturn', '累计收益']]);
-    var pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
-    var html = '<div class="an-head">业绩指标' + (isFund ? '（基金 · 基准：沪深300 · 无风险利率 2%）' : '（无风险利率 2%）') + '</div>';
+    var html = '<div class="an-head">' + head + '</div>';
     html += '<div style="overflow:auto"><table class="preview-table"><thead><tr><th>指标</th>';
     series.forEach(function (s) { html += '<th>' + s.name + '</th>'; });
     html += '</tr></thead><tbody>';
@@ -1714,7 +1728,7 @@
     function pct(v) { return (v * 100).toFixed(2) + '%'; }
     function metricsOf(x) {
       var nav = slice ? slice(x.nav) : x.nav;
-      return ML.perfMetrics(nav.map(function (p) { return p.value; }));
+      return ML.perfMetrics(nav.map(function (p) { return p.value; }), null, nav.map(function (p) { return p.date; }));
     }
     var metrics = navs.map(metricsOf);
     var html = '<div class="an-head">业绩指标（基于所选价格/净值列）</div><table class="preview-table"><thead><tr><th>指标</th>';
@@ -1758,7 +1772,7 @@
     var rows = ['annReturn', 'annVol', 'maxDD', 'sharp', 'var95', 'totalReturn'];
     var labels2 = { annReturn: '年化收益', annVol: '年化波动', maxDD: '最大回撤', sharp: '夏普比率', var95: 'VaR(95%)', totalReturn: '累计收益' };
     function pct(v) { return (v * 100).toFixed(2) + '%'; }
-    var metrics = navs.map(function (x) { var nav = slice ? slice(x.nav) : x.nav; return ML.perfMetrics(nav.map(function (p) { return p.value; })); });
+    var metrics = navs.map(function (x) { var nav = slice ? slice(x.nav) : x.nav; return ML.perfMetrics(nav.map(function (p) { return p.value; }), null, nav.map(function (p) { return p.date; })); });
     var html = '<div class="an-head">业绩指标（基于所选价格/净值列）</div><table class="preview-table"><thead><tr><th>指标</th>';
     navs.forEach(function (x) { html += '<th>' + x.name + '</th>'; });
     html += '</tr></thead><tbody>';
