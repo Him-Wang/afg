@@ -1119,7 +1119,7 @@
       state.macroItem = item;
       var merged = mergeOverlaySeries(item.labels, item.series, state.overlaySeries);
       var type = state.macroTypeOverride || item.type;
-      applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series, viewKey: vk });
+      applyChartConfig({ type: type, title: item.title, unit: item.unit, labels: merged.labels, series: merged.series, viewKey: vk }, true);
       showBack(function () { renderChinaMacro(); });
       if (state.overlaySeries.length) renderPeriodTable(merged.labels, merged.series);
     } catch (e) { toast('打开图表失败'); }
@@ -3385,7 +3385,7 @@
    * ============================================================ */
 
   /* ---------- 图表配置 JSON（大模型输出 / 分享链接） ---------- */
-  function applyChartConfig(cfg) {
+  function applyChartConfig(cfg, skipOverlayMerge) {
     var type = cfg.type || 'area';
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
     state.chartConfig = cfg;
@@ -3413,7 +3413,8 @@
       }
     }
     // agent 生成的图：把用户通过「＋指标」叠加的系列合并进来
-    if (data.labels !== undefined && data.series !== undefined && state.overlaySeries && state.overlaySeries.length) {
+    // （openMacroItem 等已自行合并过的，传 skipOverlayMerge=true 避免重复叠加）
+    if (!skipOverlayMerge && data.labels !== undefined && data.series !== undefined && state.overlaySeries && state.overlaySeries.length) {
       var mg = mergeOverlaySeries(data.labels, data.series, state.overlaySeries);
       data = { labels: mg.labels, series: mg.series };
     }
