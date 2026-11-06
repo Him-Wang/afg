@@ -245,7 +245,6 @@ INTL_GROUPS = {
         ("欧元区央行利率", "macro_bank_euro_interest_rate"),
         ("日本央行利率", "macro_bank_japan_interest_rate"),
         ("英国央行利率", "macro_bank_english_interest_rate"),
-        ("中国央行利率", "macro_bank_china_interest_rate"),
         ("澳大利亚央行利率", "macro_bank_australia_interest_rate"),
         ("印度央行利率", "macro_bank_india_interest_rate"),
         ("巴西央行利率", "macro_bank_brazil_interest_rate"),
