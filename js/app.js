@@ -803,22 +803,77 @@
     }, false);
   }
 
-  /* 悬停某条指标时，其他指标的标注（极值/最新值）同步变暗 */
+  /* 统一：把标注按聚焦系列调暗/恢复 */
+  function dimLabelsTo(inst, name) {
+    var container = inst && inst.getDom && inst.getDom();
+    if (!container) return;
+    Array.prototype.forEach.call(container.querySelectorAll('.ext-label, .last-tag'), function (el) {
+      var sname = el.dataset && el.dataset.series;
+      var on = (!name || !sname || sname === name);
+      el.style.opacity = on ? '1' : '0.18';
+      el.style.filter = on ? '' : 'grayscale(0.7)';
+    });
+  }
+
+  /* 悬停某条指标时，其他指标的标注（极值/最新值）同步变暗
+     —— ECharts 的 mouseover 只在鼠标精确压线时触发，这里改用「鼠标位置找最近指标」 */
   function bindAnnoFocus(inst) {
     if (!inst || inst._annoBound) return;
     inst._annoBound = true;
     var container = inst.getDom && inst.getDom();
     if (!container) return;
+    var last = '__init__';
     function dimAll(name) {
-      Array.prototype.forEach.call(container.querySelectorAll('.ext-label, .last-tag'), function (el) {
-        var sname = el.dataset && el.dataset.series;
-        var on = (!name || !sname || sname === name);
-        el.style.opacity = on ? '1' : '0.18';
-        el.style.filter = on ? '' : 'grayscale(0.7)';
-      });
+      if (name === last) return;
+      last = name;
+      dimLabelsTo(inst, name);
+      applyHoverFocus(inst, name);
     }
+    function idle() { return inst._focusName || null; }
+    inst.getZr().on('mousemove', function (e) {
+      var opt = inst.getOption();
+      var series = opt.series || [];
+      if (series.length < 2) { dimAll(idle()); return; }
+      var pt = null;
+      try { pt = inst.convertFromPixel({ gridIndex: 0 }, [e.offsetX, e.offsetY]); } catch (err) { pt = null; }
+      if (!pt || pt[0] === null || pt[0] === undefined || isNaN(pt[0])) { dimAll(idle()); return; }
+      var idx = Math.round(pt[0]);
+      var best = null, bestDist = Infinity;
+      series.forEach(function (sr, si) {
+        if (!sr || !sr.data || sr.type === 'pie' || sr.type === 'sankey' || sr.type === 'graph') return;
+        var v = sr.data[idx];
+        if (v === null || v === undefined || isNaN(v)) return;
+        var probe = (sr.type === 'bar') ? v / 2 : v;
+        var px = null;
+        try { px = inst.convertToPixel({ seriesIndex: si }, [idx, probe]); } catch (err) { return; }
+        if (!px) return;
+        var d = Math.abs(px[1] - e.offsetY);
+        if (d < bestDist) { bestDist = d; best = sr.name; }
+      });
+      dimAll(bestDist <= 70 ? best : idle());
+    });
+    inst.getZr().on('globalout', function () { dimAll(idle()); });
     inst.on('mouseover', function (p) { if (p && p.seriesName) dimAll(p.seriesName); });
-    inst.on('globalout', function () { dimAll(null); });
+  }
+
+  /* hover 时给非聚焦系列降低不透明度（与 legend 聚焦一致，但不改 tooltip） */
+  function applyHoverFocus(inst, focusName) {
+    var opt = inst.getOption();
+    var series = opt.series || [];
+    if (series.length < 2) return;
+    try {
+      inst.setOption({
+        series: series.map(function (s) {
+          var on = (!focusName || s.name === focusName);
+          var patch = {
+            lineStyle: Object.assign({}, s.lineStyle, { opacity: on ? 1 : 0.2 }),
+            itemStyle: Object.assign({}, s.itemStyle, { opacity: on ? 1 : 0.2 })
+          };
+          if (s.areaStyle) patch.areaStyle = Object.assign({}, s.areaStyle, { opacity: on ? 1 : 0.05 });
+          return patch;
+        })
+      }, false);
+    } catch (e) {}
   }
 
   function bindFocusLegend(inst) {
@@ -829,6 +884,7 @@
       inst._focusName = (inst._focusName === name) ? null : name;
       try { inst.dispatchAction({ type: 'legendAllSelect' }); } catch (e) {}
       applySeriesFocus(inst, inst._focusName);
+      dimLabelsTo(inst, inst._focusName);
       applyLastValueTag(inst);
     });
   }
