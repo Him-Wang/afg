@@ -312,17 +312,11 @@
       return { min: v[0], max: v[v.length - 1], median: v[Math.floor(v.length / 2)] };
     }).filter(Boolean);
     if (stats.length < 2) return false;
-    // 1) 中位数差距 > 3 倍
-    var meds = stats.map(function (s) { return Math.abs(s.median); }).filter(function (m) { return m > 0; });
-    if (meds.length >= 2) {
-      var mx = Math.max.apply(null, meds), mn = Math.min.apply(null, meds);
-      if (mx / mn > 3) return true;
-    }
-    // 2) 数值区间完全不重叠
-    for (var i = 0; i < stats.length; i++) {
-      for (var j = i + 1; j < stats.length; j++) {
-        if (stats[i].max < stats[j].min || stats[j].max < stats[i].min) return true;
-      }
+    // 只有数量级差距很大（>10 倍）才用双轴；同量级（如各国GDP增速）用单轴
+    var mags = stats.map(function (s) { return Math.max(Math.abs(s.max), Math.abs(s.min), Math.abs(s.median)); }).filter(function (m) { return m > 0; });
+    if (mags.length >= 2) {
+      var mx = Math.max.apply(null, mags), mn = Math.min.apply(null, mags);
+      if (mx / mn > 10) return true;
     }
     return false;
   }
@@ -519,11 +513,11 @@
     if (old) old.remove();
     var mode = state.labelMode || 'off';
     var tc = Themes.active().chart;
-    // 全部数据模式用 ECharts 原生标签；切走时清除
-    if (mode !== 'all') {
+    // 仅清除本功能自己开启的「全部数据」标签，不影响图表自带标签（如热力图数值）
+    if (mode !== 'all' && inst._allLabels) {
       var o0 = inst.getOption();
-      var had = (o0.series || []).some(function (s) { return s.label && s.label.show; });
-      if (had) inst.setOption({ series: (o0.series || []).map(function () { return { label: { show: false } }; }) });
+      inst.setOption({ series: (o0.series || []).map(function () { return { label: { show: false } }; }) });
+      inst._allLabels = false;
     }
     if (mode === 'off') return;
     if (mode === 'all') {
@@ -538,6 +532,7 @@
         return;
       }
       var dense = visible > 24;
+      inst._allLabels = true;
       inst.setOption({ series: (o1.series || []).map(function (s) {
         return { label: {
           show: true, position: 'top', fontSize: dense ? 7 : 10, color: tc.muted,
@@ -726,6 +721,23 @@
   }
 
   /* ---------- 首页 / 使用说明 ---------- */
+  /* AI 画图示例（等价于 Agent 调用 make_chart 生成的结果） */
+  function showExampleChart() {
+    var cfg = {
+      type: 'area', viewKey: 'example', theme: 'midnight-gold',
+      title: 'AI 示例 · 全球主要经济体 GDP 增速', subtitle: '对 AI 说一句话即可生成这样的图', unit: '%',
+      labels: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
+      series: [
+        { name: '中国', values: [6.0, 2.2, 8.4, 3.0, 5.2, 5.0, 5.0] },
+        { name: '美国', values: [2.5, -2.2, 5.7, 2.1, 2.5, 2.8, 2.4] },
+        { name: '欧元区', values: [1.6, -6.1, 5.4, 3.5, 0.4, 0.8, 1.2] },
+        { name: '日本', values: [-0.4, -4.2, 2.6, 1.0, 1.9, 0.3, 1.1] }
+      ]
+    };
+    applyChartConfig(cfg);
+    showBack(function () { renderHome(); });
+  }
+
   function renderHome() {
     clearStage();
     state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
@@ -750,18 +762,29 @@
       '<button class="btn primary home-cta" id="home-import">＋ 上传数据开始</button>' +
       '<div class="home-note">想看效果？左侧「中国宏观数据一览」看最新宏观；「参考模板」可预览各图表样式。</div>' +
       '<div class="home-mcp">' +
-        '<h3>🔌 接入本地大模型（Kimi / Codex / WorkBuddy / Cursor / Claude 等）</h3>' +
-        '<p>AFG 提供 MCP 服务，让 Agent 在写研究时直接调用 <code>make_chart</code> 工具生成图表链接。</p>' +
-        '<ol style="padding-left:20px;margin:8px 0;color:var(--muted);font-size:13px;line-height:1.9">' +
-          '<li>进入 <code>mcp-server/</code> 目录，运行 <code>npm install</code></li>' +
-          '<li>在你的 Agent 的 MCP 设置里添加：Command=<code>node</code>，Args=<code>&lt;项目路径&gt;/mcp-server/server.js</code></li>' +
-          '<li>对 Agent 说「画一张 XX 的图」，它会调用工具返回一个图表链接，点开即可查看</li>' +
-        '</ol>' +
-        '<p style="font-size:12px;color:var(--muted)">详细配置见项目 <code>mcp-server/README.md</code>。工具名 <code>make_chart</code>，支持折线/面积/柱状/堆叠/雷达与 5 套配色。</p>' +
-      '</div>';
+        '<h3>🤖 用 AI 一句话画图（Kimi / WorkBuddy / Cursor / Claude 等）</h3>' +
+        '<p>不用学任何语法，直接把数据和需求说给 AI，它会调用 AFG 的 <code>make_chart</code> 工具，返回一个图表链接，点开就能看、能分享、能导出。</p>' +
+        '<div class="home-ai-examples">' +
+          '<div class="home-ai-q">「用近 5 年沪深300和中证500做一张对比折线图」</div>' +
+          '<div class="home-ai-q">「画一张全球主要经济体近 6 年 GDP 增速的热力图」</div>' +
+          '<div class="home-ai-q">「把这几个月的中美 CPI 画成面积图，用黑金主题」</div>' +
+        '</div>' +
+        '<p class="home-ai-tip">👉 你也可以把 Excel 粘给 AI，再说「用 AFG 画图」，它会自动整理数据并生成图表链接。</p>' +
+        '<div class="home-cta-row">' +
+          '<button class="btn primary" id="home-demo">▶ 看一个 AI 生成的图表示例</button>' +
+        '</div>' +
+        '<details class="home-mcp-detail"><summary>开发者配置（MCP Server）</summary>' +
+          '<ol><li>进入 <code>mcp-server/</code>，运行 <code>npm install</code></li>' +
+          '<li>Agent 的 MCP 设置里添加：Command=<code>node</code>，Args=<code>&lt;项目路径&gt;/mcp-server/server.js</code></li>' +
+          '<li>对 Agent 说「用 AFG 画图」，即可调用 <code>make_chart</code></li></ol>' +
+          '<p>支持折线/面积/柱状/堆叠/雷达 + 5 套配色，详见 <code>mcp-server/README.md</code>。</p>' +
+        '</details>' +
+            '</div>';
     el('chart-stage').appendChild(h);
     setHead({ title: 'AFG · 智能制图', subtitle: '上传数据 → 自动识别 → 推荐图表 → 自由定制', unit: '', source: '' });
     h.querySelector('#home-import').addEventListener('click', openModal);
+    var demoBtn = h.querySelector('#home-demo');
+    if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
     syncToolbar();
   }
 
