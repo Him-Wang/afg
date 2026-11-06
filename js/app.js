@@ -704,56 +704,121 @@
     });
   }
 
-  /* 最新值标签：固定在图表右缘内、不越界、可拖动 */
+  /* 最新值标签：每个系列各一个，右缘内、不越界、可拖动、自动错开 */
   function applyLastValueTag(inst) {
     if (!inst) return;
     var container = inst.getDom && inst.getDom();
     if (!container) return;
-    var old = container.querySelector('.last-tag');
-    if (old) old.remove();
+    Array.prototype.forEach.call(container.querySelectorAll('.last-tag'), function (t) { t.remove(); });
     var opt = inst.getOption();
-    var s0 = opt.series && opt.series[0];
-    if (!s0 || !s0.data || !s0.data.length) return;
-    if ((opt.series || []).length > 1) return; // 多系列时易混乱，不显示
-    if (s0.type !== 'line' && s0.type !== 'bar') return;
-    var data = s0.data, li = -1, lv = null;
-    for (var i = data.length - 1; i >= 0; i--) {
-      var v = data[i];
-      if (v === null || v === undefined || isNaN(v)) continue;
-      li = i; lv = v; break;
-    }
-    if (li < 0) return;
-    var p = null;
-    try { p = inst.convertToPixel({ seriesIndex: 0 }, [li, lv]); } catch (e) { return; }
-    if (!p) return;
+    var all = opt.series || [];
     var theme = Themes.active().chart;
-    var color = (s0.itemStyle && s0.itemStyle.color) || s0.color || theme.accent;
-    if (typeof color !== 'string') color = theme.accent;
-    var tag = document.createElement('div');
-    tag.className = 'last-tag';
-    tag.title = '最新值（可拖动）';
-    tag.style.cssText = 'position:absolute;pointer-events:auto;cursor:move;background:' + color +
-      ';color:' + pickTextColor(color) + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:21;';
-    tag.textContent = fmtNum(lv);
-    container.appendChild(tag);
     var cw = container.clientWidth, chh = container.clientHeight;
-    var tw = tag.offsetWidth || 54, th = tag.offsetHeight || 18;
-    var tx = p[0] - tw - 8;
-    if (tx < 6) tx = p[0] + 8;
-    if (tx + tw > cw - 6) tx = cw - tw - 6;
-    if (tx < 6) tx = 6;
-    var ty = p[1] - th / 2;
-    if (ty < 6) ty = 6;
-    if (ty + th > chh - 6) ty = chh - th - 6;
-    tag.style.left = tx + 'px';
-    tag.style.top = ty + 'px';
-    makeExtLabelDraggable(tag, null);
+    var placed = [];
+    var count = 0;
+    function overlaps(x, y, w, h) {
+      for (var k = 0; k < placed.length; k++) {
+        var q = placed[k];
+        if (x < q.x + q.w + 2 && x + w + 2 > q.x && y < q.y + q.h + 2 && y + h + 2 > q.y) return true;
+      }
+      return false;
+    }
+    all.forEach(function (s, si) {
+      if (!s || (s.type !== 'line' && s.type !== 'bar')) return;
+      if (!s.data || !s.data.length) return;
+      if (count >= 6) return;
+      var data = s.data, li = -1, lv = null;
+      for (var i = data.length - 1; i >= 0; i--) {
+        var v = data[i];
+        if (v === null || v === undefined || isNaN(v)) continue;
+        li = i; lv = v; break;
+      }
+      if (li < 0) return;
+      var p = null;
+      try { p = inst.convertToPixel({ seriesIndex: si }, [li, lv]); } catch (e) { return; }
+      if (!p) return;
+      var color = (s.itemStyle && s.itemStyle.color) || s.color || (theme.series && theme.series[si % theme.series.length]) || theme.accent;
+      if (typeof color !== 'string') color = theme.accent;
+      var tag = document.createElement('div');
+      tag.className = 'last-tag';
+      tag.dataset.series = s.name || '';
+      tag.title = '最新值（可拖动）';
+      tag.style.cssText = 'position:absolute;pointer-events:auto;cursor:move;background:' + color +
+        ';color:' + pickTextColor(color) + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:21;';
+      tag.textContent = fmtNum(lv);
+      container.appendChild(tag);
+      var tw = tag.offsetWidth || 54, th = tag.offsetHeight || 18;
+      var tx = p[0] - tw - 8;
+      if (tx < 6) tx = p[0] + 8;
+      if (tx + tw > cw - 6) tx = cw - tw - 6;
+      if (tx < 6) tx = 6;
+      var ty = p[1] - th / 2;
+      if (ty < 6) ty = 6;
+      if (ty + th > chh - 6) ty = chh - th - 6;
+      // 纵向错开，避免互相重叠
+      var guard = 0;
+      while (overlaps(tx, ty, tw, th) && guard < 24) { ty += th + 3; if (ty + th > chh - 6) { ty = Math.max(6, p[1] - th / 2 - (guard + 1) * (th + 3)); } guard++; }
+      tag.style.left = tx + 'px';
+      tag.style.top = ty + 'px';
+      makeExtLabelDraggable(tag, null);
+      placed.push({ x: tx, y: ty, w: tw, h: th });
+      count++;
+    });
+  }
+
+  /* 图例点击：聚焦某条指标，其余变暗（不隐藏），再次点击恢复 */
+  function applySeriesFocus(inst, focusName) {
+    var opt = inst.getOption();
+    var series = opt.series || [];
+    if (!series.length) return;
+    var theme = Themes.active().chart;
+    inst.setOption({
+      series: series.map(function (s) {
+        var on = (!focusName || s.name === focusName);
+        var patch = {
+          lineStyle: Object.assign({}, s.lineStyle, { opacity: on ? 1 : 0.18 }),
+          itemStyle: Object.assign({}, s.itemStyle, { opacity: on ? 1 : 0.18 })
+        };
+        // 只有本来就是面积图才调 areaStyle，避免给折线图凭空加面积填充
+        if (s.areaStyle) patch.areaStyle = Object.assign({}, s.areaStyle, { opacity: on ? 1 : 0.06 });
+        return patch;
+      })
+    }, false);
+    // 提示框里的数据也同步变暗
+    inst.setOption({
+      tooltip: {
+        formatter: function (params) {
+          if (!params || !params.length) return '';
+          var html = '<div style="font-size:11px;color:' + theme.muted + ';margin-bottom:4px">' + params[0].axisValue + '</div>';
+          params.forEach(function (p) {
+            var on = (!focusName || p.seriesName === focusName);
+            var val = (p.value === null || p.value === undefined || isNaN(p.value)) ? '—' : fmtNum(p.value);
+            html += '<div style="opacity:' + (on ? 1 : 0.28) + ';display:flex;justify-content:space-between;gap:14px;line-height:1.7">' +
+              '<span>' + (p.marker || '') + p.seriesName + '</span><b>' + val + '</b></div>';
+          });
+          return html;
+        }
+      }
+    }, false);
+  }
+
+  function bindFocusLegend(inst) {
+    if (!inst || inst._focusBound) return;
+    inst._focusBound = true;
+    inst.on('legendselectchanged', function (params) {
+      var name = params.name;
+      inst._focusName = (inst._focusName === name) ? null : name;
+      try { inst.dispatchAction({ type: 'legendAllSelect' }); } catch (e) {}
+      applySeriesFocus(inst, inst._focusName);
+      applyLastValueTag(inst);
+    });
   }
 
   function attachExtremeLabels(inst) {
     if (!inst) return;
     applyExtremeLabels(inst);
     applyLastValueTag(inst);
+    bindFocusLegend(inst);
     if (inst._extBound) return;
     inst._extBound = true;
     inst.on('datazoom', function () { applyExtremeLabels(inst); applyLastValueTag(inst); });
