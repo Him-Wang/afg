@@ -141,6 +141,7 @@
       if (ym && parseInt(ym[0], 10) >= cutoffY) { start = i; break; }
     }
     if (start === 0) return { labels: labels, series: series };
+    if (labels.length - start < 3) start = Math.max(0, labels.length - 3);
     return {
       labels: labels.slice(start),
       series: series.map(function (s) { return { name: s.name, values: s.values.slice(start) }; })
@@ -225,6 +226,20 @@
         sec.items.forEach(function (item) {
           if (!item.series || !item.series.length) return;
           options.push({ key: 'cn:' + item.title, name: '【中国】' + item.title, labels: item.labels, values: item.series[0].values });
+        });
+      });
+    } else if (state.chartConfig) {
+      // AI 生成的图：可叠加真实宏观/金融指标
+      ['INTL_MACRO', 'CHINA_MACRO', 'FINANCE_DATA'].forEach(function (gname) {
+        var D = window[gname];
+        ((D && D.sections) || []).forEach(function (sec) {
+          (sec.items || []).forEach(function (item) {
+            if (!item.series || !item.series.length) return;
+            var name = item.title;
+            var exists = (state.chartConfig.series || []).some(function (x) { return x.name === name; });
+            if (exists) return;
+            options.push({ key: 'real:' + gname + ':' + name, name: name, labels: item.labels, values: item.series[0].values });
+          });
         });
       });
     } else {
@@ -623,6 +638,7 @@
       }
     }
 
+    var cw = container.clientWidth || 0, chh = container.clientHeight || 0;
     labelsInfo.forEach(function (info) {
       var m = info.m, lx = info.lx, ly = info.ly;
       var label = document.createElement('div');
@@ -630,6 +646,14 @@
       label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:move;background:' + m.color + ';color:#0E0F12;font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
       label.textContent = fmtNum(m.val);
       overlay.appendChild(label);
+      // 边界收敛：保证标签完整显示在图表内
+      var lw = label.offsetWidth || 48, lh = label.offsetHeight || 18;
+      if (lx + lw > cw - 6) lx = cw - lw - 6;
+      if (lx < 6) lx = 6;
+      if (ly + lh > chh - 6) ly = chh - lh - 6;
+      if (ly < 6) ly = 6;
+      label.style.left = lx + 'px';
+      label.style.top = ly + 'px';
       var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', m.px); line.setAttribute('y1', m.py);
       line.setAttribute('x2', lx + 3); line.setAttribute('y2', ly + 10);
@@ -2494,7 +2518,14 @@
         else toast('该指标仅支持 折线/面积/柱状/堆叠');
         return;
       }
-      if (state.mode === 'imported') { state.mapping.chartType = this.value; rerender(); }
+      if (state.mode === 'imported') {
+        state.mapping.chartType = this.value;
+        if (state.chartConfig) {
+          var okTypes = ['line', 'area', 'bar', 'stacked', 'stackedLine', 'stackedBar', 'step'];
+          if (okTypes.indexOf(this.value) >= 0) state.chartConfig.type = this.value;
+        }
+        rerender();
+      }
       else if (state.mode === 'template') {
         var s = DataLoader.SAMPLES[state.currentTemplate];
         if (s && s.data && s.data.labels !== undefined && s.data.series !== undefined) {
@@ -3010,6 +3041,11 @@
         data.labels = ranged.labels; data.series = ranged.series;
       }
     }
+    // agent 生成的图：把用户通过「＋指标」叠加的系列合并进来
+    if (data.labels !== undefined && data.series !== undefined && state.overlaySeries && state.overlaySeries.length) {
+      var mg = mergeOverlaySeries(data.labels, data.series, state.overlaySeries);
+      data = { labels: mg.labels, series: mg.series };
+    }
     data.seriesColors = state.seriesColors;
     clearStage();
     state.mode = 'imported'; state.isImported = true; state.viewKey = cfg.viewKey || 'imported';
@@ -3025,7 +3061,7 @@
     attachExtremeLabels(ci);
     state.echartsEl = c;
     setHead({ title: cfg.title || '图表', subtitle: '', unit: cfg.unit || '', source: '' });
-    el('hint').textContent = '已加载图表配置';
+    el('hint').textContent = 'AI 生成 · 可编辑图表类型/区间/＋指标后导出';
     if (data.labels && data.series) renderAnalysis(data.labels, data.series);
     syncToolbar();
   }
