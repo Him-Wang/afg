@@ -946,20 +946,10 @@
           '<h3>' + T('home.ai.title') + '</h3>' +
           '<p>' + T('home.ai.desc') + '</p>' +
           '<div class="home-cta-row"><button class="btn primary" id="home-ai-copy">' + T('home.ai.copy') + '</button></div>' +
+          '<p class="home-ai-hint">' + T('home.ai.hint') + '</p>' +
           '<details class="home-guide-details">' +
             '<summary>' + T('home.ai.adv') + '</summary>' +
-            '<div class="home-guide-body">' +
-              '<div class="home-ai-way">' +
-                '<div class="haw-badge">' + T('home.ai.wayC') + '</div>' +
-                '<p class="haw-desc">' + T('home.ai.wayC.desc') + '</p>' +
-                '<div class="home-cta-row"><button class="btn" id="home-ai-selfinstall">' + T('home.ai.copyC') + '</button></div>' +
-              '</div>' +
-              '<div class="home-ai-way">' +
-                '<div class="haw-badge">' + T('home.ai.wayB') + '</div>' +
-                '<p class="haw-desc">' + T('home.ai.wayB.desc') + '</p>' +
-                '<div class="home-guide-inner">' + ((window.AFG_AI_GUIDE && window.AFG_AI_GUIDE[(window.I18N && window.I18N.getLang()) || 'zh']) || '') + '</div>' +
-              '</div>' +
-            '</div>' +
+            '<div class="home-guide-body">' + ((window.AFG_AI_GUIDE && window.AFG_AI_GUIDE[(window.I18N && window.I18N.getLang()) || 'zh']) || '') + '</div>' +
           '</details>' +
         '</div>' +
       '</div>' +
@@ -977,64 +967,43 @@
     if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
     var copyBtn = h.querySelector('#home-ai-copy');
     if (copyBtn) copyBtn.addEventListener('click', function () {
-      var prompt = [
-        '请用 AFG（Advanced-Financial-Graph）帮我做一张图，直接输出一个可点击的图表链接。',
-        '',
-        '链接格式：https://saviorbill.github.io/afg/?chart=<把 JSON 做 base64url 编码>',
-        'JSON 结构：',
-        '{"type":"area","title":"图表标题","theme":"paper","labels":["2021","2022","2023"],',
-        ' "series":[{"name":"沪深300","values":[1,2,3]},{"name":"中证500","values":[4,5,6]}]}',
-        '',
-        '说明：',
-        '- type 可选：line 折线 / area 面积 / bar 柱状 / stacked 堆叠面积 / stackedBar 堆叠柱状 / radar 雷达 / scatterMatrix 相关系数矩阵 / heatmap 热力矩阵 / donut 环形 / treemap 树图',
-        '- theme 可选：paper 象牙白（适合文档）/ midnight-gold 黑金（适合路演）/ tradingview-dark / emerald / graphite',
-        '- labels 与每个 series 的 values 长度必须一致',
-        '',
-        '请把我的数据整理成上面的 JSON，并生成完整链接。'
-      ].join('\n');
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(prompt).then(function () { toast(T('home.ai.copied')); }, function () { toast('复制失败'); });
-      } else {
-        var ta = document.createElement('textarea'); ta.value = prompt; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); toast(T('home.ai.copied')); } catch (e) {}
-        ta.remove();
-      }
-    });
-    var selfBtn = h.querySelector('#home-ai-selfinstall');
-    if (selfBtn) selfBtn.addEventListener('click', function () {
       var en = (window.I18N && window.I18N.getLang() === 'en');
       var prompt = en ? [
-        'Please set up the AFG charting tool (an MCP server) for yourself. Do it step by step and tell me if anything needs my input.',
+        'Please set up and use AFG (a charting tool) for me. I am not technical — do everything automatically, do not ask me to run commands or edit config files.',
         '',
-        '1) Check environment: run `node -v`. If Node.js is missing, give me the download link and stop.',
-        '2) Fetch the project (prefer git):',
-        '   git clone https://github.com/saviorbill/afg.git ~/afg',
-        '   (if git is unavailable, tell me and I will download the ZIP manually)',
-        '3) Install dependencies: cd ~/afg/mcp-server && npm install',
-        '4) Get the absolute path: cd ~/afg/mcp-server && pwd  → the config needs <that path>/server.js',
-        '5) Register the MCP server in your own MCP config file:',
-        '   {"mcpServers":{"afg-charts":{"command":"node","args":["<ABSOLUTE_PATH>/server.js"]}}}',
-        '   If you cannot find your config file, tell me the path and ask me to confirm before writing.',
-        '6) Reload/reconnect MCP, then list your tools and confirm `make_chart` is available.',
-        '7) Finally call make_chart once with a tiny test dataset and give me the resulting link.',
+        'STEP 1 — If you have terminal / file access:',
+        '  a) run `node -v` (if Node.js is missing, tell me the download link and stop)',
+        '  b) git clone https://github.com/saviorbill/afg.git ~/afg',
+        '  c) cd ~/afg/mcp-server && npm install',
+        '  d) add this to YOUR OWN MCP config, then reload:',
+        '     {"mcpServers":{"afg-charts":{"command":"node","args":["<the real absolute path of ~/afg/mcp-server/server.js>"]}}}',
+        '  e) confirm the `make_chart` tool is available',
         '',
-        'Report each step result. Do not skip steps.'
+        'STEP 2 — If you cannot install anything (chat-only), use links instead:',
+        '  Build https://saviorbill.github.io/afg/?chart=<base64url of JSON>',
+        '  JSON: {"type":"area","title":"...","theme":"paper","labels":["2021","2022"],"series":[{"name":"CSI300","values":[1,2]}]}',
+        '  type: line / area / bar / stacked / stackedBar / radar / scatterMatrix / heatmap / donut / treemap',
+        '  theme: paper (documents) / midnight-gold (pitch decks) / tradingview-dark / emerald / graphite',
+        '',
+        'STEP 3 — Then draw my chart: I will send data or a request next. Use AFG and give me the link.'
       ].join('\n') : [
-        '请帮我在你这里配置 AFG 图表工具（MCP 服务器），一步一步执行，遇到需要我确认的地方先问我。',
+        '请帮我配置并使用 AFG 画图工具。我不懂技术，请你全部自动完成，不要让我手动敲命令或改配置文件。',
         '',
-        '1) 检查环境：运行 `node -v`。如果没有 Node.js，给我下载地址并停下。',
-        '2) 获取项目（优先用 git）：',
-        '   git clone https://github.com/saviorbill/afg.git ~/afg',
-        '   （如果没有 git，告诉我，我手动下载 ZIP）',
-        '3) 安装依赖：cd ~/afg/mcp-server && npm install',
-        '4) 取得绝对路径：cd ~/afg/mcp-server && pwd  → 配置里要填 <这个路径>/server.js',
-        '5) 把 MCP 服务器写进你自己的 MCP 配置文件：',
-        '   {"mcpServers":{"afg-charts":{"command":"node","args":["<绝对路径>/server.js"]}}}',
-        '   如果找不到你的配置文件在哪，先告诉我路径并让我确认，再写入。',
-        '6) 重载/重连 MCP，然后列出你有哪些工具，确认能看到 make_chart。',
-        '7) 最后调用一次 make_chart，用一个小测试数据生成图表，把链接发给我。',
+        '第一步：如果你有终端 / 文件权限',
+        '  a) 运行 node -v 检查环境（如果没有 Node.js，把下载地址给我就停下）',
+        '  b) git clone https://github.com/saviorbill/afg.git ~/afg',
+        '  c) cd ~/afg/mcp-server && npm install',
+        '  d) 把下面这段加进你自己的 MCP 配置，然后重载：',
+        '     {"mcpServers":{"afg-charts":{"command":"node","args":["<~/afg/mcp-server/server.js 的真实绝对路径>"]}}}',
+        '  e) 确认你能看到 make_chart 工具',
         '',
-        '每完成一步告诉我结果，不要跳步。'
+        '第二步：如果你不能安装（比如纯聊天环境），改用链接方式',
+        '  把数据编码成链接：https://saviorbill.github.io/afg/?chart=<base64url(JSON)>',
+        '  JSON 结构：{"type":"area","title":"标题","theme":"paper","labels":["2021","2022"],"series":[{"name":"沪深300","values":[1,2]}]}',
+        '  type 可选：line 折线 / area 面积 / bar 柱状 / stacked 堆叠面积 / stackedBar 堆叠柱状 / radar 雷达 / scatterMatrix 相关系数矩阵 / heatmap 热力矩阵 / donut 环形 / treemap 树图',
+        '  theme 可选：paper 象牙白（写文档）/ midnight-gold 黑金（路演）/ tradingview-dark / emerald / graphite',
+        '',
+        '第三步：接下来我会把数据或需求发给你，请用 AFG 画出来，并把链接给我。'
       ].join('\n');
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(prompt).then(function () { toast(T('home.ai.copied')); }, function () { toast('复制失败'); });
