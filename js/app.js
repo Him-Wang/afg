@@ -72,6 +72,10 @@
   ];
 
   /* 宏观图事件标注（竖线 + 标签 + 详细说明） */
+  /* 这些图表类型不是时间序列，不适合「最新值标签 / 极值标注」 */
+  var NO_DECOR_TYPES = { waterfall: 1, sankey: 1, donut: 1, treemap: 1, rank: 1, bubble: 1,
+    radar: 1, heatmap: 1, matrixHeat: 1, scatterMatrix: 1, perf: 1, worldMap: 1, kpi: 1, season: 0 };
+
   var EVENTS = {
     'macro-gdp-area': [
       { x: '2020Q1', label: '疫情冲击', desc: '新冠疫情爆发，经济活动停摆，GDP 同比增速骤降至 -6.8%。' },
@@ -1779,7 +1783,7 @@
       var c = document.createElement('div'); c.className = 'chart-canvas'; stage.appendChild(c);
       var ci = ChartFactory.render(c, sample.type, perfData, theme);
       attachAnnotationHandler(ci);
-      attachExtremeLabels(ci);
+      if (!NO_DECOR_TYPES[sample.type]) attachExtremeLabels(ci);
       state.echartsEl = c;
       renderPerfMetrics(perfData, ci);
     } else if (sample.type === 'worldMap' && state.tableView) {
@@ -1805,7 +1809,7 @@
       }
       var ci2 = ChartFactory.render(c2, renderType, renderData, theme);
       attachAnnotationHandler(ci2);
-      attachExtremeLabels(ci2);
+      if (!NO_DECOR_TYPES[sample.type]) attachExtremeLabels(ci2);
       state.echartsEl = c2;
     }
     var tableBtn = el('btn-table');

@@ -500,7 +500,9 @@
         { name: '占位', type: 'bar', stack: 'w', itemStyle: { color: 'transparent' }, data: base, silent: true, tooltip: { show: false } },
         { name: '增长', type: 'bar', stack: 'w', data: positive, label: labelCfg(theme.up),
           itemStyle: { color: theme.up, borderRadius: 2 } },
-        { name: '下降', type: 'bar', stack: 'w', data: negative, label: labelCfg(theme.down),
+        { name: '下降', type: 'bar', stack: 'w', data: negative,
+          label: { show: true, position: 'top', color: theme.down, fontSize: 11,
+            formatter: function (p) { return p.value === '-' ? '' : ('-' + p.value); } },
           itemStyle: { color: theme.down, borderRadius: 2 } }
       ]
     };
