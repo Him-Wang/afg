@@ -7,7 +7,7 @@
   var THEMES = {
     'midnight-gold': {
       id: 'midnight-gold',
-      short: '黑金',
+      short: '黑金', en: 'Gold',
       name: '黑金 Midnight Gold',
       css: {
         '--bg': '#0E0F12',
@@ -37,7 +37,7 @@
 
     'tradingview-dark': {
       id: 'tradingview-dark',
-      short: '暗色',
+      short: '暗色', en: 'Dark',
       name: '深蓝 TradingView Dark',
       css: {
         '--bg': '#131722',
@@ -67,7 +67,7 @@
 
     'paper': {
       id: 'paper',
-      short: '象牙白',
+      short: '象牙白', en: 'Ivory',
       name: '象牙白 Paper / Print',
       css: {
         '--bg': '#FAFAF7',
@@ -97,7 +97,7 @@
 
     'emerald': {
       id: 'emerald',
-      short: '墨绿',
+      short: '墨绿', en: 'Emerald',
       name: '墨绿 Emerald',
       css: {
         '--bg': '#0E1B17',
@@ -127,7 +127,7 @@
 
     'graphite': {
       id: 'graphite',
-      short: '石墨',
+      short: '石墨', en: 'Graphite',
       name: '石墨 Graphite',
       css: {
         '--bg': '#1B1E24',
@@ -156,9 +156,9 @@
     }
   };
 
-  var activeId = 'paper';
+  var activeId = 'midnight-gold';
 
-  function getTheme(id) { return THEMES[id] || THEMES['paper']; }
+  function getTheme(id) { return THEMES[id] || THEMES['midnight-gold']; }
   function active() { return getTheme(activeId); }
   function ids() { return Object.keys(THEMES); }
 

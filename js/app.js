@@ -138,7 +138,7 @@
   }
 
   var state = {
-    theme: 'paper',
+    theme: 'midnight-gold',
     currentTemplate: 'macro-gdp-area',
     mode: 'template',
     isImported: false,
@@ -1092,7 +1092,7 @@
   /* AI 画图示例（等价于 Agent 调用 make_chart 生成的结果） */
   function showExampleChart() {
     var cfg = {
-      type: 'area', viewKey: 'example', theme: 'paper',
+      type: 'area', viewKey: 'example', theme: 'midnight-gold',
       title: 'AI 示例 · 全球主要经济体 GDP 增速', subtitle: '对 AI 说一句话即可生成这样的图', unit: '%',
       labels: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
       series: [
@@ -1110,6 +1110,9 @@
   function syncSelectI18n() {
     document.querySelectorAll('option[data-i18n-opt]').forEach(function (op) {
       op.textContent = DT(op.getAttribute('data-i18n-opt'));
+    });
+    document.querySelectorAll('#theme-select option').forEach(function (op) {
+      if (op.dataset.zh) op.textContent = isEn() ? (op.dataset.en || op.dataset.zh) : op.dataset.zh;
     });
   }
 
@@ -2453,7 +2456,9 @@
       var o = document.createElement('option');
       o.value = id;
       var th = Themes.getTheme(id);
-      o.textContent = th.short || th.name;
+      o.dataset.zh = th.short || th.name;
+      o.dataset.en = th.en || th.name;
+      o.textContent = isEn() ? o.dataset.en : o.dataset.zh;
       o.title = th.name;
       sel.appendChild(o);
     });
@@ -2517,7 +2522,7 @@
       var rangeTxt = xs.length ? (String(xs[0]) + ' → ' + String(xs[xs.length - 1])) : '';
       var metaParts = [];
       if (sub) metaParts.push(sub);
-      if (unit) metaParts.push('单位：' + unit);
+      if (unit) metaParts.push(tr('单位：', 'Unit: ') + unit);
       var meta = metaParts.join('    ·    ');
 
       var pad = 28;
@@ -2577,7 +2582,7 @@
           ctx.textAlign = 'left'; ctx.textBaseline = 'top';
           ctx.fillStyle = theme.muted;
           ctx.font = 'bold 13px Inter, -apple-system, "PingFang SC", sans-serif';
-          ctx.fillText('事件标注', pad, ey);
+          ctx.fillText(DT('事件标注'), pad, ey);
           ey += 26;
           evList.forEach(function (ev) {
             ctx.fillStyle = theme.accent;
@@ -2585,14 +2590,14 @@
             ctx.fillText(ev.no || '', pad, ey);
             ctx.fillStyle = theme.text;
             ctx.font = '14px Inter, -apple-system, "PingFang SC", sans-serif';
-            var head = ev.label + '   ' + sd(ev.start) + ' ~ ' + sd(ev.end);
+            var head = DT(ev.label) + '   ' + sd(ev.start) + ' ~ ' + sd(ev.end);
             ctx.fillText(head, pad + 26, ey);
             var hw = ctx.measureText(head).width;
             if (ev.desc) {
               ctx.fillStyle = theme.muted;
               ctx.font = '13px Inter, -apple-system, "PingFang SC", sans-serif';
               var dx = pad + 26 + hw + 18;
-              ctx.fillText(ev.desc, dx, ey + 1, Math.max(60, canvas.width - dx - pad));
+              ctx.fillText(DT(ev.desc), dx, ey + 1, Math.max(60, canvas.width - dx - pad));
             }
             ey += evLineH;
           });
