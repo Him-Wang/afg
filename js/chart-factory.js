@@ -519,6 +519,10 @@
     var total = data.data.reduce(function (s, d) { return s + d.value; }, 0);
     var isPct = Math.abs(total - 100) < 2;            // 传入值本身就是百分比
     function pctOf(v) { return isPct ? v : (total > 0 ? v / total * 100 : 0); }
+    var w = (el && el.clientWidth) || 800;
+    var narrow = w < 520;                              // 手机 / 窄容器
+    var cx = narrow ? '50%' : '38%';
+    var cy = narrow ? '44%' : '50%';
     var centerMain = isPct ? '100%' : fmt(total);
     var centerSub = data.centerLabel
       ? (DTi(data.centerLabel) + (data.unit ? (isEnLang() ? ' (' + DTi(String(data.unit).trim()) + ')' : '（' + String(data.unit).trim() + '）') : ''))
@@ -532,13 +536,20 @@
           ? (p.name + '<br/>' + u + ' ' + fmt(p.value) + ' (' + pctOf(p.value).toFixed(1) + '% of total)')
           : (p.name + '<br/>' + (data.unit || '') + ' ' + fmt(p.value) + '（占 ' + pctOf(p.value).toFixed(1) + '%）');
       } }),
-      legend: Object.assign(legend(theme), { orient: 'vertical', right: 12, top: 'center', itemWidth: 10, itemHeight: 10,
-        formatter: function (nm) {
-          var it = data.data.filter(function (d) { return d.name === nm; })[0];
-          return it ? (nm + '  ' + pctOf(it.value).toFixed(1) + '%') : nm;
-        } }),
+      legend: narrow
+        ? Object.assign(legend(theme), { orient: 'horizontal', left: 'center', bottom: 2,
+            itemWidth: 10, itemHeight: 10, itemGap: 10, textStyle: { color: theme.text, fontSize: 10 },
+            formatter: function (nm) {
+              var it = data.data.filter(function (d) { return d.name === nm; })[0];
+              return it ? (nm + ' ' + pctOf(it.value).toFixed(1) + '%') : nm;
+            } })
+        : Object.assign(legend(theme), { orient: 'vertical', right: 12, top: 'center', itemWidth: 10, itemHeight: 10,
+            formatter: function (nm) {
+              var it = data.data.filter(function (d) { return d.name === nm; })[0];
+              return it ? (nm + '  ' + pctOf(it.value).toFixed(1) + '%') : nm;
+            } }),
       series: [{
-        type: 'pie', radius: ['58%', '80%'], center: ['38%', '50%'],
+        type: 'pie', radius: narrow ? ['46%', '64%'] : ['58%', '80%'], center: [cx, cy],
         avoidLabelOverlap: true,
         itemStyle: { borderColor: theme.bg, borderWidth: 2 },
         label: { show: false },
@@ -547,13 +558,92 @@
         emphasis: { scale: true, scaleSize: 6 }
       }],
       graphic: [{
-        type: 'text', left: '38%', top: '42%',
-        style: { text: centerMain, fill: theme.text, fontSize: 20, fontWeight: 700, textAlign: 'center' }
+        type: 'text', left: cx, top: narrow ? '39%' : '42%', z: 10,
+        style: { text: centerMain, fill: theme.text, fontSize: narrow ? 16 : 20, fontWeight: 700, textAlign: 'center' }
       }, {
-        type: 'text', left: '38%', top: '53%',
-        style: { text: centerSub, fill: theme.muted, fontSize: 12, textAlign: 'center' }
+        type: 'text', left: cx, top: narrow ? '48%' : '53%', z: 10,
+        style: {
+          text: narrow ? (data.unit ? DTi(String(data.unit).trim()) : (isEnLang() ? 'Total' : '合计')) : centerSub,
+          fill: theme.muted, fontSize: narrow ? 10 : 12, textAlign: 'center'
+        }
       }]
     };
+    return option;
+  }
+
+  /* ---------- 双轴折线（量级差异大的多指标对比） ---------- */
+  function dualLine(el, data, theme) {
+    var series = (data.series || []).map(function (s, i) {
+      return withFocus({
+        name: s.name, type: 'line', data: s.values, yAxisIndex: s.yAxisIndex || 0,
+        symbol: 'none', smooth: true, color: theme.series[i % theme.series.length],
+        lineStyle: { width: 2.4 }
+      });
+    });
+    return {
+      backgroundColor: theme.bg,
+      tooltip: tooltip(theme),
+      legend: Object.assign(legend(theme), { right: 16, top: 8 }),
+      grid: { top: 50, left: 12, right: 24, bottom: 8, containLabel: true },
+      dataZoom: dataZoomCfg(theme),
+      xAxis: [Object.assign({ type: 'category', data: data.labels }, axisCommon(theme))],
+      yAxis: [
+        Object.assign({ type: 'value', scale: true }, axisCommon(theme)),
+        Object.assign({ type: 'value', scale: true, splitLine: { show: false } }, axisCommon(theme))
+      ],
+      series: series
+    };
+  }
+
+  /* ---------- 瀑布图 ---------- */
+  function waterfall(el, data, theme) {
+    var values = data.values, labels = data.labels;
+    var n = values.length, last = n - 1;
+    var base = [], positive = [], negative = [], sum = 0, cum = [];
+    values.forEach(function (v, i) {
+      if (i === 0) { base.push('-'); positive.push(v); negative.push('-'); sum = v; cum.push(v); }
+      else if (i === last) {
+        if (data.totalFromZero) {
+          // 末项作为「结果/总额」从 0 起画，避免柱高为 0 让人看不懂
+          base.push('-'); positive.push(values[last]); negative.push('-'); cum.push(values[last]);
+        } else {
+          base.push(sum); cum.push(values[last]);
+          var d = values[last] - sum;
+          if (d >= 0) { positive.push(d); negative.push('-'); }
+          else { positive.push('-'); negative.push(-d); }
+        }
+      } else {
+        if (v >= 0) { base.push(sum); positive.push(v); negative.push('-'); sum += v; }
+        else { base.push(sum + v); positive.push('-'); negative.push(-v); sum += v; }
+        cum.push(sum);
+      }
+    });
+    var totalColor = hexToRgba(theme.accent, 0.85);
+    function labelCfg(color) {
+      return { show: true, position: 'top', color: theme.muted, fontSize: 11,
+        formatter: function (p) { return p.value === '-' ? '' : p.value; } };
+    }
+    var option = {
+      backgroundColor: theme.bg,
+      tooltip: Object.assign({}, tooltip(theme), { trigger: 'axis' }),
+      grid: { top: 46, left: 12, right: 16, bottom: 8, containLabel: true },
+      xAxis: [Object.assign({ type: 'category', data: labels, axisLabel: { color: theme.text, fontSize: 11, interval: 0 } }, axisCommon(theme))],
+      yAxis: [Object.assign({ type: 'value' }, axisCommon(theme))],
+      series: [
+        { name: '占位', type: 'bar', stack: 'w', itemStyle: { color: 'transparent' }, data: base, silent: true, tooltip: { show: false } },
+        { name: '增长', type: 'bar', stack: 'w', data: positive, label: labelCfg(theme.up),
+          itemStyle: { color: theme.up, borderRadius: 2 } },
+        { name: '下降', type: 'bar', stack: 'w', data: negative,
+          label: { show: true, position: 'top', color: theme.down, fontSize: 11,
+            formatter: function (p) { return p.value === '-' ? '' : ('-' + p.value); } },
+          itemStyle: { color: theme.down, borderRadius: 2 } }
+      ]
+    };
+    // 首尾总额高亮
+    option.series[1].data = positive.map(function (v, i) {
+      if (i === 0 || i === last) { return { value: v, itemStyle: { color: totalColor } }; }
+      return v;
+    });
     return option;
   }
 

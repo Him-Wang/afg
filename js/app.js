@@ -3036,7 +3036,26 @@
     }
     el('btn-more').addEventListener('click', function (e) {
       e.stopPropagation();
-      el('tb-menu').classList.toggle('open');
+      var menu = el('tb-menu');
+      menu.classList.toggle('open');
+      // 手机上：先让按钮滚入可视区，再把菜单固定在屏内
+      if (menu.classList.contains('open')) {
+        try {
+          this.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          var r = this.getBoundingClientRect();
+          var mw = menu.offsetWidth || 180;
+          var left = Math.min(Math.max(8, r.right - mw), window.innerWidth - mw - 8);
+          menu.style.position = 'fixed';
+          menu.style.top = Math.round(r.bottom + 6) + 'px';
+          menu.style.left = Math.round(Math.max(8, left)) + 'px';
+          menu.style.right = 'auto';
+        } catch (err) {}
+      } else {
+        menu.style.position = '';
+        menu.style.top = '';
+        menu.style.left = '';
+        menu.style.right = '';
+      }
     });
     document.addEventListener('click', function (e) {
       var menu = el('tb-menu');
