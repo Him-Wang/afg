@@ -599,3 +599,98 @@ body.is-home .chart-head { display: none; }
 .event-notes .en-no { display: inline-block; min-width: 18px; color: var(--accent); font-weight: 700; margin-right: 4px; }
 .event-notes .en-item { line-height: 1.9; }
 .event-notes .en-time { color: var(--muted); margin: 0 8px; font-variant-numeric: tabular-nums; }
+
+/* ============ 手机端（≤600px）精细适配 ============ */
+@media (max-width: 600px) {
+  :root { --header-h: 52px; }
+
+  /* --- 顶栏：不换行、不放挤 --- */
+  .app-header { padding: 0 8px; gap: 6px; justify-content: flex-start; }
+  .header-actions { margin-left: auto; }
+  .brand { gap: 6px; min-width: 0; flex: 0 1 auto; }
+  .logo-mark { width: 26px; height: 26px; font-size: 14px; border-radius: 7px; }
+  .logo-text { font-size: 14px; }
+  .header-actions { gap: 5px; flex: 0 0 auto; }
+  .header-actions .btn {
+    white-space: nowrap; height: 32px; line-height: 1; padding: 0 9px;
+    font-size: 12px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  /* 导入数据 → 只留 ＋ 图标 */
+  #btn-import { width: 34px; padding: 0; font-size: 0; }
+  #btn-import::before { content: '＋'; font-size: 17px; line-height: 1; }
+  /* 主题下拉收窄 */
+  #theme-select { width: 74px; height: 32px; padding: 0 2px; font-size: 11px; }
+  #btn-lang { min-width: 38px; padding: 0 7px; font-size: 11px; }
+  #btn-feedback { display: none; }
+
+  .main { min-width: 0; overflow-x: hidden; }
+
+  /* --- 标题区：纵向排布，来源不再挤在一起 --- */
+  .chart-head { padding: 10px 12px 6px; gap: 6px; }
+  .chart-title-block { width: 100%; min-width: 0; }
+  .chart-title-block h1 { font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+  .chart-title-block .meta { flex-wrap: wrap; gap: 6px; font-size: 11px; margin-top: 4px; }
+  .head-right { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
+  #chart-source { display: none; }
+  #hint { display: none; }
+  #back-btn { flex: none; }
+
+  /* --- 工具栏：横向滚动，隐藏小标签节省空间 --- */
+  .chart-toolbar { gap: 6px; padding: 7px 10px; }
+  .chart-toolbar .tb-label { display: none; }
+  .chart-toolbar .btn, .chart-toolbar select { flex: none; height: 32px; font-size: 12px; padding: 0 10px; }
+  .chart-toolbar::-webkit-scrollbar { height: 3px; }
+
+  /* --- 图表区域 --- */
+  .chart-stage { margin: 0 8px 8px; }
+  .chart-canvas, .chart-stage .chart-canvas { height: 260px; }
+  .chart-stage .kpi-grid { padding: 10px 4px; }
+
+  /* --- 看板卡片：单列、紧凑 --- */
+  .macro-grid { grid-template-columns: 1fr; gap: 10px; }
+  .macro-card { padding: 10px 12px 4px; }
+  .mc-chart { height: 34px !important; }
+  .mc-val { font-size: 20px; }
+
+  /* --- 事件说明：编号+名称+时间一行，说明另起一行 --- */
+  .event-notes .en-item { display: block; padding: 7px 0; border-bottom: 1px solid var(--border); line-height: 1.55; }
+  .event-notes .en-time { margin: 0 0 0 6px; }
+  .event-notes .en-desc { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+
+  /* --- 数据变动分析：允许换行 --- */
+  .an-row { flex-wrap: wrap; gap: 4px 12px; padding: 5px 0; }
+  .an-name { flex: 1 1 100%; }
+  .an-last, .an-delta { flex: 0 0 auto; font-size: 12px; }
+
+  /* --- 首页 --- */
+  .home-view { padding: 18px 14px; }
+  .home-title { font-size: 22px; }
+  .home-sub { font-size: 13px; }
+  .home-cta { width: 100%; justify-content: center; }
+  .home-cta-row { flex-wrap: wrap; gap: 8px; }
+  .home-layout { gap: 16px; }
+  .home-fb { width: 100%; flex: 1 1 auto; padding: 16px; }
+
+  /* --- 弹窗 --- */
+  .modal { padding: 16px 14px; max-height: 90vh; }
+  .modal-head h2 { font-size: 16px; }
+  .field-row { flex-direction: column; align-items: stretch !important; gap: 6px; }
+  .field-row > label { flex: none !important; }
+
+  /* --- 表格可横向滚动 --- */
+  .preview-table { min-width: 420px; }
+  .analysis table, .event-notes + table { display: block; }
+}
+
+/* 指南表格：窄屏内横向滚动 */
+.guide-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 0 10px; width: 100%; max-width: 100%; }
+@media (max-width: 600px) {
+  .guide-table { min-width: 440px; margin-bottom: 0; }
+  .home-guide-body { padding-left: 10px; }
+  .guide-code { font-size: 11px; }
+  /* 首页容器一律不超过视口 */
+  .home-layout { flex-direction: column; }
+  .home-main, .home-mcp, .home-mcp-simple, .home-guide-details,
+  .home-guide-body, .guide-sec, .home-fb { width: 100%; max-width: 100%; min-width: 0; }
+  .home-guide-body { overflow: hidden; }
+}

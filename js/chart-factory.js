@@ -777,7 +777,7 @@
             fontSize: 11, fontWeight: 700, distance: 4, rotate: 0
           },
           data: list.map(function (it, i) {
-            return [{ xAxis: it.ls, name: NUMS[i] || String(i + 1) }, { xAxis: it.le }];
+            return [{ xAxis: it.ls, name: NUMS[i] || String(i + 1), label: { offset: [0, (i % 2) * 11] } }, { xAxis: it.le }];
           })
         }
       }]

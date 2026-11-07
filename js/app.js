@@ -2452,7 +2452,9 @@
     Themes.ids().forEach(function (id) {
       var o = document.createElement('option');
       o.value = id;
-      o.textContent = Themes.getTheme(id).name;
+      var th = Themes.getTheme(id);
+      o.textContent = th.short || th.name;
+      o.title = th.name;
       sel.appendChild(o);
     });
     sel.value = state.theme;

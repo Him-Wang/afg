@@ -7,6 +7,7 @@
   var THEMES = {
     'midnight-gold': {
       id: 'midnight-gold',
+      short: '黑金',
       name: '黑金 Midnight Gold',
       css: {
         '--bg': '#0E0F12',
@@ -36,6 +37,7 @@
 
     'tradingview-dark': {
       id: 'tradingview-dark',
+      short: '暗色',
       name: '深蓝 TradingView Dark',
       css: {
         '--bg': '#131722',
@@ -65,6 +67,7 @@
 
     'paper': {
       id: 'paper',
+      short: '象牙白',
       name: '象牙白 Paper / Print',
       css: {
         '--bg': '#FAFAF7',
@@ -94,6 +97,7 @@
 
     'emerald': {
       id: 'emerald',
+      short: '墨绿',
       name: '墨绿 Emerald',
       css: {
         '--bg': '#0E1B17',
@@ -123,6 +127,7 @@
 
     'graphite': {
       id: 'graphite',
+      short: '石墨',
       name: '石墨 Graphite',
       css: {
         '--bg': '#1B1E24',
