@@ -121,6 +121,7 @@
     '净值': 'NAV', '基准': 'Benchmark', '无风险利率': 'Risk-free rate', '基金': 'Fund',
 
     /* --- 公司财务 --- */
+    '占位': 'Base', '增长': 'Increase', '下降': 'Decrease',
     '营业总收入': 'Total Revenue', '净利润': 'Net Profit', '毛利率': 'Gross Margin',
     '营业成本': 'Cost of Revenue', '期间费用': 'Operating Expenses',
     '减：营业成本': 'Less: Cost of Revenue', '减：期间费用': 'Less: Operating Expenses',
@@ -224,6 +225,60 @@
     '东方财富 · akshare 实时': 'East Money · akshare', '国家统计局 · akshare 实时': 'NBS · akshare',
     '公司财报': 'Company filings', '中国社融 · akshare 实时': 'China TSF · akshare',
     '全国银行间同业拆借中心 · akshare 实时': 'CFETS · akshare',
+
+    /* --- 国家 / 地区 --- */
+    '英国': 'UK', '德国': 'Germany', '法国': 'France', '加拿大': 'Canada', '澳大利亚': 'Australia',
+    '韩国': 'Korea', '印度': 'India', '巴西': 'Brazil', '俄罗斯': 'Russia', '意大利': 'Italy',
+    '西班牙': 'Spain', '荷兰': 'Netherlands', '瑞士': 'Switzerland', '全球': 'World',
+    '欧元区': 'Euro Area', '中国': 'China', '美国': 'United States', '日本': 'Japan',
+
+    /* --- 债券期限 --- */
+    '1年': '1Y', '2年': '2Y', '3年': '3Y', '4年': '4Y', '5年': '5Y', '6年': '6Y', '7年': '7Y',
+    '8年': '8Y', '9年': '9Y', '10年': '10Y', '15年': '15Y', '20年': '20Y', '30年': '30Y',
+
+    /* --- 指标名 --- */
+    '年化收益': 'Annualized Return', '年化波动': 'Annualized Volatility',
+    '业绩指标': 'Performance', '回撤': 'Drawdown',
+    '左列全周期 · 右列缩放区间': 'left: full period · right: zoomed range',
+
+    /* --- 模板标题 --- */
+    '全球股指累计涨幅排名': 'Global Indices · Cumulative Return Ranking',
+    '自上市/起始以来累计涨幅（%）': 'Cumulative return since inception (%)',
+    '全球股指年度收益热力': 'Global Indices · Annual Return Heatmap',
+    '年度涨跌幅（%）': 'Annual return (%)',
+    '美国国债收益率曲线': 'US Treasury Yield Curve',
+    '不同期限收益率对比（%）': 'Yields across maturities (%)',
+    '社融人民币贷款 · 近4年季节性对比': 'TSF RMB Loans · 4Y seasonal comparison',
+
+    /* --- 数据来源 --- */
+    '公开行情 · 实时': 'market data · live',
+    '中国人民银行 · akshare 实时': 'PBoC · akshare',
+    '国家统计局 · 中国人民银行 · akshare 实时': 'NBS · PBoC · akshare',
+    '美国财政部 · Tushare 实时': 'US Treasury · Tushare',
+
+    /* --- 机器学习 --- */
+    '置信下界': 'Lower CI', '置信上界': 'Upper CI', '观测值': 'Observed', '历史': 'History',
+    '聚类中心': 'Centroid', '频数': 'Frequency', '核密度': 'KDE',
+    '90% 区间下界': '90% lower bound', '90% 置信区间': '90% interval',
+    '80% 区间下界': '80% lower bound', '80% 置信区间': '80% interval',
+    '50% 区间下界': '50% lower bound', '50% 置信区间': '50% interval',
+    '簇 1': 'Cluster 1', '簇 2': 'Cluster 2', '簇 3': 'Cluster 3',
+
+    /* --- 行业（模板中出现） --- */
+    '半导体': 'Semiconductors', '数字芯片设计': 'Digital Chip Design', '通信': 'Telecom',
+    '通信服务': 'Telecom Services', '通信设备': 'Telecom Equipment',
+    '银行Ⅱ': 'Banks II', '国有大型银行Ⅲ': 'State-owned Large Banks III',
+    '石油石化': 'Oil & Petrochemicals', '有色金属': 'Non-ferrous Metals', '公用事业': 'Utilities',
+    '电力': 'Power', '炼化及贸易': 'Refining & Trading', '炼油化工': 'Refining & Chemicals',
+    '交通运输': 'Transportation', '消费电子': 'Consumer Electronics',
+    '电池': 'Batteries', '工业金属': 'Industrial Metals',
+    '消费电子零部件及组装': 'Consumer Electronics Components',
+    '汽车零部件': 'Auto Parts', '化学制药': 'Chemical Pharma',
+    '电能综合服务': 'Integrated Power Services', '教育运营及其他': 'Education Services',
+    '医美服务': 'Medical Aesthetics', '风力发电': 'Wind Power', '高速公路': 'Highways',
+    '其他能源发电': 'Other Power Generation', '其他养殖': 'Other Farming',
+    '水力发电': 'Hydropower', '纺织鞋类制造': 'Textiles & Footwear',
+    '其他种植业': 'Other Planting', '电信运营商': 'Telecom Carriers', '卫浴电器': 'Bathroom Appliances',
     /* --- 界面常用 --- */
     '对比': 'Comparison', '走势': 'Trend', '走势图': 'Trend', '最新': 'Latest', '最新值': 'Latest',
     '最高': 'High', '最低': 'Low', '时间': 'Time', '指标': 'Metric', '数值': 'Value',
@@ -239,6 +294,12 @@
 
   /* ============ 动态短语（长的在前） ============ */
   var PHRASES = [
+    ['沪深300','CSI 300'], ['中证500','CSI 500'], ['中证1000','CSI 1000'],
+    ['创业板指','ChiNext'], ['科创50','STAR 50'], ['日经225','Nikkei 225'],
+    ['英国富时100','FTSE 100'], ['法国CAC40','CAC 40'], ['COMEX黄金','COMEX Gold'],
+    ['COMEX白银','COMEX Silver'], ['布伦特原油','Brent Crude'], ['纳斯达克','Nasdaq'],
+    ['标普500','S&P 500'], ['德国DAX','DAX'], ['韩国KOSPI','KOSPI'], ['LME铜','LME Copper'],
+    ['美元指数','Dollar Index'], ['WTI原油','WTI Crude'],
     ['一块钱收入最后剩多少', 'what is left of 1 yuan of revenue'],
     ['收入都去哪了', 'where the revenue goes'],
     ['营收来自哪块业务', 'revenue by product line'],
@@ -362,6 +423,12 @@
     var s = String(zh);
     if (EXACT[s] !== undefined) return EXACT[s];
     var out = s;
+    // 2025年 → 2025；1月 → Jan
+    out = out.replace(/(\d{4})年/g, '$1');
+    out = out.replace(/(\d{1,2})月/g, function (_, m) {
+      var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return M[parseInt(m, 10) - 1] || (m + 'M');
+    });
     for (var i = 0; i < PHRASES.length; i++) {
       if (out.indexOf(PHRASES[i][0]) >= 0) out = out.split(PHRASES[i][0]).join(PHRASES[i][1]);
     }

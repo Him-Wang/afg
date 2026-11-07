@@ -7,6 +7,9 @@
 
   var instances = [];
 
+  function isEnLang() { return !!(window.I18N && window.I18N.getLang() === 'en'); }
+  function DTi(s) { return (window.DATA_I18N && window.DATA_I18N.t) ? window.DATA_I18N.t(s) : s; }
+
   function hexToRgba(hex, alpha) {
     if (hex[0] === '#') hex = hex.slice(1);
     if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
@@ -267,7 +270,7 @@
         formatter: function (p) {
           var yy = (data.yLabels && data.yLabels[p.value[1]]) || '';
           var xx = (data.xLabels && data.xLabels[p.value[0]]) || '';
-          return yy + ' · ' + xx + '：' + p.value[2] + '%';
+          return yy + ' · ' + xx + (isEnLang() ? ': ' : '：') + p.value[2] + '%';
         }
       }),
       grid: { top: 46, left: 12, right: 74, bottom: 8, containLabel: true },
@@ -294,7 +297,7 @@
       .sort(function (a, b) { return a.v - b.v; });
     var option = {
       backgroundColor: theme.bg,
-      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) { return p.name + '：' + p.value + '%'; } }),
+      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) { return p.name + (isEnLang() ? ': ' : '：') + p.value + '%'; } }),
       grid: { top: 12, left: 12, right: 52, bottom: 12, containLabel: true },
       xAxis: [Object.assign({ type: 'value', splitLine: { lineStyle: { color: theme.grid } } }, axisCommon(theme))],
       yAxis: [Object.assign({
@@ -356,7 +359,7 @@
       tooltip: Object.assign({}, tooltip(theme), {
         trigger: 'item',
         formatter: function (p) {
-          return p.name + '：' + p.value + ' 万亿元（' + ((p.value / total) * 100).toFixed(1) + '%）';
+          return isEnLang() ? (p.name + ': CNY ' + p.value + 'tn (' + ((p.value / total) * 100).toFixed(1) + '% of total)') : (p.name + '：' + p.value + ' 万亿元（' + ((p.value / total) * 100).toFixed(1) + '%）');
         }
       }),
       series: [{
@@ -516,13 +519,16 @@
     function pctOf(v) { return isPct ? v : (total > 0 ? v / total * 100 : 0); }
     var centerMain = isPct ? '100%' : fmt(total);
     var centerSub = data.centerLabel
-      ? (data.centerLabel + (data.unit ? '（' + String(data.unit).trim() + '）' : ''))
-      : (isPct ? '合计占比' : '合计');
+      ? (DTi(data.centerLabel) + (data.unit ? (isEnLang() ? ' (' + DTi(String(data.unit).trim()) + ')' : '（' + String(data.unit).trim() + '）') : ''))
+      : (isPct ? (isEnLang() ? 'of total' : '合计占比') : (isEnLang() ? 'Total' : '合计'));
     var option = {
       backgroundColor: theme.bg,
       tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) {
-        if (isPct) return p.name + '：' + p.value + '%';
-        return p.name + '<br/>' + (data.unit || '') + ' ' + fmt(p.value) + '（占 ' + pctOf(p.value).toFixed(1) + '%）';
+        if (isPct) return p.name + (isEnLang() ? ': ' : '：') + p.value + '%';
+        var u = DTi(data.unit || '');
+        return isEnLang()
+          ? (p.name + '<br/>' + u + ' ' + fmt(p.value) + ' (' + pctOf(p.value).toFixed(1) + '% of total)')
+          : (p.name + '<br/>' + (data.unit || '') + ' ' + fmt(p.value) + '（占 ' + pctOf(p.value).toFixed(1) + '%）');
       } }),
       legend: Object.assign(legend(theme), { orient: 'vertical', right: 12, top: 'center', itemWidth: 10, itemHeight: 10,
         formatter: function (nm) {
@@ -1201,7 +1207,6 @@
         }
       }
     }
-    localizeOption(option);
     return option;
   }
 
@@ -1212,8 +1217,16 @@
       var T = window.DATA_I18N.t;
       (option.series || []).forEach(function (s) {
         if (s.name) s.name = T(s.name);
-        if (s.data && s.type === 'pie') {
+        if (s.data && (s.type === 'pie' || s.type === 'treemap' || s.type === 'scatter' || s.type === 'graph')) {
           s.data = s.data.map(function (d) { return (d && typeof d === 'object' && d.name) ? Object.assign({}, d, { name: T(d.name) }) : d; });
+        }
+        if (s.data && s.type === 'treemap') {
+          s.data = s.data.map(function (d) {
+            if (d && Array.isArray(d.children)) {
+              return Object.assign({}, d, { name: T(d.name), children: d.children.map(function (ch) { return Object.assign({}, ch, { name: T(ch.name) }); }) });
+            }
+            return d;
+          });
         }
       });
       ['xAxis', 'yAxis'].forEach(function (k) {
@@ -1223,6 +1236,11 @@
           if (ax && Array.isArray(ax.data)) ax.data = ax.data.map(function (v) { return typeof v === 'string' ? T(v) : v; });
         });
       });
+      if (option.graphic) {
+        (Array.isArray(option.graphic) ? option.graphic : [option.graphic]).forEach(function (g) {
+          if (g && g.style && typeof g.style.text === 'string') g.style.text = T(g.style.text);
+        });
+      }
       if (option.legend) {
         var lg = Array.isArray(option.legend) ? option.legend : [option.legend];
         lg.forEach(function (l) { if (l && Array.isArray(l.data)) l.data = l.data.map(function (n) { return T(n); }); });
@@ -1257,6 +1275,7 @@
     }
     if (watermarkOn) addWatermark(option, theme, type);
     option = polishOption(option, theme, type);
+    localizeOption(option);
     // 大数据量不播放入场动画（专业终端习惯，且避免导出时截到半张图）
     var maxPoints = 0;
     (option.series || []).forEach(function (s) { if (s && s.data && s.data.length) maxPoints = Math.max(maxPoints, s.data.length); });
@@ -1290,5 +1309,5 @@
     instances.forEach(function (i) { try { i.resize(); } catch (e) {} });
   }
 
-  global.ChartFactory = { render: render, renderKpiSpark: renderKpiSpark, disposeAll: disposeAll, resizeAll: resizeAll, BUILDERS: BUILDERS, setWatermark: setWatermark, hexToRgba: hexToRgba, setEvents: setEvents, eventStyle: eventStyle };
+  global.ChartFactory = { render: render, renderKpiSpark: renderKpiSpark, disposeAll: disposeAll, resizeAll: resizeAll, BUILDERS: BUILDERS, setWatermark: setWatermark, hexToRgba: hexToRgba, setEvents: setEvents, eventStyle: eventStyle, localizeOption: localizeOption };
 })(window);

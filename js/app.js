@@ -122,6 +122,12 @@
   function isEn() { return !!(window.I18N && window.I18N.getLang() === 'en'); }
   function tr(zh, en) { return isEn() ? en : zh; }
 
+  /* 金额格式化：中文用「亿」，英文用 B CNY */
+  function fmtCny(v) {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    return isEn() ? (v / 1e9).toFixed(1) + 'B CNY' : (v / 1e8).toFixed(1) + ' 亿';
+  }
+
   /* 数据层文案翻译（英文模式） */
   function DT(zh) {
     return (window.DATA_I18N && window.DATA_I18N.t) ? window.DATA_I18N.t(zh) : zh;
@@ -1916,14 +1922,14 @@
     function pct(x) { return (x === null || x === undefined || isNaN(x)) ? '—' : (x >= 0 ? '+' : '') + (x * 100).toFixed(2) + '%'; }
     function num(x) { return (x === null || x === undefined || isNaN(x)) ? '—' : x.toFixed(2); }
     var rows = [
-      ['年化收益', pct(full.annReturn), pct(win.annReturn)],
-      ['年化波动', pct(full.annVol), pct(win.annVol)],
-      ['最大回撤', pct(full.maxDD), pct(win.maxDD)],
-      ['夏普比率', num(full.sharp), num(win.sharp)],
+      [DT('年化收益'), pct(full.annReturn), pct(win.annReturn)],
+      [DT('年化波动'), pct(full.annVol), pct(win.annVol)],
+      [DT('最大回撤'), pct(full.maxDD), pct(win.maxDD)],
+      [DT('夏普比率'), num(full.sharp), num(win.sharp)],
       ['VaR(95%)', pct(full.var95), pct(win.var95)],
-      ['累计收益', pct(full.totalReturn), pct(win.totalReturn)]
+      [DT('累计收益'), pct(full.totalReturn), pct(win.totalReturn)]
     ];
-    var html = '<div class="perf-head">业绩指标 <span class="perf-sub">左列全周期 · 右列缩放区间</span></div>';
+    var html = '<div class="perf-head">' + DT('业绩指标') + ' <span class="perf-sub">' + DT('左列全周期 · 右列缩放区间') + '</span></div>';
     rows.forEach(function (r) {
       html += '<div class="perf-row"><span class="perf-name">' + r[0] + '</span><span class="perf-v">' + r[1] + '</span><span class="perf-v win">' + r[2] + '</span></div>';
     });
@@ -2420,8 +2426,8 @@
       var cardEl = document.createElement('div');
       cardEl.className = 'kpi-card';
       cardEl.innerHTML =
-        '<div class="kpi-label">' + card.label + '</div>' +
-        '<div class="kpi-value">' + card.value + '</div>' +
+        '<div class="kpi-label">' + DT(card.label) + '</div>' +
+        '<div class="kpi-value">' + DT(card.value) + '</div>' +
         '<div class="kpi-delta ' + card.dir + '">' + card.delta + '</div>' +
         '<div class="kpi-spark"></div>';
       grid.appendChild(cardEl);
@@ -3948,7 +3954,7 @@
         var chg = (prev != null && prev !== 0) ? (last - prev) / Math.abs(prev) * 100 : 0;
         return { label: it.title, value: fmtNum(last), delta: (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%', dir: chg >= 0 ? 'pos' : 'neg', spark: v.slice(-12) };
       });
-      setSample('fin-kpi', { cards: cards }, { title: '金融核心指标（最新）', subtitle: '一键看盘', unit: '', source: '公开行情 · 实时' });
+      setSample('fin-kpi', { cards: cards }, { title: tr('金融核心指标（最新）','Key Market Metrics (latest)'), subtitle: tr('一键看盘','at a glance'), unit: '', source: tr('公开行情 · 实时','market data · live') });
     }
 
     /* 12. ML 趋势/预测/聚类/相关性/分布 → 真实数据 */
@@ -4161,12 +4167,12 @@
         var revYoy = yoy;
         function pctStr(v) { return v === null || !isFinite(v) ? '—' : ((v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%'); }
         var cards2 = [
-          { label: '营业总收入', value: (rv / 1e8).toFixed(1) + ' 亿', delta: pctStr(revYoy), dir: (revYoy >= 0 ? 'pos' : 'neg'), spark: rev.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
-          { label: '净利润', value: (np / 1e8).toFixed(1) + ' 亿', delta: pctStr(netYoy), dir: (netYoy >= 0 ? 'pos' : 'neg'), spark: net.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
+          { label: '营业总收入', value: fmtCny(rv), delta: pctStr(revYoy), dir: (revYoy >= 0 ? 'pos' : 'neg'), spark: rev.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
+          { label: '净利润', value: fmtCny(np), delta: pctStr(netYoy), dir: (netYoy >= 0 ? 'pos' : 'neg'), spark: net.filter(function (x) { return x; }).slice(-12).map(function (x) { return x / 1e8; }) },
           { label: '毛利率', value: gm !== null ? gm.toFixed(1) + '%' : '—', delta: '', dir: 'pos', spark: [] },
           { label: 'ROE', value: roeLast !== null && roeLast !== undefined ? roeLast.toFixed(1) + '%' : '—', delta: '', dir: 'pos', spark: roe.filter(function (x) { return x !== null && x !== undefined; }).slice(-12) }
         ];
-        setSample('fin-kpi', { cards: cards2 }, { title: co.name + ' 经营概览（' + period + '）', subtitle: '营收 / 净利润 / 毛利率 / ROE', unit: '', source: '公司财报 · akshare 实时' });
+        setSample('fin-kpi', { cards: cards2 }, { title: co.name + tr(' 经营概览（',' · Operating Overview (') + period + tr('）',')'), subtitle: tr('营收 / 净利润 / 毛利率 / ROE','Revenue / Net profit / Gross margin / ROE'), unit: '', source: '公司财报 · akshare 实时' });
       }
     }
 
@@ -4290,11 +4296,13 @@
       var maxP = pts[0], minP = pts[0];
       pts.forEach(function (p) { if (p.v > maxP.v) maxP = p; if (p.v < minP.v) minP = p; });
       var out = [];
-      out.push({ x: String(ser.labels[maxP.i]), label: '高点 ' + fmtNum(maxP.v),
-        desc: (ser.title || '指标') + ' 于 ' + ser.labels[maxP.i] + ' 达到区间最高 ' + fmtV(maxP.v, ser.unit) + '。' });
+      out.push({ x: String(ser.labels[maxP.i]), label: tr('高点 ','High ') + fmtNum(maxP.v),
+        desc: isEn() ? (DT(ser.title || 'Indicator') + ' peaked at ' + fmtV(maxP.v, DT(ser.unit)) + ' on ' + ser.labels[maxP.i] + '.')
+                     : ((ser.title || '指标') + ' 于 ' + ser.labels[maxP.i] + ' 达到区间最高 ' + fmtV(maxP.v, ser.unit) + '。') });
       if (minP.i !== maxP.i) {
-        out.push({ x: String(ser.labels[minP.i]), label: '低点 ' + fmtNum(minP.v),
-          desc: (ser.title || '指标') + ' 于 ' + ser.labels[minP.i] + ' 录得区间最低 ' + fmtV(minP.v, ser.unit) + '。' });
+        out.push({ x: String(ser.labels[minP.i]), label: tr('低点 ','Low ') + fmtNum(minP.v),
+          desc: isEn() ? (DT(ser.title || 'Indicator') + ' bottomed at ' + fmtV(minP.v, DT(ser.unit)) + ' on ' + ser.labels[minP.i] + '.')
+                       : ((ser.title || '指标') + ' 于 ' + ser.labels[minP.i] + ' 录得区间最低 ' + fmtV(minP.v, ser.unit) + '。') });
       }
       return out;
     }
@@ -4306,8 +4314,9 @@
       }
       changes = changes.slice(-(n || 2));
       return changes.map(function (c) {
-        return { x: String(ser.labels[c.i]), label: (c.to > c.from ? '上调 ' : '下调 ') + fmtNum(Math.abs(c.to - c.from)),
-          desc: ser.labels[c.i] + '：' + (ser.title || '指标') + ' 由 ' + fmtV(c.from, ser.unit) + ' 调整为 ' + fmtV(c.to, ser.unit) + '。' };
+        return { x: String(ser.labels[c.i]), label: (c.to > c.from ? tr('上调 ','Hike ') : tr('下调 ','Cut ')) + fmtNum(Math.abs(c.to - c.from)),
+          desc: isEn() ? (DT(ser.title || 'Indicator') + ' moved from ' + fmtV(c.from, DT(ser.unit)) + ' to ' + fmtV(c.to, DT(ser.unit)) + ' on ' + ser.labels[c.i] + '.')
+                       : (ser.labels[c.i] + '：' + (ser.title || '指标') + ' 由 ' + fmtV(c.from, ser.unit) + ' 调整为 ' + fmtV(c.to, ser.unit) + '。') };
       });
     }
     function setEvents(id, list) {
