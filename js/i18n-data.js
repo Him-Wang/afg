@@ -237,7 +237,8 @@
     '8年': '8Y', '9年': '9Y', '10年': '10Y', '15年': '15Y', '20年': '20Y', '30年': '30Y',
 
     /* --- 指标名 --- */
-    '年化收益': 'Annualized Return', '年化波动': 'Annualized Volatility',
+    '涨跌幅(%)': 'Change (%)', '换手率(%)': 'Turnover (%)', '密度': 'Density', '频数': 'Frequency',
+    'GDP 同比': 'GDP YoY', '年化收益': 'Annualized Return', '年化波动': 'Annualized Volatility',
     '业绩指标': 'Performance', '回撤': 'Drawdown',
     '左列全周期 · 右列缩放区间': 'left: full period · right: zoomed range',
 
@@ -418,10 +419,26 @@
 
   var LANG = function () { return (global.I18N && global.I18N.getLang()) || 'zh'; };
 
+  var _cache = {};
+  var _keys = null;
+  function greedy(s) {
+    if (!_keys) {
+      _keys = Object.keys(EXACT).filter(function (k) { return /[\u4e00-\u9fa5]/.test(k) && k.length >= 2; })
+        .sort(function (a, b) { return b.length - a.length; });
+    }
+    var out = s;
+    for (var i = 0; i < _keys.length; i++) {
+      var k = _keys[i];
+      if (out.indexOf(k) >= 0) out = out.split(k).join(EXACT[k]);
+    }
+    return out;
+  }
+
   function DT(zh) {
     if (LANG() !== 'en' || zh === undefined || zh === null) return zh;
     var s = String(zh);
     if (EXACT[s] !== undefined) return EXACT[s];
+    if (_cache[s] !== undefined) return _cache[s];
     var out = s;
     // 2025年 → 2025；1月 → Jan
     out = out.replace(/(\d{4})年/g, '$1');
@@ -432,6 +449,8 @@
     for (var i = 0; i < PHRASES.length; i++) {
       if (out.indexOf(PHRASES[i][0]) >= 0) out = out.split(PHRASES[i][0]).join(PHRASES[i][1]);
     }
+    if (/[\u4e00-\u9fa5]/.test(out)) out = greedy(out);   // 复合串：用已知词条兜底替换
+    _cache[s] = out;
     return out;
   }
 

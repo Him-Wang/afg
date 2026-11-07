@@ -1210,25 +1210,29 @@
     return option;
   }
 
-  /* 英文模式下翻译系列名 / 坐标轴分类 / 图例 */
+  /* 英文模式下深度翻译图表 option（系列名/坐标轴/雷达指标/地图标签/标题文字等） */
   function localizeOption(option) {
     try {
       if (!window.DATA_I18N || !window.I18N || window.I18N.getLang() !== 'en') return;
       var T = window.DATA_I18N.t;
-      (option.series || []).forEach(function (s) {
-        if (s.name) s.name = T(s.name);
-        if (s.data && (s.type === 'pie' || s.type === 'treemap' || s.type === 'scatter' || s.type === 'graph')) {
-          s.data = s.data.map(function (d) { return (d && typeof d === 'object' && d.name) ? Object.assign({}, d, { name: T(d.name) }) : d; });
-        }
-        if (s.data && s.type === 'treemap') {
-          s.data = s.data.map(function (d) {
-            if (d && Array.isArray(d.children)) {
-              return Object.assign({}, d, { name: T(d.name), children: d.children.map(function (ch) { return Object.assign({}, ch, { name: T(ch.name) }); }) });
-            }
-            return d;
-          });
-        }
-      });
+      var KEYS = { name: 1, text: 1, label: 1, displayLabel: 1, subtext: 1 };
+
+      function deep(o, depth) {
+        if (!o || depth > 6 || typeof o !== 'object') return;
+        if (Array.isArray(o)) { for (var i = 0; i < o.length; i++) deep(o[i], depth + 1); return; }
+        Object.keys(o).forEach(function (k) {
+          if (typeof o[k] === 'function') return;
+          var v = o[k];
+          if (typeof v === 'string') {
+            if (KEYS[k]) o[k] = T(v);
+          } else if (v && typeof v === 'object') {
+            deep(v, depth + 1);
+          }
+        });
+      }
+      deep(option, 0);
+
+      // 类目轴的数据（时间/行业/月份等）
       ['xAxis', 'yAxis'].forEach(function (k) {
         var axes = option[k];
         if (!axes) return;
@@ -1236,19 +1240,21 @@
           if (ax && Array.isArray(ax.data)) ax.data = ax.data.map(function (v) { return typeof v === 'string' ? T(v) : v; });
         });
       });
-      if (option.graphic) {
-        (Array.isArray(option.graphic) ? option.graphic : [option.graphic]).forEach(function (g) {
-          if (g && g.style && typeof g.style.text === 'string') g.style.text = T(g.style.text);
-        });
-      }
-      if (option.legend) {
-        var lg = Array.isArray(option.legend) ? option.legend : [option.legend];
-        lg.forEach(function (l) { if (l && Array.isArray(l.data)) l.data = l.data.map(function (n) { return T(n); }); });
-      }
-      if (option.series && option.series[0] && option.series[0].type === 'sankey' && option.series[0].data) {
-        option.series[0].data = option.series[0].data.map(function (n) { return Object.assign({}, n, { name: T(n.name) }); });
-        (option.series[0].links || []).forEach(function (l) { l.source = T(l.source); l.target = T(l.target); });
-      }
+      // 桑基图节点连线
+      (option.series || []).forEach(function (s) {
+        if (s && s.type === 'sankey') {
+          if (Array.isArray(s.data)) s.data = s.data.map(function (n) { return Object.assign({}, n, { name: T(n.name) }); });
+          (s.links || []).forEach(function (l) { l.source = T(l.source); l.target = T(l.target); });
+        }
+        if (s && Array.isArray(s.data)) {
+          s.data = s.data.map(function (d) {
+            if (d && typeof d === 'object' && typeof d.name === 'string') return Object.assign({}, d, { name: T(d.name) });
+            return d;
+          });
+        }
+      });
+      // 散点矩阵等 graphic 数组里的文字
+      if (option.graphic) deep(option.graphic, 0);
     } catch (e) {}
   }
 

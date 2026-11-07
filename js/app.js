@@ -1838,9 +1838,12 @@
       var m = String(v === undefined || v === null ? '' : v).match(/(\d{4})\D+(\d{1,2})/);
       return m ? (m[1] + '.' + String(m[2]).padStart(2, '0')) : String(v || '');
     }
+    var NUMS = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮'];
+    var needNo = events.every(function (e) { return !e.no; }) && events.length > 1;
     var html = '<div class="en-title">' + DT('事件标注') + '</div>';
-    events.forEach(function (e) {
-      var no = e.no ? '<span class="en-no">' + e.no + '</span>' : '<span class="en-dot"></span>';
+    events.forEach(function (e, idx) {
+      var no = e.no ? '<span class="en-no">' + e.no + '</span>'
+                    : (needNo ? '<span class="en-no">' + (NUMS[idx] || (idx + 1)) + '</span>' : '<span class="en-dot"></span>');
       var s = (e.start !== undefined) ? e.start : e.x;
       var en = e.end;
       var time = en ? (shortDate(s) + ' ~ ' + shortDate(en)) : shortDate(s);
