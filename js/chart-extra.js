@@ -155,11 +155,11 @@
         var r = rv[p.dataIndex]; if (!r) return '';
         return r.name + '<br/>实际 ' + num(r.value) + ' · 目标 ' + num(r.target) + '<br/>区间 ' + (r.ranges || []).join(' / ');
       } }),
-      grid: { left: labelW, right: W < 480 ? 36 : 48, top: 12, bottom: 20 },
+      grid: { left: labelW, right: W < 480 ? 34 : 46, top: 20, bottom: 22 },
       xAxis: yAxis(t, { type: 'value', min: 0, max: Math.ceil(maxV * 1.12), splitLine: { show: true, lineStyle: { color: rule(t) } } }),
       yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: W < 480 ? 9.5 : 10.5, fontFamily: FONT, width: labelW - 12, overflow: 'truncate' } }),
       series: [
-        { type: 'bar', barWidth: W < 480 ? 12 : 16, data: rv.map(function (r) { return r.value; }),
+        { type: 'bar', barWidth: W < 480 ? 10 : 13, barCategoryGap: '58%', data: rv.map(function (r) { return r.value; }),
           itemStyle: { color: accent(t), borderRadius: 2 }, z: 3,
           label: { show: true, position: 'right', distance: 6, color: ink(t), fontSize: 10, fontWeight: 700, fontFamily: FONT,
             formatter: function (p) { return num(p.value); } } },

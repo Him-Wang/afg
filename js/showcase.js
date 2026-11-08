@@ -152,7 +152,7 @@
     if (!global.d3) return;
     var d3 = global.d3;
     var r = svgRoot(el, theme);
-    var radius = Math.min(r.w, r.h) / 2 - 46;
+    var radius = Math.min(r.w * 0.44, r.h * 0.47);
     var g = r.svg.append('g').attr('transform', 'translate(' + (r.w / 2) + ',' + (r.h / 2) + ')');
 
     var root = d3.hierarchy(data.tree);
@@ -180,7 +180,7 @@
       .attr('text-anchor', function (d) { return d.x < Math.PI === !d.children ? 'start' : 'end'; })
       .attr('transform', function (d) { return d.x >= Math.PI ? 'rotate(180)' : null; })
       .attr('font-family', FONT)
-      .attr('font-size', function (d) { return small ? (d.depth === 0 ? 9 : 7.5) : (d.depth === 0 ? 11 : 9); })
+      .attr('font-size', function (d) { return small ? (d.depth === 0 ? 10 : 8.5) : (d.depth === 0 ? 12 : 9.5); })
       .attr('font-weight', function (d) { return d.depth === 0 ? 700 : 400; })
       .attr('fill', function (d) { return d.depth === 0 ? ink(theme) : muted(theme); })
       .text(function (d) { return d.data.name; })

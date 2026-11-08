@@ -302,6 +302,45 @@
     ]
   });
 
+
+  /* ---- 机构级精选：每类保留 2–3 张代表作，D3 高级图嵌入对应分类 ---- */
+  (function () {
+    var SHOW = {};
+    var sc = null;
+    for (var i = 0; i < CATS.length; i++) {
+      if (CATS[i].id === 'showcase') { sc = CATS[i]; break; }
+    }
+    if (sc) { sc.charts.forEach(function (ch) { SHOW[ch.id] = ch; }); }
+    var keep = {
+      compare: ['groupedBar', 'lollipop', 'bullet'],
+      trend: ['line', 'area', 'waterfall'],
+      composition: ['donut', 'percentBar', 'sunburst'],
+      distribution: ['histogram', 'boxplot', 'violin'],
+      relation: ['scatter', 'corrMatrix'],
+      flow: ['funnel', 'sankey'],
+      geo: ['choropleth', 'heatMapGeo'],
+      hierarchy: ['tree', 'swimlane'],
+      special: ['control', 'streamgraph', 'parallel']
+    };
+    var next = [];
+    CATS.forEach(function (c) {
+      if (!keep[c.id]) return;                          // 丢掉 showcase 分类
+      c.charts = c.charts.filter(function (ch) { return keep[c.id].indexOf(ch.id) >= 0; });
+      next.push(c);
+    });
+    CATS = next;
+    /* 把 D3 代表作放进对应分类 */
+    function pushTo(catId, chId) {
+      if (!SHOW[chId]) return;
+      for (var k = 0; k < CATS.length; k++) {
+        if (CATS[k].id === catId) { CATS[k].charts.push(SHOW[chId]); return; }
+      }
+    }
+    pushTo('flow', 'scChord');           // 和弦图（渐变丝带）
+    pushTo('hierarchy', 'scRadialTree'); // 径向树
+    pushTo('trend', 'scGlowLine');       // 发光趋势线
+  })();
+
   function localizeDemo(obj) {
     var en = false;
     try { en = window.I18N && window.I18N.getLang() === 'en'; } catch (e) {}

@@ -1958,7 +1958,12 @@
   /* 分类看板：顶部说明 + 图表案例卡 */
   function renderCategoryDash(catId) {
     if (!window.echarts) { withCharts(function () { renderCategoryDash(catId); }); return; }
-    if (catId === 'showcase' && !window.d3) {
+    var _needD3 = false;
+    (function () {
+      var _c = findCat(catId);
+      if (_c) _c.charts.forEach(function (ch) { if (SHOWCASE_TYPES[ch.type]) _needD3 = true; });
+    })();
+    if (_needD3 && !window.d3) {
       var stD = el('chart-stage');
       if (stD) stD.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载高级绘图引擎…', 'Loading advanced engine…') + '</span></div>';
       ensureD3().then(function () { renderCategoryDash(catId); }).catch(function () {});
