@@ -1233,6 +1233,44 @@
     return lum > 0.6 ? '#0E0F12' : '#FFFFFF';
   }
 
+  /* 量纲差异过大时自动拆双轴（如债券收益率 vs 股票指数） */
+  function maybeDualAxis(option, theme, type) {
+    var okTypes = { line: 1, area: 1, step: 1, dualLine: 1, stackedLine: 1, season: 1 };
+    if (!okTypes[type]) return;
+    var ss = option.series || [];
+    if (ss.length < 2) return;
+    for (var i = 0; i < ss.length; i++) if (ss[i] && ss[i].stack) return;   // 堆叠不拆
+    var scales = ss.map(function (ser) {
+      var vs = (ser.data || []).map(function (v) { return (v && typeof v === 'object') ? v.value : v; })
+        .filter(function (v) { return v !== null && v !== undefined && isFinite(v); })
+        .map(function (v) { return Math.abs(v); });
+      return vs.length ? Math.max.apply(null, vs) : 0;
+    });
+    var pos = scales.filter(function (x) { return x > 0; });
+    if (pos.length < 2) return;
+    var maxS = Math.max.apply(null, pos);
+    var minS = Math.min.apply(null, pos);
+    if (!(minS > 0 && maxS / minS > 20)) return;         // 差异 20 倍以上才拆
+    var big = scales.indexOf(maxS);
+    var yAxes = Array.isArray(option.yAxis) ? option.yAxis : [option.yAxis || {}];
+    option.yAxis = yAxes;
+    var first = yAxes[0];
+    var others = ss.filter(function (_, i) { return i !== big; }).map(function (ser) { return ser.name; }).filter(Boolean);
+    if (others.length) first.name = others.join(' / ');
+    first.nameTextStyle = Object.assign({}, first.nameTextStyle, { color: theme.muted, fontSize: 10 });
+    first.nameLocation = 'end'; first.nameGap = 8;
+    var right = Object.assign({}, first, {
+      position: 'right', name: ss[big].name || '',
+      splitLine: { show: false },
+      axisLabel: Object.assign({}, first.axisLabel),
+      nameTextStyle: { color: theme.muted, fontSize: 10 }
+    });
+    yAxes[1] = right;
+    ss[big].yAxisIndex = 1;
+    /* 第一条也归到左轴 */
+    ss.forEach(function (ser, i) { if (i !== big) ser.yAxisIndex = 0; });
+  }
+
   function polishOption(option, theme, type) {
     if (theme && theme._noZoom) { delete option.dataZoom; }
 
@@ -1243,9 +1281,9 @@
     if (!Array.isArray(yAxes)) { yAxes = [yAxes]; option.yAxis = yAxes; }
     yAxes.forEach(function (y, yi) {
       if (!y) return;
+      delete y.position;
       // 单轴 → 右侧；双轴 → 左(主)+右(次)，避免重叠
-      if (theme && theme._noZoom) { y.position = 'left'; }   // 分类看板：期刊风格左轴
-      else y.position = (yAxes.length > 1 && yi === 0) ? 'left' : 'right';
+      y.position = (yAxes.length > 1 && yi > 0) ? 'right' : 'left';   // 主轴一律左侧，次轴右侧
       if (yAxes.length > 1 && yi > 1) y.offset = (yi - 1) * 46;
       if (y.type === 'value' && !(y.axisLabel && y.axisLabel.formatter)) {
         y.axisLabel = Object.assign({}, y.axisLabel, { formatter: axisNum, margin: 8 });
@@ -1379,6 +1417,7 @@
     }
     if (watermarkOn) addWatermark(option, theme, type);
     option = polishOption(option, theme, type);
+    maybeDualAxis(option, theme, type);
     if (theme && theme._noZoom) { delete option.dataZoom; }
     localizeOption(option);
     // 大数据量不播放入场动画（专业终端习惯，且避免导出时截到半张图）

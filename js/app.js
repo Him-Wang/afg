@@ -616,12 +616,116 @@
     return lum > 0.6 ? '#0E0F12' : '#FFFFFF';
   }
 
+
+  /* 全部标注：覆盖层纯数字标签（不依赖 ECharts label，避免高密度时不渲染） */
+  function renderAllValueLabels(inst) {
+    var container = inst.getDom && inst.getDom();
+    if (!container) return;
+    var old = container.querySelector('.all-overlay');
+    if (old) old.remove();
+    var opt = inst.getOption();
+    var dz = opt.dataZoom && opt.dataZoom[0];
+    var st = dz ? (dz.start || 0) : 0, en = dz ? (dz.end || 100) : 100;
+    var tc = Themes.active().chart;
+    var series = opt.series || [];
+    var total = 0;
+    series.forEach(function (s) { total = Math.max(total, (s.data || []).length); });
+    var visible = Math.max(1, Math.round(total * (en - st) / 100));
+    var freq = state.dataFreq || '';
+    var highFreq = freq === 'day';
+    var W = container.clientWidth || 800;
+
+    var picks = [];      // {px,py,val,color,series}
+    series.forEach(function (ser, si) {
+      if (ser.type && ['line', 'bar', 'area', 'step', 'scatter'].indexOf(ser.type) < 0) return;
+      var data = ser.data || [];
+      var n = data.length;
+      if (!n) return;
+      var s0 = Math.floor(n * st / 100), e0 = Math.ceil(n * en / 100);
+      var idxs = [];
+      if (visible <= 40 && !highFreq) {
+        for (var i = s0; i < e0; i++) idxs.push(i);
+      } else if (visible <= 400 && !highFreq) {
+        var step = Math.max(1, Math.ceil(visible / 30));
+        for (var j = s0; j < e0; j += step) idxs.push(j);
+      } else {
+        /* 日频 / 超密：每段只取高点与低点 */
+        var buckets = Math.max(6, Math.min(20, Math.round(W / 60)));
+        var span = Math.max(1, Math.floor((e0 - s0) / buckets));
+        for (var b = 0; b < buckets; b++) {
+          var bs = s0 + b * span, be = Math.min(e0, bs + span);
+          if (be <= bs) break;
+          var hiI = -1, loI = -1, hiV = -Infinity, loV = Infinity;
+          for (var k = bs; k < be; k++) {
+            var raw = data[k];
+            var v = (raw && typeof raw === 'object') ? raw.value : raw;
+            if (v === null || v === undefined || isNaN(v)) continue;
+            if (v > hiV) { hiV = v; hiI = k; }
+            if (v < loV) { loV = v; loI = k; }
+          }
+          if (hiI >= 0) idxs.push(hiI);
+          if (loI >= 0 && loI !== hiI) idxs.push(loI);
+        }
+      }
+      idxs.forEach(function (i) {
+        var raw = data[i];
+        var v = (raw && typeof raw === 'object') ? raw.value : raw;
+        if (v === null || v === undefined || isNaN(v)) return;
+        var px = null, py = null;
+        try { px = inst.convertToPixel({ seriesIndex: si }, [i, v]); } catch (e) {}
+        if (!px && typeof i === 'number') {
+          try { px = inst.convertToPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [i, v]); } catch (e) {}
+        }
+        if (!px) return;
+        picks.push({ px: px[0], py: px[1], val: v, color: (tc.series && tc.series[si % tc.series.length]) || tc.accent, si: si });
+      });
+    });
+    if (!picks.length) return;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'all-overlay';
+    overlay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:19;';
+    container.appendChild(overlay);
+
+    /* 去重：同一位置只保留一个 */
+    picks.sort(function (a, b) { return a.px - b.px; });
+    var lastX = -999, placed = [];
+    picks.forEach(function (p) {
+      if (Math.abs(p.px - lastX) < Math.max(26, W / 34)) return;
+      lastX = p.px;
+      placed.push(p);
+    });
+
+    var pr = getPlotRect(inst);
+    var bx = pr ? pr.x : 0, by = pr ? pr.y : 0, bw = pr ? pr.w : (container.clientWidth || W), bh = pr ? pr.h : (container.clientHeight || 300);
+    placed.forEach(function (p) {
+      var el2 = document.createElement('div');
+      el2.className = 'all-val';
+      var txt = Math.abs(p.val) >= 1000 ? Number(p.val.toFixed(0)).toLocaleString('en-US') : (Math.round(p.val * 100) / 100);
+      el2.textContent = txt;
+      var lx = p.px, ly = p.py - 12 - p.si * 13;
+      el2.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;transform:translateX(-50%);' +
+        'color:' + p.color + ';font:600 9.5px Inter,"PingFang SC",sans-serif;white-space:nowrap;' +
+        'text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 6px #fff;';
+      overlay.appendChild(el2);
+      var lw = el2.offsetWidth || 30, lh = el2.offsetHeight || 12;
+      if (lx - lw / 2 < bx + 2) lx = bx + 2 + lw / 2;
+      if (lx + lw / 2 > bx + bw - 2) lx = bx + bw - 2 - lw / 2;
+      if (ly < by + 2) ly = by + 2;
+      if (ly + lh > by + bh - 2) ly = by + bh - 2 - lh;
+      el2.style.left = lx + 'px';
+      el2.style.top = ly + 'px';
+    });
+  }
+
   function applyExtremeLabels(inst) {
     if (!inst) return;
     var container = inst.getDom && inst.getDom();
     if (!container) return;
     var old = container.querySelector('.ext-overlay');
     if (old) old.remove();
+    var oldAll = container.querySelector('.all-overlay');
+    if (oldAll) oldAll.remove();
     var mode = state.labelMode || 'off';
     var tc = Themes.active().chart;
     // 仅清除本功能自己开启的「全部数据」标签，不影响图表自带标签（如热力图数值）
@@ -632,35 +736,7 @@
     }
     if (mode === 'off') return;
     if (mode === 'all') {
-      var o1 = inst.getOption();
-      var dz1 = o1.dataZoom && o1.dataZoom[0];
-      var st1 = dz1 ? (dz1.start || 0) : 0, en1 = dz1 ? (dz1.end || 100) : 100;
-      var total = 0;
-      (o1.series || []).forEach(function (s) { total = Math.max(total, (s.data || []).length); });
-      var visible = Math.max(1, Math.round(total * (en1 - st1) / 100));
-      if (visible > 300) {
-        toast('可见 ' + visible + ' 个数据点，请先用「区间」缩小到 300 个点以内再标注全部数据');
-        return;
-      }
-      var dense = visible > 24;
-      var step = Math.max(1, Math.ceil(visible / 30));      // 过密自动按间隔出数
-      inst._allLabels = true;
-      var na = (tc.text || '#1A1A2E');
-      inst.setOption({ series: (o1.series || []).map(function (s) {
-        return {
-          label: {
-            show: true, position: 'top', fontSize: dense ? 9 : 10, color: na,
-            rotate: 0, align: 'center', verticalAlign: 'bottom', distance: 3,
-            formatter: function (p) {
-              if (p.dataIndex % step !== 0 && p.dataIndex !== (s.data || []).length - 1) return '';
-              var v = (p.value && typeof p.value === 'object') ? p.value.value : p.value;
-              if (v === null || v === undefined || isNaN(v)) return '';
-              return Math.abs(v) >= 1000 ? Number(v.toFixed(0)).toLocaleString('en-US') : Math.round(v * 100) / 100;
-            }
-          },
-          labelLayout: { hideOverlap: true }     // 自动避让，保证不重叠
-        };
-      }) });
+      renderAllValueLabels(inst);
       return;
     }
     var opt = inst.getOption();
@@ -749,7 +825,7 @@
       label.dataset.series = m.name || '';
       label.dataset.idx = m.i;
       var txtColor = pickTextColor(m.color);
-      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:default;background:' + m.color + ';color:' + txtColor + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);';
+      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:default;background:transparent;color:' + m.color + ';font:700 10.5px Inter,"PingFang SC",sans-serif;padding:0 1px;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 7px #fff;';
       label.textContent = fmtNum(m.val);
       overlay.appendChild(label);
       // 边界收敛：保证标签完整显示在图表内

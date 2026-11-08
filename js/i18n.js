@@ -72,7 +72,7 @@
       'tb.chart': '图表',
       'tb.range': '区间',
       'tb.add': '＋ 指标',
-      'tb.labels': '◉ 数据标注', 'tb.palette': '🎨 配色', 'labels.all': '全部标注', 'labels.extreme': '极值标注', 'labels.off': '关闭标注',
+      'tb.labels': '◉ 数据', 'tb.palette': '🎨 配色', 'labels.all': '全部标注', 'labels.extreme': '极值标注', 'labels.off': '关闭标注',
       'tb.export': '⇩ 导出图片',
       'tb.share': '🔗 复制链接',
       'tb.more': '⚙ 更多',
