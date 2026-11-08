@@ -142,21 +142,30 @@
   };
 
   B.bullet = function (el, d, t) {
+    var W = (el && el.clientWidth) || 600;
     var rows = d.rows || [];
-    var maxV = 0; rows.forEach(function (r) { maxV = Math.max(maxV, r.target, r.value, r.ranges[r.ranges.length - 1]); });
+    var names = rows.map(function (r) { return r.name; });
+    var maxV = 0;
+    rows.forEach(function (r) { maxV = Math.max(maxV, r.target || 0, r.value || 0); });
+    var labelW = W < 480 ? 54 : 76;
+    var cats = names.slice().reverse();           // y 轴自下而上
+    var rv = rows.slice().reverse();
     return base(t, {
-      tooltip: tip(t, { trigger: 'axis' }),
-      grid: { left: 6, right: 46, top: 16, bottom: 18, containLabel: true },
-      xAxis: yAxis(t, { type: 'value', min: 0, max: Math.ceil(maxV * 1.06), splitLine: { show: false } }),
-      yAxis: xAxis(t, { data: rows.map(function (r) { return r.name; }), axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT } }),
+      tooltip: tip(t, { formatter: function (p) {
+        var r = rv[p.dataIndex]; if (!r) return '';
+        return r.name + '<br/>实际 ' + num(r.value) + ' · 目标 ' + num(r.target) + '<br/>区间 ' + (r.ranges || []).join(' / ');
+      } }),
+      grid: { left: labelW, right: W < 480 ? 36 : 48, top: 12, bottom: 20 },
+      xAxis: yAxis(t, { type: 'value', min: 0, max: Math.ceil(maxV * 1.12), splitLine: { show: true, lineStyle: { color: rule(t) } } }),
+      yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: W < 480 ? 9.5 : 10.5, fontFamily: FONT, width: labelW - 12, overflow: 'truncate' } }),
       series: [
-        { type: 'bar', data: rows.map(function (r) { return r.ranges[2]; }), barWidth: '58%', itemStyle: { color: rgba(ink(t), 0.05), borderRadius: 2 }, silent: true, z: 1 },
-        { type: 'bar', data: rows.map(function (r) { return r.ranges[1]; }), barWidth: '58%', itemStyle: { color: rgba(ink(t), 0.09), borderRadius: 2 }, silent: true, z: 1 },
-        { type: 'bar', data: rows.map(function (r) { return r.value; }), barWidth: 12, itemStyle: { color: accent(t), borderRadius: 1 }, z: 3 },
-        { type: 'scatter', data: rows.map(function (r) { return r.target; }), symbol: 'rect', symbolSize: [2, 22], itemStyle: { color: ink(t) }, z: 4 },
-        { type: 'scatter', data: rows.map(function (r, i) { return [r.value, i]; }), symbolSize: 0.1, silent: true, z: 5,
-          label: { show: true, position: 'insideRight', distance: 4, color: '#fff', fontSize: 9.5, fontWeight: 700, fontFamily: FONT,
-            formatter: function (p) { return num(p.value[0]); } } }
+        { type: 'bar', barWidth: W < 480 ? 12 : 16, data: rv.map(function (r) { return r.value; }),
+          itemStyle: { color: accent(t), borderRadius: 2 }, z: 3,
+          label: { show: true, position: 'right', distance: 6, color: ink(t), fontSize: 10, fontWeight: 700, fontFamily: FONT,
+            formatter: function (p) { return num(p.value); } } },
+        { type: 'scatter', silent: true, z: 5,
+          data: rv.map(function (r) { return [r.target, rv.indexOf(r)]; }),
+          symbol: 'rect', symbolSize: [3, W < 480 ? 14 : 18], itemStyle: { color: ink(t) } }
       ]
     });
   };
@@ -803,6 +812,8 @@
   };
 
   B.chord = function (el, d, t) {
+    var W = (el && el.clientWidth) || 600;
+    var narrow = W < 480;
     var names = d.names, m = d.matrix;
     var nodes = names.map(function (n, i) { return { name: n, symbolSize: 9, itemStyle: { color: seriesColor(t, i) }, label: { color: ink(t), fontSize: 10, fontFamily: FONT } }; });
     var links = [];
@@ -814,22 +825,25 @@
     return base(t, {
       tooltip: tip(t),
       series: [{
-        type: 'graph', layout: 'circular', circular: { rotateLabel: true },
+        type: 'graph', layout: 'circular', circular: { rotateLabel: !narrow },
         data: nodes, links: links, roam: false, symbolSize: 9,
         lineStyle: { curveness: 0.45, opacity: 0.5 },
-        label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT },
+        label: { show: true, position: 'right', color: ink(t), fontSize: narrow ? 8 : 10, fontFamily: FONT },
         itemStyle: { borderColor: '#FFF', borderWidth: 1.5 },
-        top: 26, bottom: 26
+        top: narrow ? 30 : 26, bottom: narrow ? 30 : 26
       }]
     });
   };
 
   /* ================= 7. 地理空间 ================= */
+  var _GEO_EL = null;
   function geo(t, series, extra) {
     return base(t, Object.assign({
       tooltip: tip(t),
       geo: {
-        map: 'world', roam: true, zoom: 1.1, center: [24, 20],
+        map: 'world', roam: true,
+        zoom: ((_GEO_EL && _GEO_EL.clientWidth) || 600) < 480 ? 1.5 : 1.1,
+        center: [18, 18],
         itemStyle: { areaColor: rgba(ink(t), 0.045), borderColor: rgba(ink(t), 0.13), borderWidth: 0.4 },
         emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.16) }, label: { show: false } },
         select: { itemStyle: { areaColor: rgba(accent(t), 0.16) } }
@@ -838,6 +852,7 @@
     }, extra || {}));
   }
   B.choropleth = function (el, d, t) {
+    _GEO_EL = el;
     var vals = [
       { name: 'China', value: 5.2 }, { name: 'United States', value: 2.8 }, { name: 'Germany', value: 1.6 },
       { name: 'Japan', value: 1.2 }, { name: 'India', value: 6.8 }, { name: 'Brazil', value: 2.9 },
@@ -858,6 +873,7 @@
     }));
   };
   B.symbolMap = function (el, d, t) {
+    _GEO_EL = el;
     var pts = d.points || [];
     var max = Math.max.apply(null, pts.map(function (p) { return p.value; }));
     return geo(t, [{
@@ -869,6 +885,7 @@
     }]);
   };
   B.heatMapGeo = function (el, d, t) {
+    _GEO_EL = el;
     var pts = [];
     var hubs = [[121.47, 31.23], [-74.01, 40.71], [-0.13, 51.51], [139.69, 35.69], [103.82, 1.35], [55.27, 25.20], [151.21, -33.87], [-46.63, -23.55]];
     hubs.forEach(function (h, i) {
@@ -879,6 +896,7 @@
     return opt;
   };
   B.trajectory = function (el, d, t) {
+    _GEO_EL = el;
     var path = d.path || [];
     return geo(t, [
       { type: 'lines', coordinateSystem: 'geo', polyline: true, data: [{ coords: path }], silent: true,
@@ -891,6 +909,7 @@
     ]);
   };
   B.migration = function (el, d, t) {
+    _GEO_EL = el;
     var flows = d.flows || [];
     return geo(t, [{
       type: 'lines', coordinateSystem: 'geo', zlevel: 2,
@@ -900,6 +919,7 @@
     }]);
   };
   B.flowMap = function (el, d, t) {
+    _GEO_EL = el;
     var flows = d.flows || [];
     return geo(t, [
       { type: 'lines', coordinateSystem: 'geo', data: flows.map(function (f) { return { coords: [f.from, f.to], value: f.value }; }),
@@ -910,12 +930,14 @@
     ]);
   };
   B.hexMap = function (el, d, t) {
+    _GEO_EL = el;
     var pts = d.points || [];
     var max = Math.max.apply(null, pts.map(function (p) { return p.value; }));
     return geo(t, [{
       type: 'scatter', coordinateSystem: 'geo',
       data: pts.map(function (p) { return { name: p.name, value: p.coord.concat(p.value) }; }),
-      symbol: 'hexagon', symbolSize: function (v) { return 12 + (v[2] / max) * 22; },
+      symbol: 'path://M50,0 L150,0 L200,86.6 L150,173.2 L50,173.2 L0,86.6 Z',
+      symbolSize: function (v) { return 12 + (v[2] / max) * 22; },
       itemStyle: { color: rgba(accent(t), 0.5), borderColor: accent(t), borderWidth: 0.8 },
       label: { show: true, position: 'bottom', distance: 2, color: muted(t), fontSize: 8.5, fontFamily: FONT, formatter: function (p) { return p.name; } }
     }]);
@@ -1041,22 +1063,27 @@
 
   /* ================= 9. 特殊 ================= */
   B.control = function (el, d, t) {
+    var W = (el && el.clientWidth) || 600;
+    var narrow = W < 480;
+    var endLbl = function (txt, color) {
+      return narrow ? { show: false } : { show: true, formatter: txt, color: color, fontSize: 8.5, fontFamily: FONT, distance: 4 };
+    };
     return base(t, {
       tooltip: tip(t, { trigger: 'axis' }),
-      grid: grid({ left: 8, right: 52, top: 16, bottom: 12 }),
+      grid: grid({ left: 8, right: narrow ? 14 : 52, top: 16, bottom: 12 }),
       xAxis: timeAxis(t, d.labels),
       yAxis: yAxis(t, { scale: true }),
       series: [
         { type: 'line', data: d.values, showSymbol: false, lineStyle: { color: ink(t), width: 1.6 }, z: 3 },
         { type: 'line', data: d.values.map(function () { return d.ucl; }), showSymbol: false, silent: true,
           lineStyle: { color: rgba('#B5484B', 0.75), type: 'dashed', width: 1 },
-          endLabel: { show: true, formatter: 'UCL', color: '#B5484B', fontSize: 8.5, fontFamily: FONT, distance: 4 } },
+          endLabel: endLbl('UCL', '#B5484B') },
         { type: 'line', data: d.values.map(function () { return d.lcl; }), showSymbol: false, silent: true,
           lineStyle: { color: rgba('#B5484B', 0.75), type: 'dashed', width: 1 },
-          endLabel: { show: true, formatter: 'LCL', color: '#B5484B', fontSize: 8.5, fontFamily: FONT, distance: 4 } },
+          endLabel: endLbl('LCL', '#B5484B') },
         { type: 'line', data: d.values.map(function () { return d.mean; }), showSymbol: false, silent: true,
           lineStyle: { color: rgba(ink(t), 0.35), width: 1 },
-          endLabel: { show: true, formatter: 'CL', color: muted(t), fontSize: 8.5, fontFamily: FONT, distance: 4 } },
+          endLabel: endLbl('CL', muted(t)) },
         { type: 'scatter', symbolSize: 6, z: 5, itemStyle: { color: '#B5484B' },
           data: d.values.map(function (v, i) { return (v > d.ucl || v < d.lcl) ? [i, v] : null; }).filter(function (x) { return x; }) }
       ]
@@ -1064,18 +1091,25 @@
   };
 
   B.parallel = function (el, d, t) {
-    var dims = d.dims || [];
+    var W = (el && el.clientWidth) || 600;
+    var narrow = W < 480;
+    var dims = (d.dims || []).slice();
+    if (narrow && dims.length > 4) dims = dims.slice(0, 4);          // 窄卡片只保留 4 维
+    var rows = (d.rows || []).map(function (r) { return { name: r.name, values: r.values.slice(0, dims.length) }; });
     return base(t, {
       tooltip: tip(t, { trigger: 'item' }),
-      legend: legend(t, { data: (d.rows || []).map(function (r) { return r.name; }) }),
+      legend: legend(t, { data: rows.map(function (r) { return r.name; }), itemGap: narrow ? 8 : 14 }),
       parallelAxis: dims.map(function (n, i) {
-        return { dim: i, name: n, nameTextStyle: { color: muted(t), fontSize: 9, fontFamily: FONT, padding: [0, 0, 4, 0] },
-          axisLine: { lineStyle: { color: rgba(ink(t), 0.18) } }, axisLabel: { show: i === 0 || i === dims.length - 1, color: muted(t), fontSize: 8.5, fontFamily: FONT }, axisTick: { show: false } };
+        return { dim: i, name: n,
+          nameTextStyle: { color: muted(t), fontSize: narrow ? 8 : 9.5, fontFamily: FONT, padding: [0, 0, 3, 0] },
+          axisLine: { lineStyle: { color: rgba(ink(t), 0.18) } },
+          axisLabel: { show: !narrow && (i === 0 || i === dims.length - 1), color: muted(t), fontSize: 8.5, fontFamily: FONT },
+          axisTick: { show: false } };
       }),
-      parallel: { left: 34, right: 30, top: 44, bottom: 16 },
-      series: (d.rows || []).map(function (r, i) {
+      parallel: { left: narrow ? 18 : 34, right: narrow ? 18 : 30, top: narrow ? 48 : 44, bottom: narrow ? 10 : 16 },
+      series: rows.map(function (r, i) {
         return { name: r.name, type: 'parallel', data: [r.values], smooth: 0.2,
-          lineStyle: { width: 1.8, color: seriesColor(t, i), opacity: 0.8 } };
+          lineStyle: { width: narrow ? 1.3 : 1.8, color: seriesColor(t, i), opacity: 0.8 } };
       })
     });
   };
