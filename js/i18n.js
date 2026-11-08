@@ -1,4 +1,4 @@
-/* AFG 双语支持（中文 / English） */
+/* ADV 双语支持（中文 / English） */
 (function (global) {
   'use strict';
 
@@ -17,7 +17,7 @@
       'nav.explore': '数据探索',
       'nav.examples': '示例图',
 
-      'home.logo': 'AFG',
+      'home.logo': 'ADV',
       'home.title': '上传数据，直接出图',
       'home.sub': 'Excel / CSV / JSON · 全程本地处理 · 不用登录',
       'step1.t': '上传数据',
@@ -33,7 +33,7 @@
       'home.ai.desc': '复制下面这段话粘给 AI —— 它会自己完成全部配置，你不用懂技术细节。',
       'home.ai.ex1': '「用近 5 年沪深300和中证500做对比折线图」',
       'home.ai.ex2': '「画一张全球主要经济体的 GDP 热力图」',
-      'home.ai.tip': '也可以把 Excel 发给 AI，再说「用 AFG 画图」。',
+      'home.ai.tip': '也可以把 Excel 发给 AI，再说「用 ADV 画图」。',
       'home.ai.demo': '▶ 看示例',
       'home.ai.detail': '支持 Codex / Kimi / Cursor / Claude 等，配置见 mcp-server/README.md',
       'home.ai.wayA': '方式 A · 零安装',
@@ -41,7 +41,7 @@
       'home.ai.copy': '📋 复制这段话给 AI（自动配置）',
       'home.ai.hint': '粘完之后，直接把数据或需求发给它，例如「帮我画这组数据的折线图」。',
       'home.ai.wayB': '方式 B · 配一次 MCP',
-      'home.ai.wayB.desc': '在客户端加一行配置，之后直接说「用 AFG 画图」',
+      'home.ai.wayB.desc': '在客户端加一行配置，之后直接说「用 ADV 画图」',
       'home.ai.copied': '已复制，粘贴给 AI 即可',
       'home.ai.a1': '点「复制提示词给 AI」，粘到 Cursor / Claude / Kimi / WorkBuddy 的对话框',
       'home.ai.a2': '接着说「用这个格式，帮我做一张 XXX 图，象牙白主题」',
@@ -65,7 +65,7 @@
       'tb.chart': '图表',
       'tb.range': '区间',
       'tb.add': '＋ 指标',
-      'tb.labels': '极值标注',
+      'tb.labels': '◉ 数据标注', 'tb.palette': '🎨 配色', 'labels.all': '全部标注', 'labels.extreme': '极值标注', 'labels.off': '关闭标注',
       'tb.export': '⇩ 导出图片',
       'tb.share': '🔗 复制链接',
       'tb.more': '⚙ 更多',
@@ -127,7 +127,7 @@
       'nav.explore': 'Explore',
       'nav.examples': 'Gallery',
 
-      'home.logo': 'AFG',
+      'home.logo': 'ADV',
       'home.title': 'Upload data, get charts',
       'home.sub': 'Excel / CSV / JSON · processed locally · no login',
       'step1.t': 'Upload',
@@ -143,7 +143,7 @@
       'home.ai.desc': 'Paste the block below to your AI — it configures everything itself. No technical knowledge needed.',
       'home.ai.ex1': '"Compare CSI300 and CSI500 over the last 5 years"',
       'home.ai.ex2': '"Make a GDP heatmap of major economies"',
-      'home.ai.tip': 'You can also paste an Excel into the AI and say "chart it with AFG".',
+      'home.ai.tip': 'You can also paste an Excel into the AI and say "chart it with ADV".',
       'home.ai.demo': '▶ See example',
       'home.ai.detail': 'Works with Codex / Kimi / Cursor / Claude. Setup: mcp-server/README.md',
       'home.ai.wayA': 'Option A · No install',
@@ -151,7 +151,7 @@
       'home.ai.copy': '📋 Copy setup prompt',
       'home.ai.hint': 'After pasting, just send your data or request, e.g. \"chart this as a line chart\".',
       'home.ai.wayB': 'Option B · Configure MCP once',
-      'home.ai.wayB.desc': 'Add one line to your client, then just say "chart it with AFG"',
+      'home.ai.wayB.desc': 'Add one line to your client, then just say "chart it with ADV"',
       'home.ai.copied': 'Copied — paste it to your AI',
       'home.ai.a1': 'Click "Copy prompt" and paste it into Cursor / Claude / Kimi / WorkBuddy',
       'home.ai.a2': 'Then say: "use this format to chart XXX, paper theme"',

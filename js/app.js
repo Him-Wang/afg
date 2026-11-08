@@ -138,7 +138,7 @@
   }
 
   var state = {
-    theme: 'midnight-gold',
+    theme: 'paper',
     currentTemplate: 'macro-gdp-area',
     mode: 'template',
     isImported: false,
@@ -148,6 +148,7 @@
     tableView: false,
     transposed: false,
     labelMode: 'off',
+    palette: 'consult',
     seriesColors: {},
     overrideType: null,
     annotations: {},
@@ -211,6 +212,10 @@
     var t = Themes.active();
     var c = Object.assign({}, t.chart);
     c.id = t.id;
+    // 单图配色（顶级咨询/金融/期刊风格）
+    var pid = state.palette || 'consult';
+    var ps = (window.ADV_PALETTES || []).filter(function (p) { return p.id === pid; })[0];
+    if (ps) c.series = ps.colors.slice();
     return c;
   }
 
@@ -536,6 +541,8 @@
     state.priceInsts = [];
     (state.macroInsts || []).forEach(function (i) { try { i.dispose(); } catch (e) {} });
     state.macroInsts = [];
+    (state.catInsts || []).forEach(function (o) { try { o.inst.dispose(); } catch (e) {} });
+    state.catInsts = [];
     state.priceEl = null; state.echartsEl = null;
     el('chart-stage').innerHTML = '';
     clearAnalysis();
@@ -635,15 +642,23 @@
         return;
       }
       var dense = visible > 24;
+      var step = Math.max(1, Math.ceil(visible / 30));      // 过密自动按间隔出数
       inst._allLabels = true;
+      var na = (tc.text || '#1A1A2E');
       inst.setOption({ series: (o1.series || []).map(function (s) {
-        return { label: {
-          show: true, position: 'top', fontSize: dense ? 7 : 10, color: tc.muted,
-          rotate: dense ? 90 : 0,
-          align: dense ? 'left' : 'center',
-          verticalAlign: dense ? 'middle' : 'bottom',
-          distance: dense ? 3 : 2
-        } };
+        return {
+          label: {
+            show: true, position: 'top', fontSize: dense ? 9 : 10, color: na,
+            rotate: 0, align: 'center', verticalAlign: 'bottom', distance: 3,
+            formatter: function (p) {
+              if (p.dataIndex % step !== 0 && p.dataIndex !== (s.data || []).length - 1) return '';
+              var v = (p.value && typeof p.value === 'object') ? p.value.value : p.value;
+              if (v === null || v === undefined || isNaN(v)) return '';
+              return Math.abs(v) >= 1000 ? Number(v.toFixed(0)).toLocaleString('en-US') : Math.round(v * 100) / 100;
+            }
+          },
+          labelLayout: { hideOverlap: true }     // 自动避让，保证不重叠
+        };
       }) });
       return;
     }
@@ -832,6 +847,9 @@
 
   /* 最新值标签：每个系列各一个，右缘内、不越界、可拖动、自动错开 */
   function applyLastValueTag(inst) {
+    var _cont = inst && inst.getDom && inst.getDom();
+    if (_cont) { var _old = _cont.querySelectorAll('.last-tag'); for (var _k = 0; _k < _old.length; _k++) _old[_k].remove(); }
+    if (state.labelMode && state.labelMode !== 'off') return;   // 已有数据标注，避免重复
     if (!inst) return;
     var container = inst.getDom && inst.getDom();
     if (!container) return;
@@ -1092,7 +1110,7 @@
   /* AI 画图示例（等价于 Agent 调用 make_chart 生成的结果） */
   function showExampleChart() {
     var cfg = {
-      type: 'area', viewKey: 'example', theme: 'midnight-gold',
+      type: 'area', viewKey: 'example', theme: 'paper',
       title: 'AI 示例 · 全球主要经济体 GDP 增速', subtitle: '对 AI 说一句话即可生成这样的图', unit: '%',
       labels: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
       series: [
@@ -1134,7 +1152,7 @@
     h.innerHTML =
       '<div class="home-layout">' +
       '<div class="home-main">' +
-        '<div class="home-logo">AFG</div>' +
+        '<div class="home-logo">ADV</div>' +
         '<div class="home-title">' + T('home.title') + '</div>' +
         '<div class="home-sub">' + T('home.sub') + '</div>' +
         '<div class="home-cta-row" style="margin-top:6px">' +
@@ -1149,7 +1167,7 @@
           '<p class="home-ai-hint">' + T('home.ai.hint') + '</p>' +
           '<details class="home-guide-details">' +
             '<summary>' + T('home.ai.adv') + '</summary>' +
-            '<div class="home-guide-body">' + ((window.AFG_AI_GUIDE && window.AFG_AI_GUIDE[(window.I18N && window.I18N.getLang()) || 'zh']) || '') + '</div>' +
+            '<div class="home-guide-body">' + ((window.ADV_AI_GUIDE && window.ADV_AI_GUIDE[(window.I18N && window.I18N.getLang()) || 'zh']) || '') + '</div>' +
           '</details>' +
         '</div>' +
       '</div>' +
@@ -1161,7 +1179,7 @@
       '</aside>' +
       '</div>';
     el('chart-stage').appendChild(h);
-    setHead({ title: 'AFG', subtitle: '', unit: '', source: '' });
+    setHead({ title: 'ADV', subtitle: '', unit: '', source: '' });
     h.querySelector('#home-import').addEventListener('click', openModal);
     var demoBtn = h.querySelector('#home-demo');
     if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
@@ -1169,7 +1187,7 @@
     if (copyBtn) copyBtn.addEventListener('click', function () {
       var en = (window.I18N && window.I18N.getLang() === 'en');
       var prompt = en ? [
-        'Please set up and use AFG (a charting tool) for me. I am not technical — do everything automatically, do not ask me to run commands or edit config files.',
+        'Please set up and use ADV (a charting tool) for me. I am not technical — do everything automatically, do not ask me to run commands or edit config files.',
         '',
         'STEP 1 — If you have terminal / file access:',
         '  a) run `node -v` (if Node.js is missing, tell me the download link and stop)',
@@ -1185,9 +1203,9 @@
         '  type: line / area / bar / stacked / stackedBar / radar / scatterMatrix / heatmap / donut / treemap',
         '  theme: paper (documents) / midnight-gold (pitch decks) / tradingview-dark / emerald / graphite',
         '',
-        'STEP 3 — Then draw my chart: I will send data or a request next. Use AFG and give me the link.'
+        'STEP 3 — Then draw my chart: I will send data or a request next. Use ADV and give me the link.'
       ].join('\n') : [
-        '请帮我配置并使用 AFG 画图工具。我不懂技术，请你全部自动完成，不要让我手动敲命令或改配置文件。',
+        '请帮我配置并使用 ADV 画图工具。我不懂技术，请你全部自动完成，不要让我手动敲命令或改配置文件。',
         '',
         '第一步：如果你有终端 / 文件权限',
         '  a) 运行 node -v 检查环境（如果没有 Node.js，把下载地址给我就停下）',
@@ -1203,7 +1221,7 @@
         '  type 可选：line 折线 / area 面积 / bar 柱状 / stacked 堆叠面积 / stackedBar 堆叠柱状 / radar 雷达 / scatterMatrix 相关系数矩阵 / heatmap 热力矩阵 / donut 环形 / treemap 树图',
         '  theme 可选：paper 象牙白（写文档）/ midnight-gold 黑金（路演）/ tradingview-dark / emerald / graphite',
         '',
-        '第三步：接下来我会把数据或需求发给你，请用 AFG 画出来，并把链接给我。'
+        '第三步：接下来我会把数据或需求发给你，请用 ADV 画出来，并把链接给我。'
       ].join('\n');
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(prompt).then(function () { toast(T('home.ai.copied')); }, function () { toast('复制失败'); });
@@ -1653,10 +1671,190 @@
   }
 
   /* ---------- 侧边导航 ---------- */
+
+  /* ================= 图表分类（9 大用途） ================= */
+  var ADV_EN = {
+    cat: { compare: 'Comparison & Ranking', trend: 'Trend & Time', composition: 'Composition & Share',
+      distribution: 'Distribution', relation: 'Relationship & Correlation', flow: 'Flow & Conversion',
+      geo: 'Geospatial', hierarchy: 'Hierarchy & Process', special: 'Specialized' },
+    catDesc: {
+      compare: 'Who is higher or lower, how much more, ranking, and differences between items or versus a benchmark.',
+      trend: 'How values change over time — pace, turning points, cycles, and accumulation.',
+      composition: 'What the whole is made of, how much each part contributes, and hierarchical composition.',
+      distribution: 'Where values concentrate, dispersion, skewness, outliers, and multi-modal shapes.',
+      relation: 'Whether variables are related, strength and direction, network structure, and set overlaps.',
+      flow: 'Where data, resources or users come from and go, flow volume, conversion and churn.',
+      geo: 'Where things happen, regional gaps, spatial density and location patterns.',
+      hierarchy: 'Organizational or categorical hierarchy, and the sequence/ownership of tasks and approvals.',
+      special: 'Domain-specific graphics, or charts for state / interval / diagnostics rather than general data.'
+    },
+    chart: {
+      groupedBar: 'Grouped Bar', tornado: 'Tornado / Diverging Bar', lollipop: 'Lollipop', bullet: 'Bullet',
+      wordcloud: 'Word Cloud', radar: 'Radar', line: 'Line', area: 'Area', stacked: 'Stacked Area',
+      waterfall: 'Waterfall', heatmap: 'Heatmap', pie: 'Pie', donut: 'Donut', stackedBar: 'Stacked Bar',
+      percentBar: '100% Stacked Bar', treemap: 'Treemap', sunburst: 'Sunburst', histogram: 'Histogram',
+      boxplot: 'Box Plot', violin: 'Violin Plot', beeswarm: 'Beeswarm', ridge: 'Ridge Plot',
+      matrixHeat: '2D Heatmap', ecdf: 'Q-Q / ECDF', scatter: 'Scatter', bubble: 'Bubble',
+      scatterMatrix: 'Scatter Matrix', corrMatrix: 'Correlation Matrix', venn: 'Venn Diagram',
+      arc: 'Arc Diagram', funnel: 'Funnel', sankey: 'Sankey', chord: 'Chord Diagram',
+      flowMap: 'Flow Map', choropleth: 'Choropleth', symbolMap: 'Symbol Map', heatMapGeo: 'Heat Map',
+      trajectory: 'Trajectory', migration: 'Migration Map', hexMap: 'Hexagon Map', tree: 'Tree',
+      orgChart: 'Org Chart', icicle: 'Icicle', flowchart: 'Flowchart', swimlane: 'Swimlane',
+      bulletSpecial: 'Bullet (KPI)', control: 'Control Chart', parallel: 'Parallel Coordinates',
+      streamgraph: 'Streamgraph'
+    },
+    chartDesc: {
+      groupedBar: 'Side-by-side bars for multi-group comparison', tornado: 'Mirrored bars to compare two sides at once',
+      lollipop: 'Ranked comparison, lighter than bars', bullet: 'Actual vs target within qualitative ranges',
+      wordcloud: 'Text sized by frequency to surface themes', radar: 'Multi-dimensional profile across axes',
+      line: 'The default time-series view: trend and turning points', area: 'Emphasizes accumulated magnitude',
+      stacked: 'Total plus composition changing together', waterfall: 'Step-by-step contribution from start to end',
+      heatmap: 'Colour-encoded matrix to spot hot and cold zones', pie: 'Share of a whole in 3–5 slices',
+      donut: 'Pie with a centre slot for a total or KPI', stackedBar: 'Compare categories and their makeup',
+      percentBar: 'Structure only, most fair across groups', treemap: 'Area equals share, two hierarchy levels',
+      sunburst: 'Radial hierarchy for three or more levels', histogram: 'Distribution shape and long tails',
+      boxplot: 'Five-number summary, compare median and spread', violin: 'Box plot plus density, shows multi-modality',
+      beeswarm: 'Every point shown without overlap', ridge: 'Stacked densities to compare distributions',
+      matrixHeat: 'Two-dimensional cross-tab heat matrix', ecdf: 'Empirical CDF against theoretical quantiles',
+      scatter: 'Direction and strength between two variables', bubble: 'Scatter plus a third size dimension',
+      scatterMatrix: 'Pairwise scatters across many variables', corrMatrix: 'Quantified pairwise correlation',
+      venn: 'Set overlaps and unique parts', arc: 'One-dimensional order plus long arcs for links',
+      funnel: 'Stage-by-stage conversion and drop-off', sankey: 'Multi-stage flow and split ratios',
+      chord: 'Bidirectional flows arranged in a ring', flowMap: 'Geographic flows with direction and volume',
+      choropleth: 'Shade regions by an indicator', symbolMap: 'Bubble size encodes magnitude by location',
+      heatMapGeo: 'Spatial density heat to find hotspots', trajectory: 'Path over time and movement pattern',
+      migration: 'Direction and scale of migration', hexMap: 'Equal-area hexagon bins avoid area bias',
+      tree: 'Hierarchy expansion', orgChart: 'Reporting lines, top-down',
+      icicle: 'Horizontal hierarchy share, space efficient', flowchart: 'Steps, order and branches',
+      swimlane: 'Cross-team process by owner lane', bulletSpecial: 'KPI against target and thresholds',
+      control: 'Process monitoring with control limits', parallel: 'Multi-dimensional sample lines',
+      streamgraph: 'Theme evolution over time'
+    }
+  };
+  function findCat(id) {
+    var list = window.CHART_CATALOG || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+  function findChart(catId, chartId) {
+    var cat = findCat(catId); if (!cat) return null;
+    for (var i = 0; i < cat.charts.length; i++) if (cat.charts[i].id === chartId) return cat.charts[i];
+    return null;
+  }
+  function catName(cat) { return isEn() ? (ADV_EN.cat[cat.id] || cat.name) : cat.name; }
+  function catDesc(cat) { return isEn() ? (ADV_EN.catDesc[cat.id] || cat.desc) : cat.desc; }
+  function chartName(ch) { return isEn() ? (ADV_EN.chart[ch.id] || ch.name) : ch.name; }
+  function chartDesc(ch) { return isEn() ? (ADV_EN.chartDesc[ch.id] || ch.desc) : ch.desc; }
+
+  /* 分类看板：顶部说明 + 图表案例卡 */
+  function renderCategoryDash(catId) {
+    clearStage();
+    state.mode = 'catalog';
+    state.catId = catId;
+    state.viewKey = 'cat:' + catId;
+    state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
+    state.table = null; state.det = null; state.macroItem = null; state.finItem = null;
+    state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
+    highlightNav('cat:' + catId);
+    var cat = findCat(catId);
+    if (!cat) { renderHome(); return; }
+    setHead({ title: catName(cat), subtitle: cat.charts.length + ' ' + tr('种图表 · 点击任意图表查看大图', 'chart types · click any chart for the full view'), unit: '', source: tr('示例数据 · 随机生成 · 仅演示图表形态', 'Sample data · generated · chart form only') });
+
+    var theme = getChartTheme();
+    var wrap = document.createElement('div');
+    wrap.className = 'cat-dash';
+
+    var intro = document.createElement('div');
+    intro.className = 'cat-intro';
+    intro.innerHTML =
+      '<div class="cat-intro-label">' + tr('这个分类解决什么问题', 'What this category solves') + '</div>' +
+      '<div class="cat-intro-text">' + catDesc(cat) + '</div>' +
+      '<div class="cat-intro-meta">' + tr('共', '') + ' ' + cat.charts.length + ' ' + tr('种图表', 'chart types') + '</div>';
+    wrap.appendChild(intro);
+
+    var grid = document.createElement('div');
+    grid.className = 'cat-grid';
+    var insts = [];
+    cat.charts.forEach(function (ch) {
+      var card = document.createElement('div');
+      card.className = 'cat-card';
+      card.innerHTML =
+        '<div class="cat-card-hd">' +
+          '<div class="cat-card-name">' + chartName(ch) + '</div>' +
+          '<div class="cat-card-desc">' + chartDesc(ch) + '</div>' +
+        '</div><div class="cat-chart"></div>' +
+        '<div class="cat-card-foot">' + tr('查看大图', 'Open full chart') + ' →</div>';
+      card.addEventListener('click', function () { openCatalogChart(catId, ch.id); });
+      grid.appendChild(card);
+      var cv = card.querySelector('.cat-chart');
+      requestAnimationFrame(function () {
+        try {
+          var inst = ChartFactory.render(cv, ch.type, ch.data(), theme);
+          insts.push({ el: cv, inst: inst, chart: ch });
+          setTimeout(function () { try { inst.resize(); } catch (e) {} }, 60);
+        } catch (e) { cv.innerHTML = '<div class="cat-err">渲染失败</div>'; }
+      });
+    });
+    wrap.appendChild(grid);
+    el('chart-stage').appendChild(wrap);
+    state.catInsts = insts;
+    syncToolbar();
+  }
+
+  /* 分类下的单图详情 */
+  function openCatalogChart(catId, chartId) {
+    clearStage();
+    state.mode = 'catalogChart';
+    state.catId = catId;
+    state.catalogChartId = chartId;
+    state.viewKey = 'cat:' + catId + ':' + chartId;
+    state.currentTemplate = null; state.macroItem = null; state.finItem = null; state.intlItem = null;
+    var cat = findCat(catId), ch = findChart(catId, chartId);
+    if (!cat || !ch) { renderCategoryDash(catId); return; }
+    highlightNav('cat:' + catId);
+    setHead({ title: chartName(ch), subtitle: chartDesc(ch), unit: '', source: tr('示例数据 · 随机生成', 'Sample data · generated') });
+
+    var back = document.createElement('div');
+    back.className = 'cat-back';
+    back.innerHTML = '<span class="cat-back-btn">← ' + tr('返回', 'Back') + ' ' + catName(cat) + '</span>';
+    back.addEventListener('click', function () { renderCategoryDash(catId); });
+    el('chart-stage').appendChild(back);
+
+    var c = document.createElement('div');
+    c.className = 'chart-canvas cat-single';
+    el('chart-stage').appendChild(c);
+    var theme = getChartTheme();
+    try {
+      var inst = ChartFactory.render(c, ch.type, ch.data(), theme);
+      state.echartsEl = c;
+      requestAnimationFrame(function () { try { inst.resize(); } catch (e) {} });
+    } catch (e) {}
+
+    var note = document.createElement('div');
+    note.className = 'cat-note';
+    note.textContent = tr('说明：本页数据为随机生成，仅用于演示该图表的形态与用途。', 'Note: data on this page is generated to demonstrate the chart form and use case.');
+    el('chart-stage').appendChild(note);
+    syncToolbar();
+  }
+
   function buildSidebar() {
     var sb = el('sidebar');
     sb.innerHTML = '';
     var T = window.I18N ? window.I18N.t : function (k) { return k; };
+    function expando(iconSvg, label, id) {
+      var item = document.createElement('div');
+      item.className = 'nav-item nav-parent';
+      item.dataset.id = id;
+      item.innerHTML = '<span class="nav-icon">' + iconSvg + '</span><span>' + label + '</span><span class="nav-caret">' + ICONS.caret + '</span>';
+      var sub = document.createElement('div');
+      sub.className = 'nav-submenu';
+      item.addEventListener('click', function () {
+        var open = sub.classList.toggle('open');
+        item.classList.toggle('open', open);
+      });
+      sb.appendChild(item); sb.appendChild(sub);
+      return sub;
+    }
 
     // 1. 使用说明
     var home = document.createElement('div');
@@ -1665,62 +1863,31 @@
     home.addEventListener('click', function () { state.overlaySeries = []; renderHome(); closeSidebar(); });
     sb.appendChild(home);
 
-    // 2. 中国宏观数据
-    var macro = document.createElement('div');
-    macro.className = 'nav-item nav-macro'; macro.dataset.id = 'china-macro';
-    macro.innerHTML = '<span class="nav-icon">' + ICONS.macro + '</span><span>' + T('nav.china') + '</span>';
-    macro.addEventListener('click', function () { state.overlaySeries = []; renderChinaMacro(); closeSidebar(); });
-    sb.appendChild(macro);
-
-    // 3. 国际宏观数据
-    var intl = document.createElement('div');
-    intl.className = 'nav-item nav-macro'; intl.dataset.id = 'intl-macro';
-    intl.innerHTML = '<span class="nav-icon">' + ICONS.globe + '</span><span>' + T('nav.intl') + '</span>';
-    intl.addEventListener('click', function () { state.overlaySeries = []; renderIntlMacro(); closeSidebar(); });
-    sb.appendChild(intl);
-
-    // 4. 金融数据
-    var fin = document.createElement('div');
-    fin.className = 'nav-item nav-macro'; fin.dataset.id = 'finance';
-    fin.innerHTML = '<span class="nav-icon">' + ICONS.perf + '</span><span>' + T('nav.finance') + '</span>';
-    fin.addEventListener('click', function () { state.overlaySeries = []; renderFinance(); closeSidebar(); });
-    sb.appendChild(fin);
-
-    // 5. 数据探索
-    var explore = document.createElement('div');
-    explore.className = 'nav-item'; explore.dataset.id = 'explore';
-    explore.innerHTML = '<span class="nav-icon">' + ICONS.ml + '</span><span>' + T('nav.explore') + '</span>';
-    explore.addEventListener('click', function () { openExplore(); closeSidebar(); });
-    sb.appendChild(explore);
-
-    // 6. 示例图（可展开子菜单）
-    var ex = document.createElement('div');
-    ex.className = 'nav-item nav-parent';
-    ex.innerHTML = '<span class="nav-icon">' + ICONS.examples + '</span><span>' + T('nav.examples') + '</span><span class="nav-caret">' + ICONS.caret + '</span>';
-    var submenu = document.createElement('div');
-    submenu.className = 'nav-submenu';
-    ex.addEventListener('click', function () {
-      var open = submenu.classList.toggle('open');
-      ex.classList.toggle('open', open);
+    // 2. 图表分类（9 类）
+    var catSub = expando(ICONS.charts || ICONS.examples, tr('图表分类', 'Chart Types'), 'catalog');
+    (window.CHART_CATALOG || []).forEach(function (cat) {
+      var nav = document.createElement('div');
+      nav.className = 'nav-item nav-sub';
+      nav.dataset.id = 'cat:' + cat.id;
+      nav.innerHTML = '<span>' + tr(cat.name, ADV_EN.cat[cat.id] || cat.name) + '</span>';
+      nav.addEventListener('click', function () { state.overlaySeries = []; renderCategoryDash(cat.id); closeSidebar(); });
+      catSub.appendChild(nav);
     });
-    sb.appendChild(ex);
 
-    TEMPLATES.forEach(function (group) {
-      var label = document.createElement('div');
-      label.className = 'nav-group-label';
-      label.textContent = DT(group.category);
-      submenu.appendChild(label);
-      group.items.forEach(function (item) {
-        var nav = document.createElement('div');
-        nav.className = 'nav-item nav-sub';
-        nav.dataset.id = item.id;
-        nav.innerHTML = '<span>' + DT(item.label) + '</span>';
-        nav.addEventListener('click', function () { state.overrideType = null; state.overlaySeries = []; renderTemplate(item.id); closeSidebar(); });
-        submenu.appendChild(nav);
-      });
+    // 3. 金融案例（3 个数据集）
+    var finSub = expando(ICONS.perf, tr('金融案例', 'Finance Cases'), 'cases');
+    [['china-macro', T('nav.china'), ICONS.macro, renderChinaMacro],
+     ['intl-macro',  T('nav.intl'),  ICONS.globe, renderIntlMacro],
+     ['finance',     T('nav.finance'), ICONS.perf, renderFinance]].forEach(function (c) {
+      var nav = document.createElement('div');
+      nav.className = 'nav-item nav-sub';
+      nav.dataset.id = c[0];
+      nav.innerHTML = '<span>' + c[1] + '</span>';
+      nav.addEventListener('click', function () { state.overlaySeries = []; c[3](); closeSidebar(); });
+      finSub.appendChild(nav);
     });
-    sb.appendChild(submenu);
   }
+
 
   function highlightNav(id) {
     document.querySelectorAll('.nav-item').forEach(function (n) {
@@ -2463,6 +2630,7 @@
       sel.appendChild(o);
     });
     sel.value = state.theme;
+    sel.style.display = 'none';   // 整体只保留象牙白，配色在单图功能栏选择
     sel.addEventListener('change', function () {
       state.theme = sel.value;
       Themes.applyTheme(state.theme);
@@ -2683,14 +2851,24 @@
 
   function syncExtremeBtn() {
     var b = el('btn-labels');
-    if (b) b.classList.toggle('active', state.labelMode === 'extreme');
+    if (b) b.classList.toggle('active', state.labelMode && state.labelMode !== 'off');
   }
 
   function syncToolbar() {
     document.body.classList.toggle('is-home', state.mode === 'home');
     var tb = el('chart-toolbar');
-    if (tb) tb.style.display = (state.mode === 'home' || state.mode === 'macro') ? 'none' : '';
+    if (tb) tb.style.display = (state.mode === 'home' || state.mode === 'macro' || state.mode === 'catalog' || state.mode === 'catalogChart') ? 'none' : '';
     syncExtremeBtn();
+    // 只有时间序列 / 多指标对比类图表，才显示 区间、指标、事件
+    var isTimeSeries = (state.mode === 'macro' || state.mode === 'template' ||
+      (state.mode === 'imported' && state.dataFreq !== 'day') || !!state.macroItem || !!state.intlItem);
+    var multi = false;
+    if (state.echartsEl) {
+      var _i = echarts.getInstanceByDom(state.echartsEl);
+      if (_i) { var _o = _i.getOption(); multi = (_o.series || []).length > 1; }
+    }
+    document.querySelectorAll('.tb-time-only').forEach(function (n) { n.style.display = isTimeSeries ? '' : 'none'; });
+    if (el('btn-events')) el('btn-events').style.display = isTimeSeries ? '' : 'none';
     var sel = el('toolbar-chart-type');
     if (!sel) return;
     var isData = (state.mode === 'imported' || state.mode === 'dataset');
@@ -3069,7 +3247,7 @@
     el('modal-close').addEventListener('click', closeModal);
     el('overlay').addEventListener('click', function (e) { if (e.target === el('overlay')) closeModal(); });
     el('btn-export').addEventListener('click', exportImage);
-    el('btn-share-link').addEventListener('click', copyShareLink);
+    if (el('btn-share-link')) el('btn-share-link').addEventListener('click', copyShareLink);
     el('btn-events').addEventListener('click', function () {
       state.showEvents = !state.showEvents;
       rerender();
@@ -3086,17 +3264,64 @@
       rerender();
       toast('已清除当前图表的说明');
     });
-    el('btn-labels').addEventListener('click', function () {
-      state.labelMode = (state.labelMode === 'extreme') ? 'off' : 'extreme';
-      this.classList.toggle('active', state.labelMode === 'extreme');
-      if (state.echartsEl) {
-        var inst = echarts.getInstanceByDom(state.echartsEl);
-        if (inst) {
-          applyExtremeLabels(inst);
-          applyLastValueTag(inst);     // 重建最新值标签：与极值重合的点自动跳过
-          layoutChartLabels(inst);
-        }
-      } else { rerender(); }
+    // 数据标注：下拉选择 全部 / 极值 / 关闭
+    function setLabelMode(mode) {
+      state.labelMode = mode;
+      syncExtremeBtn();
+      rerenderLabels();
+      var m = el('tb-label-menu'); if (m) m.classList.remove('open');
+    }
+    function rerenderLabels() {
+      if (!state.echartsEl) return;
+      var inst = echarts.getInstanceByDom(state.echartsEl);
+      if (inst) { applyExtremeLabels(inst); applyLastValueTag(inst); }
+    }
+    if (el('btn-labels')) el('btn-labels').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var m = el('tb-label-menu');
+      if (!m) return;
+      m.classList.toggle('open');
+      if (m.classList.contains('open')) {
+        var r = this.getBoundingClientRect(), mw = m.offsetWidth || 150;
+        m.style.position = 'fixed';
+        m.style.top = Math.round(r.bottom + 6) + 'px';
+        m.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - mw - 8))) + 'px';
+        m.style.right = 'auto';
+      }
+    });
+    if (el('lb-all')) el('lb-all').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('all'); });
+    if (el('lb-extreme')) el('lb-extreme').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('extreme'); });
+    if (el('lb-off')) el('lb-off').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('off'); });
+
+    // 单图配色
+    if (el('btn-palette')) el('btn-palette').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var m = el('tb-palette-menu');
+      if (!m) return;
+      if (!m.children.length) {
+        (window.ADV_PALETTES || []).forEach(function (p) {
+          var b = document.createElement('button');
+          b.className = 'btn sm';
+          b.innerHTML = '<span style="display:inline-flex;gap:3px;margin-right:7px">' +
+            p.colors.slice(0, 5).map(function (c) { return '<i style="width:10px;height:10px;border-radius:2px;background:' + c + ';display:inline-block"></i>'; }).join('') +
+            '</span>' + (isEn() ? p.nameEn : p.name);
+          b.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            state.palette = p.id;
+            m.classList.remove('open');
+            rerender();
+          });
+          m.appendChild(b);
+        });
+      }
+      m.classList.toggle('open');
+      if (m.classList.contains('open')) {
+        var r2 = this.getBoundingClientRect(), mw2 = m.offsetWidth || 180;
+        m.style.position = 'fixed';
+        m.style.top = Math.round(r2.bottom + 6) + 'px';
+        m.style.left = Math.round(Math.max(8, Math.min(r2.left, window.innerWidth - mw2 - 8))) + 'px';
+        m.style.right = 'auto';
+      }
     });
     el('btn-watermark').addEventListener('click', function () {
       state.showWatermark = !state.showWatermark;
@@ -3110,7 +3335,7 @@
       el('btn-table').textContent = state.tableView ? '◉ 地图视图' : '☰ 表格视图';
       rerender();
     });
-    el('btn-transform').addEventListener('click', openTransform);
+    if (el('btn-transform')) el('btn-transform').addEventListener('click', openTransform);
     el('tf-close').addEventListener('click', closeTransform);
     el('tf-q').addEventListener('click', function () { doTransform('q', el('tf-agg').value); });
     el('tf-y').addEventListener('click', function () { doTransform('y', el('tf-agg').value); });
@@ -3130,7 +3355,7 @@
     titleEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
 
     // 工具栏
-    el('tb-swapxy').addEventListener('click', function () {
+    if (el('tb-swapxy')) el('tb-swapxy').addEventListener('click', function () {
       if (state.mode !== 'imported' && state.mode !== 'dataset') { toast('X/Y 交换适用于导入的数据'); return; }
       state.transposed = !state.transposed;
       el('tb-swapxy').classList.toggle('active', state.transposed);
@@ -3162,7 +3387,7 @@
       state.timeRange = this.value;
       rerender();
     });
-    el('btn-series-color').addEventListener('click', openColorPanel);
+    if (el('btn-series-color')) el('btn-series-color').addEventListener('click', openColorPanel);
     el('color-close').addEventListener('click', closeColorPanel);
     el('color-list').addEventListener('click', function (e) {
       var t = e.target;
@@ -3270,6 +3495,7 @@
 
     window.addEventListener('resize', function () {
       ChartFactory.resizeAll();
+      (state.catInsts || []).forEach(function (o) { try { o.inst.resize(); } catch (e) {} });
       if (state.labelMode && state.labelMode !== 'off' && state.echartsEl) {
         var rinst = echarts.getInstanceByDom(state.echartsEl);
         if (rinst) applyExtremeLabels(rinst);
@@ -4394,7 +4620,7 @@
     buildGoalCards();
     bindEvents();
     if (el('btn-watermark')) el('btn-watermark').classList.add('active');
-    el('footer-note').textContent = 'Advanced-Financial-Graph (AFG) · ' + tr('数据仅本地处理','processed locally') + ' · ' + tr('生成于','generated') + ' ' + new Date().toLocaleDateString(isEn() ? 'en-US' : 'zh-CN');
+    el('footer-note').textContent = 'Advanced Data Visualization (ADV) · ' + tr('数据仅本地处理','processed locally') + ' · ' + tr('生成于','generated') + ' ' + new Date().toLocaleDateString(isEn() ? 'en-US' : 'zh-CN');
     if (q.chart) {
       try {
         var cfg = JSON.parse(b64Decode(q.chart));

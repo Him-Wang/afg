@@ -37,7 +37,7 @@
       },
       watermark: {
         visible: true,
-        text: 'AFG',
+        text: 'ADV',
         fontSize: 44,
         color: hexToRgba(theme.text, 0.05),
         fontFamily: "'Inter', sans-serif"

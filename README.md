@@ -1,6 +1,6 @@
 <div align="center">
 
-# AFG · Advanced Financial Graph
+# ADV · Advanced Financial Graph
 
 **上传数据，直接出图 —— 专业级金融图表，纯前端运行**
 
@@ -14,7 +14,7 @@
 
 ### 这是什么
 
-AFG 是一个**纯静态的金融图表工具**：上传 Excel / CSV / JSON，自动识别数据结构并推荐图表，无需登录、无需服务器，**数据全程在本地浏览器处理、不上传**。
+ADV 是一个**纯静态的金融图表工具**：上传 Excel / CSV / JSON，自动识别数据结构并推荐图表，无需登录、无需服务器，**数据全程在本地浏览器处理、不上传**。
 
 适合：研究报告配图、路演材料、财报分析、宏观数据可视化。
 
@@ -42,7 +42,7 @@ AI 会返回一个 `?chart=` 链接，点开即图，可导出、可分享。**�
 
 #### ③ 配置 MCP（一次配置，长期省事）
 
-如果你常用 Cursor / Claude Code 等支持 MCP 的客户端，配置一次后可以直接说「用 AFG 画图」。
+如果你常用 Cursor / Claude Code 等支持 MCP 的客户端，配置一次后可以直接说「用 ADV 画图」。
 
 ```bash
 cd mcp-server && npm install
@@ -149,9 +149,9 @@ python3 update_cn_corridor.py       # 中国利率走廊
 
 ## English
 
-### What is AFG
+### What is ADV
 
-AFG is a **fully static financial charting tool**. Upload Excel / CSV / JSON, and it automatically detects the data structure and suggests a chart. No login, no server — **everything runs in your browser, your data never leaves your machine.**
+ADV is a **fully static financial charting tool**. Upload Excel / CSV / JSON, and it automatically detects the data structure and suggests a chart. No login, no server — **everything runs in your browser, your data never leaves your machine.**
 
 Built for research reports, pitch decks, earnings analysis, and macro data visualization.
 
@@ -179,7 +179,7 @@ The AI returns a `?chart=` link. Open it, export it, share it. **Nothing to inst
 
 #### ③ Configure MCP (one-time setup)
 
-For Cursor / Claude Code and other MCP-capable clients, configure once and just say "chart it with AFG".
+For Cursor / Claude Code and other MCP-capable clients, configure once and just say "chart it with ADV".
 
 ```bash
 cd mcp-server && npm install

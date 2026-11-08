@@ -901,7 +901,7 @@
     var wm = {
       type: 'text', left: 'center', top: 'middle', z: 0, silent: true,
       style: {
-        text: 'AFG', fill: hexToRgba(theme.text, 0.045),
+        text: 'ADV', fill: hexToRgba(theme.text, 0.045),
         font: '800 44px Inter, sans-serif', letterSpacing: 6, textAlign: 'center'
       }
     };
@@ -1210,6 +1210,8 @@
     'mlCorr': mlCorr, 'matrixHeat': matrixHeat, 'mlDist': mlDist, 'stackedBar': stackedBar, 'radar': radar,
     'perf': perf, 'scatterMatrix': scatterMatrix, 'worldMap': worldMap
   };
+  // 合并扩展图表构建器（图表分类新增类型）
+  if (window.ADV_BUILDERS) { Object.keys(window.ADV_BUILDERS).forEach(function (k) { BUILDERS[k] = window.ADV_BUILDERS[k]; }); }
 
   /* 专业终端化排版：右侧价格轴 / 图例左上 / 底部时间滑块 / 千分位刻度 */
   function axisNum(v) {

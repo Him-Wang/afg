@@ -1,4 +1,4 @@
-/* AFG 数据层中文 → 英文翻译 */
+/* ADV 数据层中文 → 英文翻译 */
 (function (global) {
   'use strict';
 

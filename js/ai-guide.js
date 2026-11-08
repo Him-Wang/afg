@@ -1,4 +1,4 @@
-/* AFG · AI 绘图使用指南（完整版，中英双语） */
+/* ADV · AI 绘图使用指南（完整版，中英双语） */
 (function (global) {
   'use strict';
 
@@ -55,7 +55,7 @@
     '<p><b>完全退出</b>客户端再打开（不是关窗口，要退出程序，Mac 用 Cmd+Q）。然后问 AI：</p>',
     '<pre class="guide-code">你现在有哪些工具？有没有 make_chart？</pre>',
     '<p>如果它列出 <code>make_chart</code> → 配置成功。之后直接用自然语言：</p>',
-    '<pre class="guide-code">用 AFG 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题</pre>',
+    '<pre class="guide-code">用 ADV 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题</pre>',
     '<p>AI 会返回一个 <code>https://saviorbill.github.io/afg/?chart=...</code> 链接，点开就是图。</p>',
     '</div>',
 
@@ -117,7 +117,7 @@
     '<p>Quit the client <b>completely</b> (not just close the window) and reopen. Then ask:</p>',
     '<pre class="guide-code">What tools do you have? Is make_chart available?</pre>',
     '<p>If it lists <code>make_chart</code>, it works. Then just say:</p>',
-    '<pre class="guide-code">Chart CSI300 vs CSI500 over the last 5 years with AFG, paper theme</pre>',
+    '<pre class="guide-code">Chart CSI300 vs CSI500 over the last 5 years with ADV, paper theme</pre>',
     '</div>',
 
     '<div class="guide-sec">',
@@ -132,5 +132,5 @@
     '</div>'
   ].join('\n');
 
-  global.AFG_AI_GUIDE = { zh: ZH, en: EN };
+  global.ADV_AI_GUIDE = { zh: ZH, en: EN };
 })(window);
