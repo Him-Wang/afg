@@ -79,6 +79,72 @@
     };
   }
 
+
+  /* ---------- 期刊式注释：自动识别拐点 + 最大回撤区间 ---------- */
+  function analyzeSeries(labels, values) {
+    var pts = [];
+    for (var i = 0; i < values.length; i++) {
+      var v = values[i];
+      if (v === null || v === undefined || isNaN(v)) continue;
+      pts.push({ i: i, v: v, lb: labels[i] });
+    }
+    if (pts.length < 4) return null;
+    /* 单期变化最大涨幅 / 跌幅 */
+    var up = null, down = null;
+    for (var k = 1; k < pts.length; k++) {
+      var d = pts[k].v - pts[k - 1].v;
+      if (!up || d > up.d) up = { d: d, i: pts[k].i, from: pts[k - 1].v, to: pts[k].v, lb: pts[k].lb };
+      if (!down || d < down.d) down = { d: d, i: pts[k].i, from: pts[k - 1].v, to: pts[k].v, lb: pts[k].lb };
+    }
+    /* 最大回撤区间（峰 → 谷） */
+    var peakIdx = pts[0].i, peakV = pts[0].v;
+    var best = { dd: 0, from: pts[0].i, to: pts[0].i, fromV: pts[0].v, toV: pts[0].v };
+    for (var j = 0; j < pts.length; j++) {
+      if (pts[j].v > peakV) { peakV = pts[j].v; peakIdx = pts[j].i; }
+      var dd = peakV ? (pts[j].v - peakV) / Math.abs(peakV) : 0;
+      if (dd < best.dd) best = { dd: dd, from: peakIdx, to: pts[j].i, fromV: peakV, toV: pts[j].v };
+    }
+    return { up: up, down: down, dd: best, first: pts[0], last: pts[pts.length - 1] };
+  }
+
+  function calloutData(t, d, an, narrow) {
+    var points = [], lines = [];
+    if (!an) return { points: points, lines: lines };
+    var labels = d.labels;
+    function anchor(i, v, dir) {
+      var span = Math.max(1e-6, Math.abs(v) * 0.16);
+      return [i, dir > 0 ? v + span : v - span];
+    }
+    /* 只标「最大单期涨幅」与「最大单期跌幅」两处转折 */
+    var items = [];
+    if (an.up) items.push({ i: an.up.i, v: an.up.to, dir: 1, color: '#3E7A5A',
+      text: '↑ ' + (an.up.d >= 0 ? '+' : '') + num(an.up.d) });
+    if (an.down) items.push({ i: an.down.i, v: an.down.to, dir: -1, color: '#B5484B',
+      text: '↓ ' + num(an.down.d) });
+    if (narrow) items = items.slice(0, 1);
+    items.forEach(function (it) {
+      var a = anchor(it.i, it.v, it.dir);
+      lines.push({ coord: [[it.i, it.v], a], lineStyle: { color: rgba(it.color, 0.5), width: 1, type: 'solid' } });
+      points.push({ coord: a, symbol: 'circle', symbolSize: 1, itemStyle: { color: 'transparent' }, silent: true,
+        label: { show: true, position: 'top', distance: 2, color: it.color,
+          font: '700 9.5px ' + FONT, backgroundColor: 'rgba(255,255,255,.82)', padding: [1, 3], borderRadius: 2,
+          formatter: function () { return it.text + '  ' + num(it.v); } } });
+      points.push({ coord: [it.i, it.v], symbol: 'circle', symbolSize: 4, itemStyle: { color: it.color } });
+    });
+    return { points: points, lines: lines };
+  }
+
+  function ddArea(t, d, an, narrow) {
+    if (!an || !an.dd || an.dd.dd >= -0.04) return null;
+    var from = an.dd.from, to = an.dd.to;
+    if (to - from < 2) return null;
+    return { silent: true,
+      itemStyle: { color: rgba('#B5484B', 0.07), borderColor: rgba('#B5484B', 0.18), borderWidth: 1 },
+      label: { show: !narrow, position: 'insideBottom', distance: 8, color: '#B5484B',
+        font: '600 9px ' + FONT, formatter: 'max drawdown ' + (an.dd.dd * 100).toFixed(1) + '%' },
+      data: [[{ xAxis: d.labels[from] }, { xAxis: d.labels[to] }]] };
+  }
+
   /* ================= 1. 比较与排序 ================= */
   B.groupedBar = function (el, d, t) {
     var n = d.series.length;
@@ -263,6 +329,8 @@
       yAxis: yAxis(t, { scale: !zero }),
       series: d.series.map(function (s, i) {
         var last = s.values.length - 1;
+        var an = analyzeSeries(d.labels, s.values);
+        var co = calloutData(t, d, an, !big);
         var marks = [];
         if (i === 0) {
           var vs = s.values.map(function (v, k) { return { v: v, k: k }; }).filter(function (o) { return o.v !== null && o.v !== undefined && !isNaN(o.v); });
@@ -280,22 +348,24 @@
                 formatter: function () { return num(lo.v); } } });
             marks.push({ kind: 'mean', name: '均值', coord: [0, mean],
               symbol: 'none',
-              lineStyle: { color: rgba(ink(t), 0.35), width: 1, type: [4, 3] },
-              label: { show: big, position: 'insideEndTop', distance: 4, color: muted(t), font: '9px ' + FONT,
+              lineStyle: { color: rgba(ink(t), 0.35), width: 1, type: 'dashed' },
+              label: { show: big, position: 'insideStartTop', distance: 4, color: muted(t), font: '9px ' + FONT,
                 formatter: function () { return 'avg ' + num(mean); } } });
           }
         }
+        var anI = i === 0 ? analyzeSeries(d.labels, s.values) : null;
+        var areaI = anI ? ddArea(t, d, anI, !big) : null;
         return lineSeries(t, s, i, {
+          markArea: areaI || undefined,
           markPoint: { silent: true, symbol: 'circle', symbolSize: 5,
             data: [{ coord: [last, s.values[last]], itemStyle: { color: seriesColor(t, i) } }].concat(
               marks.filter(function (m) { return m.kind !== 'mean'; }).map(function (m) {
                 return { name: m.name, coord: m.coord, symbol: m.symbol, symbolSize: m.symbolSize, itemStyle: m.itemStyle, label: m.label };
-              })) },
-          markLine: marks.filter(function (m) { return m.kind === 'mean'; }).length
-            ? { silent: true, symbol: 'none', data: marks.filter(function (m) { return m.kind === 'mean'; }).map(function (m) {
+              })).concat(i === 0 ? co.points : []) },
+          markLine: { silent: true, symbol: 'none',
+            data: marks.filter(function (m) { return m.kind === 'mean'; }).map(function (m) {
                 return { name: m.name, yAxis: m.coord[1], lineStyle: m.lineStyle, label: m.label };
-              }) }
-            : undefined,
+              }) },
           endLabel: endLabel(t)
         });
       })
