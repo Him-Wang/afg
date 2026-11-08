@@ -677,7 +677,7 @@
       },
       series: [{
         type: 'sankey',
-        left: 14, right: 150, top: 24, bottom: 24,
+        left: 6, right: ((el && el.clientWidth) || 700) < 480 ? 78 : 150, top: 18, bottom: 18,
         nodeWidth: 18, nodeGap: 16,
         data: nodes,
         links: data.links,

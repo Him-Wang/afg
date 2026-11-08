@@ -82,7 +82,8 @@
   /* ================= 1. 比较与排序 ================= */
   B.groupedBar = function (el, d, t) {
     var n = d.series.length;
-    var showVal = d.labels.length * n <= 12;
+    var W = (el && el.clientWidth) || 600;
+    var showVal = d.labels.length * n <= 12 && W >= 460;
     return base(t, {
       tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: rgba(ink(t), 0.04) } } }),
       legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
@@ -127,7 +128,7 @@
     var idx = d.labels.map(function (_, i) { return i; });
     return base(t, {
       tooltip: tip(t, { trigger: 'item' }),
-      grid: grid({ left: 6, right: 34, top: 16, bottom: 18 }),
+      grid: grid({ left: 6, right: ((el && el.clientWidth) || 600) < 480 ? 30 : 44, top: 16, bottom: 18 }),
       xAxis: yAxis(t, { type: 'value', splitLine: { show: true, lineStyle: { color: rule(t) } } }),
       yAxis: xAxis(t, { data: d.labels, axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT } }),
       series: [
@@ -243,10 +244,11 @@
 
   B.line = function (el, d, t) {
     var zero = d.values && d.values.some(function (v) { return v < 0; });
+    var W = (el && el.clientWidth) || 700;
     return base(t, {
       tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: rgba(ink(t), 0.2), width: 1 } } }),
       legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
-      grid: grid({ left: 8, right: 46, top: 30, bottom: 10 }),
+      grid: grid({ left: 8, right: W < 480 ? 40 : 64, top: 30, bottom: 10 }),
       xAxis: timeAxis(t, d.labels),
       yAxis: yAxis(t, { scale: !zero }),
       series: d.series.map(function (s, i) {
@@ -264,7 +266,7 @@
     return base(t, {
       tooltip: tip(t, { trigger: 'axis' }),
       legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
-      grid: grid({ left: 8, right: 46, top: 28, bottom: 10 }),
+      grid: grid({ left: 8, right: W < 480 ? 42 : 64, top: 28, bottom: 10 }),
       xAxis: timeAxis(t, d.labels),
       yAxis: yAxis(t, { scale: true }),
       series: d.series.map(function (s, i) {
@@ -505,25 +507,22 @@
 
   B.boxplot = function (el, d, t) {
     var boxes = d.boxes || [];
+    var W = (el && el.clientWidth) || 600;
     return base(t, {
       tooltip: tip(t, { trigger: 'item', formatter: function (p) {
         var v = p.value;
-        return p.name + '<br/>max ' + num(v[5]) + ' · Q3 ' + num(v[4]) + ' · med ' + num(v[3]) + ' · Q1 ' + num(v[2]) + ' · min ' + num(v[1]);
+        return (p.name || '') + '<br/>max ' + num(v[5]) + ' · Q3 ' + num(v[4]) + ' · median ' + num(v[3]) + ' · Q1 ' + num(v[2]) + ' · min ' + num(v[1]);
       } }),
-      grid: grid({ left: 6, right: 16, top: 16, bottom: 18 }),
+      grid: grid({ left: 6, right: 18, top: 18, bottom: 18 }),
       xAxis: xAxis(t, { data: d.categories, boundaryGap: true, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
       yAxis: yAxis(t, { scale: true }),
       series: [{
-        type: 'boxplot', boxWidth: [10, 22],
-        data: boxes,  /* [min, Q1, med, Q3, max] */
-        itemStyle: { color: rgba(accent(t), 0.16), borderColor: rgba(accent(t), 0.9), borderWidth: 1.1 },
-        emphasis: { itemStyle: { borderColor: accent(t), borderWidth: 1.6 } }
-      }, {
-        /* 中位数标注 */
-        type: 'scatter', symbolSize: 0.1, silent: true,
-        data: boxes.map(function (b, i) { return [i, b[2]]; }),
-        label: { show: true, position: 'right', distance: 8, color: ink(t), fontSize: 9.5, fontFamily: FONT,
-          formatter: function (p) { return num(p.value[1]); } }
+        type: 'boxplot',
+        boxWidth: (W < 480 ? ['18%', '34%'] : ['10%', '20%']),
+        data: boxes,   /* [min, Q1, median, Q3, max] */
+        itemStyle: { color: rgba(accent(t), 0.14), borderColor: rgba(accent(t), 0.85), borderWidth: 1.1 },
+        emphasis: { itemStyle: { borderColor: accent(t), borderWidth: 1.6 } },
+        label: { show: false }
       }]
     });
   };
