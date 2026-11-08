@@ -253,6 +253,55 @@
     ]
   });
 
+
+  CATS.push({
+    id: 'showcase', name: '高级案例', icon: '✦',
+    desc: '与常规图表不一样的定制可视化：D3.js 手工绘制，强调视觉表达与叙事张力。',
+    charts: [
+      { id: 'scForce', name: '关系网络图', type: 'scForce', desc: '力导向布局 · 节点大小代表权重，连线代表关联强度',
+        data: function () { return { nodes: [
+          { id: 'a', name: '算力', value: 92, group: 0 }, { id: 'b', name: '芯片', value: 78, group: 0 },
+          { id: 'c', name: '云服务', value: 66, group: 1 }, { id: 'd', name: '大模型', value: 88, group: 1 },
+          { id: 'e', name: '数据', value: 71, group: 2 }, { id: 'f', name: '电力', value: 54, group: 0 },
+          { id: 'g', name: '应用', value: 48, group: 1 }, { id: 'h', name: '监管', value: 32, group: 3 },
+          { id: 'i', name: '资本', value: 45, group: 3 }],
+          links: [
+            { source: 'a', target: 'b', value: 9 }, { source: 'a', target: 'f', value: 6 }, { source: 'b', target: 'c', value: 5 },
+            { source: 'd', target: 'a', value: 8 }, { source: 'd', target: 'e', value: 7 }, { source: 'c', target: 'g', value: 4 },
+            { source: 'e', target: 'd', value: 6 }, { source: 'i', target: 'd', value: 3 }, { source: 'h', target: 'd', value: 2 },
+            { source: 'g', target: 'h', value: 2 }, { source: 'b', target: 'e', value: 3 }] }; } },
+      { id: 'scChord', name: '和弦图', type: 'scChord', desc: '环形双向流量 · 渐变丝带展示区域间资金往来',
+        data: function () { return { names: ['华东', '华南', '华北', '西南', '境外'],
+          matrix: [[0, 32, 18, 9, 12], [28, 0, 14, 7, 16], [15, 11, 0, 5, 9], [8, 6, 4, 0, 3], [11, 14, 8, 2, 0]] }; } },
+      { id: 'scRadialTree', name: '径向树', type: 'scRadialTree', desc: '环形层级展开 · 适合多级分类结构',
+        data: function () { return { tree: { name: '业务版图', children: [
+          { name: '消费', children: [{ name: '家电' }, { name: '食品' }, { name: '服饰' }] },
+          { name: '科技', children: [{ name: '半导体', children: [{ name: '设计' }, { name: '制造' }] }, { name: '软件' }, { name: '硬件' }] },
+          { name: '医药', children: [{ name: '创新药' }, { name: '器械' }] },
+          { name: '能源', children: [{ name: '光伏' }, { name: '储能' }] }] } }; } },
+      { id: 'scHexbin', name: '六边形密度图', type: 'scHexbin', desc: '二维数据密度聚合 · 避免散点过度重叠',
+        data: function () {
+          var pts = [], i;
+          for (i = 0; i < 260; i++) {
+            var cx = [30, 55, 75][i % 3], cy = [40, 62, 30][i % 3];
+            pts.push([cx + (Math.sin(i * 1.7) * 12), cy + (Math.cos(i * 2.3) * 14)]);
+          }
+          for (i = 0; i < 140; i++) pts.push([50 + Math.sin(i * 3.1) * 30, 55 + Math.cos(i * 1.9) * 26]);
+          return { points: pts }; } },
+      { id: 'scGlowLine', name: '发光趋势线', type: 'scGlowLine', desc: '终端式单曲线 · 渐变发光 + 末端强调',
+        data: function () {
+          var labels = [], vals = [], v = 120;
+          for (var i = 0; i < 48; i++) {
+            labels.push('M' + (i + 1));
+            v += Math.sin(i / 3.2) * 6 + Math.cos(i / 1.7) * 3 + 0.6;
+            vals.push(Math.round(v * 100) / 100);
+          }
+          return { labels: labels, series: [{ name: '指数', values: vals }] }; } },
+      { id: 'scWaterfall', name: '动画瀑布图', type: 'scWaterfall', desc: '逐条生长的增减拆解 · 节奏感更强',
+        data: function () { return { labels: ['期初', '新增', '流失', '提价', '成本', '期末'], values: [500, 120, -80, 60, -45, 555] }; } }
+    ]
+  });
+
   function localizeDemo(obj) {
     var en = false;
     try { en = window.I18N && window.I18N.getLang() === 'en'; } catch (e) {}

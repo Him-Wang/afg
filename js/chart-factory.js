@@ -1395,6 +1395,20 @@
   }
 
   function render(el, type, data, theme) {
+    /* 高级案例：D3 定制渲染（不走 ECharts 管线） */
+    if (window.ADV_SHOWCASE && ADV_SHOWCASE[type]) {
+      var _dispose = ADV_SHOWCASE[type](el, data, theme) || function () {};
+      return {
+        resize: function () {
+          try { _dispose(); } catch (e) {}
+          try { _dispose = ADV_SHOWCASE[type](el, data, theme) || function () {}; } catch (e) {}
+        },
+        dispose: function () { try { _dispose(); } catch (e) {} el.innerHTML = ''; },
+        getDom: function () { return el; },
+        getOption: function () { return { series: [] }; },
+        on: function () {}
+      };
+    }
     var builder = BUILDERS[type];
     if (!builder) throw new Error('未知图表类型: ' + type);
     var option = builder(el, data, theme);

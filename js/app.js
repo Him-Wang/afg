@@ -1204,7 +1204,8 @@
     echarts: 'vendor/echarts.min.js',
     worldmap: 'vendor/world-map.js',
     xlsx: 'vendor/xlsx.full.min.js',
-    lightweight: 'vendor/lightweight-charts.standalone.production.js'
+    lightweight: 'vendor/lightweight-charts.standalone.production.js',
+    d3: 'vendor/d3.v7.min.js'
   };
   var _libPromise = {};
 
@@ -1213,6 +1214,7 @@
     if (key === 'xlsx' && window.XLSX) return Promise.resolve(window.XLSX);
     if (key === 'lightweight' && window.LightweightCharts) return Promise.resolve(window.LightweightCharts);
     if (key === 'worldmap' && window.WORLD_GEOJSON) return Promise.resolve(window.WORLD_GEOJSON);
+    if (key === 'd3' && window.d3) return Promise.resolve(window.d3);
     if (_libPromise[key]) return _libPromise[key];
     _libPromise[key] = new Promise(function (resolve, reject) {
       var sc = document.createElement('script');
@@ -1236,6 +1238,8 @@
   }
   function ensureXLSX() { return loadLib('xlsx'); }
   function ensureLightweight() { return loadLib('lightweight'); }
+  function ensureD3() { return loadLib('d3'); }
+  var SHOWCASE_TYPES = { scForce: 1, scChord: 1, scRadialTree: 1, scHexbin: 1, scGlowLine: 1, scWaterfall: 1 };
 
   function withCharts(fn) {
     if (window.echarts) { fn(); return; }
@@ -1875,7 +1879,7 @@
   var ADV_EN = {
     cat: { compare: 'Comparison & Ranking', trend: 'Trend & Time', composition: 'Composition & Share',
       distribution: 'Distribution', relation: 'Relationship & Correlation', flow: 'Flow & Conversion',
-      geo: 'Geospatial', hierarchy: 'Hierarchy & Process', special: 'Specialized' },
+      geo: 'Geospatial', hierarchy: 'Hierarchy & Process', special: 'Specialized', showcase: 'Showcase' },
     catDesc: {
       compare: 'Who is higher or lower, how much more, ranking, and differences between items or versus a benchmark.',
       trend: 'How values change over time — pace, turning points, cycles, and accumulation.',
@@ -1885,7 +1889,8 @@
       flow: 'Where data, resources or users come from and go, flow volume, conversion and churn.',
       geo: 'Where things happen, regional gaps, spatial density and location patterns.',
       hierarchy: 'Organizational or categorical hierarchy, and the sequence/ownership of tasks and approvals.',
-      special: 'Domain-specific graphics, or charts for state / interval / diagnostics rather than general data.'
+      special: 'Domain-specific graphics, or charts for state / interval / diagnostics rather than general data.',
+      showcase: 'Bespoke D3.js visuals that go beyond standard charts — built for visual impact and narrative.'
     },
     chart: {
       groupedBar: 'Grouped Bar', tornado: 'Tornado / Diverging Bar', lollipop: 'Lollipop', bullet: 'Bullet',
@@ -1900,7 +1905,9 @@
       trajectory: 'Trajectory', migration: 'Migration Map', hexMap: 'Hexagon Map', tree: 'Tree',
       orgChart: 'Org Chart', icicle: 'Icicle', flowchart: 'Flowchart', swimlane: 'Swimlane',
       bulletSpecial: 'Bullet (KPI)', control: 'Control Chart', parallel: 'Parallel Coordinates',
-      streamgraph: 'Streamgraph'
+      streamgraph: 'Streamgraph',
+      scForce: 'Force Network', scChord: 'Chord Diagram', scRadialTree: 'Radial Tree',
+      scHexbin: 'Hexbin Density', scGlowLine: 'Glow Trend', scWaterfall: 'Animated Waterfall'
     },
     chartDesc: {
       groupedBar: 'Side-by-side bars for multi-group comparison', tornado: 'Mirrored bars to compare two sides at once',
@@ -1927,7 +1934,10 @@
       icicle: 'Horizontal hierarchy share, space efficient', flowchart: 'Steps, order and branches',
       swimlane: 'Cross-team process by owner lane', bulletSpecial: 'KPI against target and thresholds',
       control: 'Process monitoring with control limits', parallel: 'Multi-dimensional sample lines',
-      streamgraph: 'Theme evolution over time'
+      streamgraph: 'Theme evolution over time',
+      scForce: 'Force-directed network sized by weight', scChord: 'Ring of bidirectional flows with gradient ribbons',
+      scRadialTree: 'Circular hierarchy for multi-level categories', scHexbin: '2D density bins without overplotting',
+      scGlowLine: 'Single glowing trend line with end emphasis', scWaterfall: 'Bars grow one by one to tell the story'
     }
   };
   function findCat(id) {
@@ -1948,6 +1958,12 @@
   /* 分类看板：顶部说明 + 图表案例卡 */
   function renderCategoryDash(catId) {
     if (!window.echarts) { withCharts(function () { renderCategoryDash(catId); }); return; }
+    if (catId === 'showcase' && !window.d3) {
+      var stD = el('chart-stage');
+      if (stD) stD.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载高级绘图引擎…', 'Loading advanced engine…') + '</span></div>';
+      ensureD3().then(function () { renderCategoryDash(catId); }).catch(function () {});
+      return;
+    }
     clearStage();
     state.mode = 'catalog';
     state.catId = catId;
@@ -2027,6 +2043,12 @@
   function openCatalogChart(catId, chartId) {
     if (!window.echarts) { withCharts(function () { openCatalogChart(catId, chartId); }); return; }
     var _ch0 = findChart(catId, chartId);
+    if (_ch0 && SHOWCASE_TYPES[_ch0.type] && !window.d3) {
+      var stS = el('chart-stage');
+      if (stS) stS.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载高级绘图引擎…', 'Loading advanced engine…') + '</span></div>';
+      ensureD3().then(function () { openCatalogChart(catId, chartId); }).catch(function () {});
+      return;
+    }
     if (_ch0 && GEO_TYPES[_ch0.type] && !window.WORLD_GEOJSON) {
       var st0 = el('chart-stage');
       if (st0) st0.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载地图数据…', 'Loading map data…') + '</span></div>';
@@ -2119,8 +2141,8 @@
       catSub.appendChild(nav);
     });
 
-    // 3. 金融案例（3 个数据集）
-    var finSub = expando(ICONS.perf, tr('金融案例', 'Finance Cases'), 'cases');
+    // 3. 金融数据（3 个数据集）
+    var finSub = expando(ICONS.perf, tr('金融数据', 'Financial Data'), 'cases');
     [['china-macro', T('nav.china'), ICONS.macro, renderChinaMacro],
      ['intl-macro',  T('nav.intl'),  ICONS.globe, renderIntlMacro],
      ['finance',     T('nav.finance'), ICONS.perf, renderFinance]].forEach(function (c) {
