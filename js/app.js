@@ -3601,7 +3601,7 @@
         closeFeedback();
       });
     }
-    el('btn-more').addEventListener('click', function (e) {
+    if (el('btn-more')) el('btn-more').addEventListener('click', function (e) {
       e.stopPropagation();
       var menu = el('tb-menu');
       menu.classList.toggle('open');
