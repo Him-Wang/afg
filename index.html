@@ -217,25 +217,29 @@
       <div id="mapping-area" style="display:none">
         <hr style="border:none;border-top:1px solid var(--border);margin:16px 0" />
         <div style="font-size:12.5px;color:var(--muted)" id="detect-info"></div>
-        <div class="field-row">
-          <label>分析目的</label>
-          <div class="goal-cards" id="analysis-goal"></div>
+        <div class="pick-wrap">
+          <div class="pick-head">
+            <span class="pick-title">制图方式</span>
+            <div class="pick-tabs" id="pick-mode">
+              <button class="pick-tab on" data-mode="rec">ADV 推荐</button>
+              <button class="pick-tab" data-mode="self">我自己选</button>
+            </div>
+          </div>
+          <div class="pick-body" id="pick-body"></div>
         </div>
         <div class="field-row">
           <label>X / 时间列</label>
           <select id="x-col"></select>
-          <label style="margin-left:12px" data-i18n="ex.chartType">图表类型</label>
-          <select id="chart-type">
-            <option value="line" data-i18n-opt="折线图">折线图</option>
-            <option value="area" data-i18n-opt="面积图">面积图</option>
-            <option value="bar" data-i18n-opt="柱状图">柱状图</option>
-            <option value="stacked" data-i18n-opt="堆叠面积">堆叠面积</option>
-            <option value="stackedBar" data-i18n-opt="堆叠柱状">堆叠柱状</option>
-            <option value="radar" data-i18n-opt="雷达图">雷达图</option>
-            <option value="rank" data-i18n-opt="横向排名">横向排名</option>
+          <select id="chart-type" style="display:none">
+            <option value="line">折线图</option><option value="area">面积图</option><option value="bar">柱状图</option>
+            <option value="stacked">堆叠面积</option><option value="stackedBar">堆叠柱状</option><option value="rank">横向排名</option>
+            <option value="pie">饼图</option><option value="donut">环形图</option><option value="radar">雷达图</option>
+            <option value="step">阶梯线</option><option value="dual">双轴对比</option><option value="treemap">矩形树图</option>
+            <option value="heatmap">热力图</option><option value="bubble">气泡图</option><option value="scatterMatrix">矩阵散点</option>
           </select>
-          <button class="btn sm" id="btn-swapxy" title="交换 X/Y（转置方向）" data-i18n="more.swap">⇅ 交换 X/Y</button>
+          <button class="btn sm" id="btn-swapxy" style="display:none"></button>
         </div>
+        <div class="field-row" id="analysis-goal" style="display:none"></div>
         <div class="field-row"><label>Y / 数值列</label><span class="hint" id="y-hint">点击选择一列或多列</span></div>
         <div class="column-picker" id="y-cols"></div>
         <div class="field-row">

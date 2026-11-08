@@ -850,6 +850,11 @@
     var _cont = inst && inst.getDom && inst.getDom();
     if (_cont) { var _old = _cont.querySelectorAll('.last-tag'); for (var _k = 0; _k < _old.length; _k++) _old[_k].remove(); }
     if (state.labelMode && state.labelMode !== 'off') return;   // 已有数据标注，避免重复
+    var _tsTypes = ['line', 'area', 'stacked', 'stackedLine', 'step', 'dual', 'dualLine', 'season'];
+    var _curType = '';
+    try { var _oo = inst.getOption(); _curType = (_oo.series && _oo.series[0] && _oo.series[0].type) || ''; } catch (e) {}
+    if (state.mode === 'imported' && _curType === 'bar' && state.mapping && _tsTypes.indexOf(state.mapping.chartType) < 0) return;
+    if (state.mode === 'imported' && state.mapping && _tsTypes.indexOf(state.mapping.chartType) < 0) return;
     if (!inst) return;
     var container = inst.getDom && inst.getDom();
     if (!container) return;
@@ -2803,6 +2808,127 @@
     });
   }
 
+
+  /* ---------- 导入后：制图方式（ADV 推荐 / 我自己选） ---------- */
+  var PICK_GROUPS = [
+    { name: '趋势', types: [['line', '折线图'], ['area', '面积图'], ['stacked', '堆叠面积'], ['step', '阶梯线']] },
+    { name: '比较', types: [['bar', '柱状图'], ['rank', '横向排名'], ['dual', '双轴对比'], ['radar', '雷达图']] },
+    { name: '构成', types: [['stackedBar', '堆叠柱状'], ['pie', '饼图'], ['donut', '环形图'], ['treemap', '矩形树图']] },
+    { name: '关系', types: [['scatterMatrix', '矩阵散点'], ['bubble', '气泡图'], ['heatmap', '热力图']] }
+  ];
+  var PICK_DESC = {
+    line: '看趋势与拐点', area: '强调累计量', stacked: '总量与结构', step: '阶跃变化',
+    bar: '分类对比', rank: '排序展示', dual: '量纲不同的双指标', radar: '多维能力',
+    stackedBar: '分类内部构成', pie: '占比（≤6类）', donut: '占比+中心指标', treemap: '层级占比',
+    scatterMatrix: '多变量相关性', bubble: '三维关系', heatmap: '二维矩阵热力'
+  };
+
+  function suggestCharts(det, table) {
+    var out = [];
+    var nSeries = state.mapping.yCols.length;
+    var isTS = det && det.isTimeSeries;
+    if (isTS) {
+      out.push({ t: 'line', why: '时间序列最通用：看趋势、拐点与节奏' });
+      if (nSeries <= 2) out.push({ t: 'area', why: '强调累积量级，视觉重量更强' });
+      else out.push({ t: 'stacked', why: '多个指标叠加：总量与结构同步变化' });
+      out.push({ t: 'bar', why: '按周期对比高低，适合离散时点' });
+      if (nSeries >= 3) out.push({ t: 'stackedBar', why: '分类内看构成变化' });
+    } else {
+      out.push({ t: 'rank', why: '分类数据先排序，一眼看出高低' });
+      out.push({ t: 'bar', why: '标准分类对比' });
+      var n = table ? table.rows.length : 0;
+      if (n <= 8) out.push({ t: 'pie', why: '类别不多，适合看占比' });
+      out.push({ t: 'donut', why: '占比之外，中心还能放总量' });
+    }
+    return out.slice(0, 4);
+  }
+
+
+  /* 下拉菜单定位：始终落在视口内（手机端尤其重要） */
+  function placeMenu(menu, anchor) {
+    if (!menu || !anchor) return;
+    menu.style.position = 'fixed';
+    menu.style.left = 'auto'; menu.style.right = 'auto';
+    var r = anchor.getBoundingClientRect();
+    var top = Math.round(r.bottom + 6);
+    menu.style.top = top + 'px';
+    var mw = menu.offsetWidth || 160;
+    var vw = window.innerWidth;
+    if (r.left + mw > vw - 8) {
+      menu.style.right = '8px';
+    } else {
+      menu.style.left = Math.max(8, Math.round(r.left)) + 'px';
+    }
+    // 若下方空间不足，向上翻转
+    var mh = menu.offsetHeight || 0;
+    if (mh && top + mh > window.innerHeight - 8) {
+      menu.style.top = Math.max(8, Math.round(r.top - mh - 6)) + 'px';
+    }
+  }
+
+  function buildPickSection() {
+    var body = el('pick-body');
+    if (!body || !state.table) return;
+    var mode = state.pickMode || 'rec';
+    body.innerHTML = '';
+    if (mode === 'rec') {
+      var recs = suggestCharts(state.det, state.table);
+      var wrap = document.createElement('div');
+      wrap.className = 'pick-recs';
+      recs.forEach(function (r, i) {
+        var card = document.createElement('div');
+        card.className = 'pick-rec' + (state.mapping.chartType === r.t ? ' on' : '');
+        card.innerHTML = '<div class="pick-rec-hd"><span class="pick-rec-name">' +
+          (TYPE_LABELS[r.t] || r.t) + '</span>' + (i === 0 ? '<span class="pick-rec-badge">最推荐</span>' : '') + '</div>' +
+          '<div class="pick-rec-why">' + r.why + '</div>';
+        card.addEventListener('click', function () { selectChartType(r.t); });
+        wrap.appendChild(card);
+      });
+      body.appendChild(wrap);
+      var tip = document.createElement('div');
+      tip.className = 'pick-tip';
+      tip.textContent = '以上基于数据形状自动推荐。也可以切到「我自己选」指定图表类型。';
+      body.appendChild(tip);
+    } else {
+      PICK_GROUPS.forEach(function (g) {
+        var hd = document.createElement('div');
+        hd.className = 'pick-group-label';
+        hd.textContent = g.name;
+        body.appendChild(hd);
+        var grid = document.createElement('div');
+        grid.className = 'pick-grid';
+        g.types.forEach(function (tp) {
+          var b = document.createElement('div');
+          b.className = 'pick-type' + (state.mapping.chartType === tp[0] ? ' on' : '');
+          b.innerHTML = '<b>' + tp[1] + '</b><i>' + (PICK_DESC[tp[0]] || '') + '</i>';
+          b.addEventListener('click', function () { selectChartType(tp[0]); });
+          grid.appendChild(b);
+        });
+        body.appendChild(grid);
+      });
+    }
+  }
+
+  function selectChartType(t) {
+    state.mapping.chartType = t;
+    var sel = el('chart-type');
+    if (sel && sel.querySelector('option[value="' + t + '"]')) sel.value = t;
+    updateChartTypeHint();
+    buildPickSection();
+  }
+
+  function buildPickTabs() {
+    var tabs = el('pick-mode');
+    if (!tabs) return;
+    tabs.addEventListener('click', function (e) {
+      var b = e.target.closest('.pick-tab');
+      if (!b) return;
+      state.pickMode = b.dataset.mode;
+      Array.prototype.forEach.call(tabs.children, function (x) { x.classList.toggle('on', x === b); });
+      buildPickSection();
+    });
+  }
+
   function buildGoalCards() {
     var box = el('analysis-goal');
     if (!box) return;
@@ -2920,7 +3046,10 @@
     var goal = suggestGoal(state.det, table);
     state.analysisGoal = goal; buildGoalCards();
     var goalLabel = { trend: '趋势图', perf: '业绩评估', kline: 'K线' }[goal] || '趋势图';
-    el('detect-info').textContent = info + '　·　建议分析目的：' + goalLabel;
+    el('detect-info').textContent = info;
+    state.pickMode = 'rec';
+    buildPickTabs();
+    buildPickSection();
     updateChartTypeHint();
     var splitBtn = el('btn-split');
     if (splitBtn) splitBtn.style.display = (state.mapping.yCols.length >= 4) ? '' : 'none';
@@ -3281,13 +3410,7 @@
       var m = el('tb-label-menu');
       if (!m) return;
       m.classList.toggle('open');
-      if (m.classList.contains('open')) {
-        var r = this.getBoundingClientRect(), mw = m.offsetWidth || 150;
-        m.style.position = 'fixed';
-        m.style.top = Math.round(r.bottom + 6) + 'px';
-        m.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - mw - 8))) + 'px';
-        m.style.right = 'auto';
-      }
+      placeMenu(m, this);
     });
     if (el('lb-all')) el('lb-all').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('all'); });
     if (el('lb-extreme')) el('lb-extreme').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('extreme'); });
@@ -3315,13 +3438,7 @@
         });
       }
       m.classList.toggle('open');
-      if (m.classList.contains('open')) {
-        var r2 = this.getBoundingClientRect(), mw2 = m.offsetWidth || 180;
-        m.style.position = 'fixed';
-        m.style.top = Math.round(r2.bottom + 6) + 'px';
-        m.style.left = Math.round(Math.max(8, Math.min(r2.left, window.innerWidth - mw2 - 8))) + 'px';
-        m.style.right = 'auto';
-      }
+      placeMenu(m, this);
     });
     el('btn-watermark').addEventListener('click', function () {
       state.showWatermark = !state.showWatermark;

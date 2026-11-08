@@ -741,3 +741,31 @@ body.is-home .chart-head { display: none; }
 /* 工具栏目：更多 / 数据标注 / 配色 下拉 */
 .tb-menu.open { display: flex; }
 .tb-menu .btn { justify-content: flex-start; text-align: left; }
+
+/* ============ 导入后制图方式选择 ============ */
+.pick-wrap { margin: 14px 0 4px; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--bg-elevated); }
+.pick-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.pick-title { font-size: 11.5px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+.pick-tabs { display: inline-flex; gap: 4px; background: rgba(26,26,46,.05); padding: 3px; border-radius: 20px; }
+.pick-tab { border: 0; background: transparent; padding: 5px 13px; border-radius: 16px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.pick-tab.on { background: var(--accent); color: #fff; font-weight: 600; }
+.pick-recs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 9px; }
+.pick-rec { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: pointer; background: var(--panel); transition: border-color .15s; }
+.pick-rec:hover { border-color: var(--accent); }
+.pick-rec.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pick-rec-hd { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+.pick-rec-name { font-size: 13px; font-weight: 700; }
+.pick-rec-badge { font-size: 9.5px; background: rgba(201,169,106,.18); color: var(--accent); padding: 1px 6px; border-radius: 10px; font-weight: 700; }
+.pick-rec-why { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.pick-tip { font-size: 11px; color: var(--muted); margin-top: 9px; }
+.pick-group-label { font-size: 10.5px; letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; margin: 10px 0 6px; font-weight: 700; }
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 7px; }
+.pick-type { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; cursor: pointer; background: var(--panel); }
+.pick-type:hover { border-color: var(--accent); }
+.pick-type.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pick-type b { display: block; font-size: 12px; font-weight: 600; }
+.pick-type i { display: block; font-size: 10.5px; color: var(--muted); font-style: normal; margin-top: 2px; }
+@media (max-width: 600px) {
+  .pick-recs { grid-template-columns: 1fr 1fr; }
+  .pick-grid { grid-template-columns: 1fr 1fr; }
+}
