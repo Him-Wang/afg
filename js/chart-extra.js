@@ -254,6 +254,7 @@
   B.line = function (el, d, t) {
     var zero = d.values && d.values.some(function (v) { return v < 0; });
     var W = (el && el.clientWidth) || 700;
+    var big = !(W < 480);   // 大图才做精细标注
     return base(t, {
       tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: rgba(ink(t), 0.2), width: 1 } } }),
       legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
@@ -262,8 +263,39 @@
       yAxis: yAxis(t, { scale: !zero }),
       series: d.series.map(function (s, i) {
         var last = s.values.length - 1;
+        var marks = [];
+        if (i === 0) {
+          var vs = s.values.map(function (v, k) { return { v: v, k: k }; }).filter(function (o) { return o.v !== null && o.v !== undefined && !isNaN(o.v); });
+          if (vs.length > 4) {
+            var hi = vs.reduce(function (a, b) { return b.v > a.v ? b : a; });
+            var lo = vs.reduce(function (a, b) { return b.v < a.v ? b : a; });
+            var mean = vs.reduce(function (a, b) { return a + b.v; }, 0) / vs.length;
+            marks.push({ kind: 'max', name: '峰值', coord: [hi.k, hi.v],
+              itemStyle: { color: seriesColor(t, i) }, symbol: 'circle', symbolSize: 4,
+              label: { show: true, position: 'top', distance: 8, color: ink(t), font: '600 9.5px ' + FONT,
+                formatter: function () { return num(hi.v); } } });
+            marks.push({ kind: 'min', name: '谷值', coord: [lo.k, lo.v],
+              itemStyle: { color: seriesColor(t, i) }, symbol: 'circle', symbolSize: 4,
+              label: { show: true, position: 'bottom', distance: 8, color: muted(t), font: '600 9.5px ' + FONT,
+                formatter: function () { return num(lo.v); } } });
+            marks.push({ kind: 'mean', name: '均值', coord: [0, mean],
+              symbol: 'none',
+              lineStyle: { color: rgba(ink(t), 0.35), width: 1, type: [4, 3] },
+              label: { show: big, position: 'insideEndTop', distance: 4, color: muted(t), font: '9px ' + FONT,
+                formatter: function () { return 'avg ' + num(mean); } } });
+          }
+        }
         return lineSeries(t, s, i, {
-          markPoint: { silent: true, symbol: 'circle', symbolSize: 5, data: [{ coord: [last, s.values[last]], itemStyle: { color: seriesColor(t, i) } }] },
+          markPoint: { silent: true, symbol: 'circle', symbolSize: 5,
+            data: [{ coord: [last, s.values[last]], itemStyle: { color: seriesColor(t, i) } }].concat(
+              marks.filter(function (m) { return m.kind !== 'mean'; }).map(function (m) {
+                return { name: m.name, coord: m.coord, symbol: m.symbol, symbolSize: m.symbolSize, itemStyle: m.itemStyle, label: m.label };
+              })) },
+          markLine: marks.filter(function (m) { return m.kind === 'mean'; }).length
+            ? { silent: true, symbol: 'none', data: marks.filter(function (m) { return m.kind === 'mean'; }).map(function (m) {
+                return { name: m.name, yAxis: m.coord[1], lineStyle: m.lineStyle, label: m.label };
+              }) }
+            : undefined,
           endLabel: endLabel(t)
         });
       })

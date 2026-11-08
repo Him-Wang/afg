@@ -786,20 +786,6 @@
     });
     if (!marks.length) return;
 
-    var colorIdx = {};
-    Object.keys(marks.reduce(function (a, m) { a[m.color] = 1; return a; }, {})).forEach(function (c, ci) {
-      colorIdx[c] = ci;
-      var mk = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-      mk.setAttribute('id', 'extArrow' + ci);
-      mk.setAttribute('markerWidth', '8'); mk.setAttribute('markerHeight', '8');
-      mk.setAttribute('refX', '6'); mk.setAttribute('refY', '3');
-      mk.setAttribute('orient', 'auto'); mk.setAttribute('markerUnits', 'userSpaceOnUse');
-      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', 'M0,0 L7,3 L0,6 z'); path.setAttribute('fill', c);
-      mk.appendChild(path);
-      defs.appendChild(mk);
-    });
-
     // 计算初始位置并做纵向去重（防遮挡）
     var labelsInfo = marks.map(function (m) {
       var shortName = m.name.length > 7 ? m.name.slice(0, 7) + '…' : m.name;
@@ -839,13 +825,7 @@
       if (ly < by0 + 3) ly = by0 + 3;
       label.style.left = lx + 'px';
       label.style.top = ly + 'px';
-      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', m.px); line.setAttribute('y1', m.py);
-      line.setAttribute('x2', lx + 3); line.setAttribute('y2', ly + 10);
-      line.setAttribute('stroke', m.color); line.setAttribute('stroke-width', '1.2');
-      line.setAttribute('marker-end', 'url(#extArrow' + colorIdx[m.color] + ')');
-      svg.appendChild(line);
-      makeExtLabelDraggable(label, line);
+      label.style.userSelect = 'none';
     });
   }
 
@@ -1651,7 +1631,7 @@
         attachExtremeLabels(ci);
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
-        renderFinanceMetricsTable(merged.labels, merged.series, item.type === 'fund', item.unit === '%');
+        renderFinanceMetricsTable(merged.labels, merged.series, item.type === 'fund', item.unit === '%', ci);
         setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '', unit: item.unit || '', source: '公开数据' });
         el('hint').textContent = DT(state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势');
       } else {
@@ -1659,7 +1639,7 @@
         var nav = merged.labels.map(function (d, i) { return { date: d, value: merged.series[0].values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
         var ci2 = ChartFactory.render(c, 'perf', { name: item.title, nav: nav }, theme);
         renderPerfMetrics({ name: item.title, nav: nav }, ci2);
-        renderFinanceMetricsTable(merged.labels, merged.series, true);
+        renderFinanceMetricsTable(merged.labels, merged.series, true, false, ci2);
         state.echartsEl = c;
         setHead({ title: item.title + ' · 业绩评估', subtitle: '净值曲线（上）+ 最大回撤（下）', unit: item.unit || '净值', source: '基金' });
         el('hint').textContent = '业绩评估 · 单个资产';
@@ -2595,55 +2575,84 @@
     });
     return found;
   }
-  function renderFinanceMetricsTable(labels, series, isFund, levelMode) {
+  function renderFinanceMetricsTable(labels, series, isFund, levelMode, inst) {
     if (!series || !series.length) return null;
-    var metrics, rows, pctRows, head;
-    if (levelMode) {
-      // 利率/波动率等点位型：不适用收益率指标，用水平统计
-      function lv(values) {
-        var v = values.filter(function (x) { return x !== null && x !== undefined && !isNaN(x); });
-        if (!v.length) return null;
-        return {
-          latest: v[v.length - 1], mean: ML.mean(v),
-          max: Math.max.apply(null, v), min: Math.min.apply(null, v),
-          change: v[v.length - 1] - v[0], std: ML.std(v)
-        };
-      }
-      metrics = series.map(function (s) { return lv(s.values); });
-      rows = [['latest', DT('最新值')], ['mean', tr('平均值','Mean')], ['max', DT('最高')], ['min', DT('最低')], ['change', tr('区间变化','Change')], ['std', tr('标准差','Std Dev')]];
-      pctRows = [];
-      head = tr('水平统计（利率/点位 · 不适用收益率指标）','Level statistics (rates / points — return metrics not applicable)');
-    } else {
-      var bench = isFund ? financeBenchmark() : null;
-      var benchVals = bench ? alignSeriesToBase(labels, bench.labels, bench.series[0].values) : null;
-      metrics = series.map(function (s) { return ML.perfMetrics(s.values, benchVals, labels); });
-      rows = [['annReturn', DT('年化回报')], ['annVol', DT('年化波动（标准差）')], ['maxDD', DT('最大回撤')], ['sharp', DT('夏普比率')]];
-      if (isFund) rows = rows.concat([['sortino', tr('索提诺比率','Sortino')], ['m2', 'M²'], ['alpha', tr('詹森 alpha','Jensen alpha')], ['beta', 'Beta']]);
-      rows = rows.concat([['calmar', DT('卡玛比率')], ['var95', 'VaR 95%'], ['totalReturn', DT('累计收益')]]);
-      pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
-      head = tr('业绩指标','Performance') + (isFund ? tr('（基金 · 基准：沪深300 · 无风险利率 2%）',' (fund · benchmark: CSI 300 · risk-free 2%)') : tr('（无风险利率 2%）',' (risk-free 2%)'));
-    }
-    var html = '<div class="an-head">' + head + '</div>';
-    html += '<div style="overflow:auto"><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
-    series.forEach(function (s) { html += '<th>' + DT(s.name) + '</th>'; });
-    html += '</tr></thead><tbody>';
-    rows.forEach(function (r) {
-      html += '<tr><td>' + r[1] + '</td>';
-      metrics.forEach(function (m) {
-        var v = m ? m[r[0]] : null;
-        var txt = '—';
-        if (v !== null && v !== undefined && !isNaN(v)) {
-          txt = (pctRows.indexOf(r[0]) >= 0) ? (v * 100).toFixed(2) + '%' : v.toFixed(2);
-        }
-        html += '<td>' + txt + '</td>';
-      });
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
     var wrap = document.createElement('div');
     wrap.className = 'analysis';
-    wrap.innerHTML = html;
     el('chart-stage').appendChild(wrap);
+
+    function build(labels2, series2) {
+      var metrics, rows, pctRows, head;
+      if (levelMode) {
+        function lv(values) {
+          var v = values.filter(function (x) { return x !== null && x !== undefined && !isNaN(x); });
+          if (!v.length) return null;
+          return {
+            latest: v[v.length - 1], mean: ML.mean(v),
+            max: Math.max.apply(null, v), min: Math.min.apply(null, v),
+            change: v[v.length - 1] - v[0], std: ML.std(v)
+          };
+        }
+        metrics = series2.map(function (x) { return lv(x.values); });
+        rows = [['latest', DT('最新值')], ['mean', tr('平均值','Mean')], ['max', DT('最高')], ['min', DT('最低')], ['change', tr('区间变化','Change')], ['std', tr('标准差','Std Dev')]];
+        pctRows = [];
+        head = tr('水平统计（利率/点位 · 不适用收益率指标）','Level statistics (rates / points — return metrics not applicable)');
+      } else {
+        var bench = isFund ? financeBenchmark() : null;
+        var benchVals = bench ? alignSeriesToBase(labels2, bench.labels, bench.series[0].values) : null;
+        metrics = series2.map(function (x) { return ML.perfMetrics(x.values, benchVals, labels2); });
+        rows = [['annReturn', DT('年化回报')], ['annVol', DT('年化波动（标准差）')], ['maxDD', DT('最大回撤')], ['sharp', DT('夏普比率')]];
+        if (isFund) rows = rows.concat([['sortino', tr('索提诺比率','Sortino')], ['m2', 'M²'], ['alpha', tr('詹森 alpha','Jensen alpha')], ['beta', 'Beta']]);
+        rows = rows.concat([['calmar', DT('卡玛比率')], ['var95', 'VaR 95%'], ['totalReturn', DT('累计收益')]]);
+        pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
+        head = tr('业绩指标','Performance') + (isFund ? tr('（基金 · 基准：沪深300 · 无风险利率 2%）',' (fund · benchmark: CSI 300 · risk-free 2%)') : tr('（无风险利率 2%）',' (risk-free 2%)'));
+      }
+      var html = '<div class="an-head">' + head +
+        '<span class="an-sub">' + (labels2.length && labels2.length < labels.length
+          ? tr('· 已按当前缩放区间计算', '· computed on the zoomed range') : '') + '</span></div>';
+      html += '<div style="overflow:auto"><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
+      series2.forEach(function (x) { html += '<th>' + DT(x.name) + '</th>'; });
+      html += '</tr></thead><tbody>';
+      rows.forEach(function (r) {
+        html += '<tr><td>' + r[1] + '</td>';
+        metrics.forEach(function (m) {
+          var v = m ? m[r[0]] : null;
+          var txt = '—';
+          if (v !== null && v !== undefined && !isNaN(v)) {
+            txt = (pctRows.indexOf(r[0]) >= 0) ? (v * 100).toFixed(2) + '%' : v.toFixed(2);
+          }
+          html += '<td>' + txt + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    wrap.innerHTML = build(labels, series);
+
+    /* 跟随时间轴缩放联动：按可见区间重算业绩指标 */
+    if (inst && inst.on) {
+      var timer = null;
+      inst.on('datazoom', function () {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+          try {
+            var opt = inst.getOption();
+            var dz = opt.dataZoom && opt.dataZoom[0];
+            var st = dz ? dz.start : 0, en = dz ? dz.end : 100;
+            var n = labels.length;
+            var s0 = Math.floor(n * st / 100), e0 = Math.ceil(n * en / 100);
+            if (e0 - s0 < 2) return;
+            var sl = labels.slice(s0, e0);
+            var ss = series.map(function (x) {
+              return { name: x.name, values: x.values.slice(s0, e0) };
+            });
+            wrap.innerHTML = build(sl, ss);
+          } catch (e) {}
+        }, 90);
+      });
+    }
     return wrap;
   }
 
