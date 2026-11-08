@@ -221,7 +221,7 @@
 
   function currentSeriesNames() {
     // 优先从已渲染图表读取（适配宏观/金融/国际等所有视图）
-    if (state.echartsEl) {
+    if (state.echartsEl && window.echarts) {
       try {
         var _inst = echarts.getInstanceByDom(state.echartsEl);
         if (_inst) {
@@ -1142,6 +1142,66 @@
 
 
   /* ---------- 数据按需加载：首屏只加载界面，数据用到时再拉 ---------- */
+
+  /* ---------- 第三方库按需加载 + 空闲预取 ---------- */
+  var LIB_SRC = {
+    echarts: 'vendor/echarts.min.js',
+    worldmap: 'vendor/world-map.js',
+    xlsx: 'vendor/xlsx.full.min.js',
+    lightweight: 'vendor/lightweight-charts.standalone.production.js'
+  };
+  var _libPromise = {};
+
+  function loadLib(key) {
+    if (key === 'echarts' && window.echarts) return Promise.resolve(window.echarts);
+    if (key === 'xlsx' && window.XLSX) return Promise.resolve(window.XLSX);
+    if (key === 'lightweight' && window.LightweightCharts) return Promise.resolve(window.LightweightCharts);
+    if (key === 'worldmap' && window.WORLD_GEOJSON) return Promise.resolve(window.WORLD_GEOJSON);
+    if (_libPromise[key]) return _libPromise[key];
+    _libPromise[key] = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = LIB_SRC[key];
+      sc.async = true;
+      sc.onload = function () {
+        if (key === 'worldmap') {
+          try { if (window.WORLD_GEOJSON) echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {}
+          resolve(window.WORLD_GEOJSON);
+        } else resolve();
+      };
+      sc.onerror = function () { delete _libPromise[key]; reject(new Error(key)); };
+      document.head.appendChild(sc);
+    });
+    return _libPromise[key];
+  }
+
+  function ensureCharts() { return loadLib('echarts'); }
+  function ensureWorldMap() {
+    return loadLib('echarts').then(function () { return loadLib('worldmap'); });
+  }
+  function ensureXLSX() { return loadLib('xlsx'); }
+  function ensureLightweight() { return loadLib('lightweight'); }
+
+  function withCharts(fn) {
+    if (window.echarts) { fn(); return; }
+    var stage = el('chart-stage');
+    if (stage) stage.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载绘图引擎…', 'Loading chart engine…') + '</span></div>';
+    ensureCharts().then(fn).catch(function () {
+      if (stage) stage.innerHTML = '<div class="stage-loading"><span>' + tr('绘图引擎加载失败，请刷新重试', 'Failed to load chart engine. Please refresh.') + '</span></div>';
+    });
+  }
+
+  /* 空闲时预取，用户点分类时基本已就绪 */
+  function prefetchLibs() {
+    var idle = window.requestIdleCallback || function (cb) { return setTimeout(cb, 1200); };
+    idle(function () {
+      ensureCharts().then(function () {
+        idle(function () { loadLib('worldmap').catch(function () {}); });
+      }).catch(function () {});
+    });
+  }
+
+  var GEO_TYPES = { choropleth: 1, symbolMap: 1, heatMapGeo: 1, trajectory: 1, migration: 1, flowMap: 1, hexMap: 1, worldMap: 1 };
+
   var DATA_SRC = { china: 'js/china-macro.js', intl: 'js/intl-macro.js', finance: 'js/finance-data.js', akshare: 'js/akshare-data.js' };
   var DATA_GLOBAL = { china: 'CHINA_MACRO', intl: 'INTL_MACRO', finance: 'FINANCE_DATA', akshare: 'AKSHARE_DATA' };
   var DATA_LABEL = { china: '中国宏观数据', intl: '国际宏观数据', finance: '金融数据', akshare: '行情数据' };
@@ -1177,7 +1237,7 @@
       stage.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span>' +
         '<span>' + tr('正在加载', 'Loading') + ' ' + ([].concat(keys).map(function (k) { return tr(DATA_LABEL[k] || '', k); }).join(' / ') ) + '…</span></div>';
     }
-    loadData(keys).then(function () { after(); }).catch(function () {
+    Promise.all([loadData(keys), ensureCharts()]).then(function () { after(); }).catch(function () {
       if (stage) stage.innerHTML = '<div class="stage-loading"><span>' + tr('数据加载失败，请检查网络后重试', 'Failed to load data. Check your connection and retry.') + '</span></div>';
     });
   }
@@ -1831,6 +1891,7 @@
 
   /* 分类看板：顶部说明 + 图表案例卡 */
   function renderCategoryDash(catId) {
+    if (!window.echarts) { withCharts(function () { renderCategoryDash(catId); }); return; }
     clearStage();
     state.mode = 'catalog';
     state.catId = catId;
@@ -1889,12 +1950,15 @@
       card.addEventListener('click', function () { openCatalogChart(catId, ch.id); });
       grid.appendChild(card);
       var cv = card.querySelector('.cat-chart');
-      requestAnimationFrame(function () {
+      var needMap = GEO_TYPES[ch.type] && !window.WORLD_GEOJSON;
+      (needMap ? ensureWorldMap() : Promise.resolve()).then(function () {
+        requestAnimationFrame(function () {
         try {
           var inst = ChartFactory.render(cv, ch.type, (window.localizeDemo ? localizeDemo(ch.data()) : ch.data()), theme);
           insts.push({ el: cv, inst: inst, chart: ch });
           setTimeout(function () { try { inst.resize(); } catch (e) {} }, 60);
         } catch (e) { cv.innerHTML = '<div class="cat-err">渲染失败</div>'; }
+        });
       });
     });
     wrap.appendChild(grid);
@@ -1905,6 +1969,14 @@
 
   /* 分类下的单图详情 */
   function openCatalogChart(catId, chartId) {
+    if (!window.echarts) { withCharts(function () { openCatalogChart(catId, chartId); }); return; }
+    var _ch0 = findChart(catId, chartId);
+    if (_ch0 && GEO_TYPES[_ch0.type] && !window.WORLD_GEOJSON) {
+      var st0 = el('chart-stage');
+      if (st0) st0.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载地图数据…', 'Loading map data…') + '</span></div>';
+      ensureWorldMap().then(function () { openCatalogChart(catId, chartId); }).catch(function () {});
+      return;
+    }
     clearStage();
     state.mode = 'catalogChart';
     state.catId = catId;
@@ -3735,6 +3807,12 @@
   function handleFile(file) {
     var name = (file.name || '').toLowerCase();
     var ext = name.split('.').pop() || '';
+    if (ext !== 'csv' && ext !== 'txt' && ext !== 'json' && !window.XLSX) {
+      var stF = el('overlay');
+      if (stF) toast(tr('正在加载 Excel 解析器…', 'Loading Excel parser…'));
+      ensureXLSX().then(function () { handleFile(file); }).catch(function () { toast(tr('Excel 组件加载失败', 'Failed to load Excel parser')); });
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function (e) {
       try {
@@ -4847,8 +4925,9 @@
     if (q.theme && Themes.getTheme(q.theme)) state.theme = q.theme;
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) state.currentTemplate = q.tpl;
     Themes.applyTheme(state.theme);
-    if (window.WORLD_GEOJSON) { try { echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {} }
+    if (window.WORLD_GEOJSON && window.echarts) { try { echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {} }
     /* 数据改为按需加载，启动时不再预解析 */
+    prefetchLibs();
     buildThemeSelect();
     buildSidebar();
     buildTabs();

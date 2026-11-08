@@ -74,12 +74,7 @@
           { name: '营收完成率', value: 86, target: 100, ranges: [60, 80, 100] },
           { name: '毛利完成率', value: 72, target: 85, ranges: [50, 70, 90] },
           { name: '客户留存', value: 91, target: 90, ranges: [70, 85, 95] }] }; } },
-      { id: 'wordcloud', name: '词云', type: 'wordcloud', desc: '按词频大小排布的文本可视化，突出高频主题',
-        data: function () { return { words: [
-          { text: '算力', weight: 100 }, { text: '新能源', weight: 92 }, { text: '出海', weight: 85 }, { text: '降本', weight: 78 },
-          { text: '现金流', weight: 72 }, { text: '毛利率', weight: 66 }, { text: 'AI', weight: 63 }, { text: '库存', weight: 56 },
-          { text: '研发', weight: 51 }, { text: '分红', weight: 46 }, { text: '并购', weight: 40 }, { text: '汇率', weight: 35 },
-          { text: '供应链', weight: 31 }, { text: '产能', weight: 28 }, { text: '估值', weight: 24 }] }; } },
+
       { id: 'radar', name: '雷达图', type: 'radar', desc: '多维度能力画像，比较主体在各维度的强项与短板',
         data: function () { return { indicators: ['盈利', '成长', '运营', '偿债', '现金流', '估值'], series: [
           { name: '公司 A', values: [85, 72, 66, 78, 81, 58] }, { name: '公司 B', values: [62, 88, 74, 55, 60, 82] }] }; } }
@@ -116,9 +111,7 @@
       { id: 'donut', name: '环形图', type: 'donut', desc: '中心可放总量或关键指标，比饼图信息密度更高',
         data: function () { return { data: [
           { name: '直销', value: 48 }, { name: '经销', value: 32 }, { name: '电商', value: 20 }], unit: '%', centerLabel: '渠道结构' }; } },
-      { id: 'stackedBar', name: '堆叠柱状图', type: 'stackedBar', desc: '分类间比较的同时看内部构成',
-        data: function () { return { labels: ['2021', '2022', '2023', '2024', '2025'], series: [
-          { name: '华东', values: [120, 138, 152, 171, 190] }, { name: '华南', values: [90, 102, 118, 127, 145] }, { name: '华北', values: [70, 76, 82, 95, 104] }] }; } },
+
       { id: 'percentBar', name: '百分比堆叠条形图', type: 'percentBar', desc: '只比结构不比总量，跨组比较最公平',
         data: function () { return { labels: ['客单价 <50', '50–100', '100–300', '>300'], series: [
           { name: '新客', values: [58, 42, 25, 12] }, { name: '老客', values: [32, 46, 55, 61] }, { name: '会员', values: [10, 12, 20, 27] }] }; } },
@@ -147,12 +140,7 @@
       { id: 'violin', name: '小提琴图', type: 'violin', desc: '箱线图 + 密度曲线，看清分布的多峰形态',
         data: function () { return { categories: ['A 组', 'B 组', 'C 组'], groups: [
           rndArr(51, 80, 20, 96), rndArr(52, 80, 35, 100), rndArr(53, 80, 15, 80)] }; } },
-      { id: 'beeswarm', name: '蜂群图', type: 'beeswarm', desc: '逐点展示，避免散点重叠，看清真实样本分布',
-        data: function () { return { categories: ['A 组', 'B 组', 'C 组'], groups: [
-          rndArr(61, 60, 18, 92), rndArr(62, 60, 30, 100), rndArr(63, 60, 12, 78)] }; } },
-      { id: 'ridge', name: '山脊图', type: 'ridge', desc: '多组密度曲线竖向堆叠，比较分布形态变化',
-        data: function () { return { labels: ['2021', '2022', '2023', '2024', '2025'],
-          groups: [rndArr(71, 70, 20, 80), rndArr(72, 70, 25, 85), rndArr(73, 70, 30, 90), rndArr(74, 70, 28, 95), rndArr(75, 70, 35, 100)] }; } },
+
       { id: 'matrixHeat', name: '二维热力图', type: 'matrixHeat', desc: '两个维度交叉的热力矩阵，找聚集区',
         data: function () { var names = ['0–20', '20–40', '40–60', '60–80', '80–100'];
           return { names: names, matrix: names.map(function (_, i) { return names.map(function (_, j) { return Math.round((rnd(i * 10 + j + 1, 20, 95) / 100) * 100) / 100; }); }) }; } },
@@ -179,13 +167,7 @@
       { id: 'corrMatrix', name: '相关系数矩阵', type: 'corrMatrix', desc: '量化两两相关强度，红正蓝负一目了然',
         data: function () { return { names: ['GDP', 'CPI', 'M2', '出口', '投资'],
           matrix: [[1, .32, .68, .51, .74], [.32, 1, .18, -.12, .25], [.68, .18, 1, .44, .82], [.51, -.12, .44, 1, .39], [.74, .25, .82, .39, 1]] }; } },
-      { id: 'venn', name: '维恩图', type: 'venn', desc: '集合交集与独有部分，适合客群/功能重叠分析',
-        data: function () { return { sets: [
-          { name: '功能 A', value: 42 }, { name: '功能 B', value: 35 }, { name: '功能 C', value: 28 }], overlapAB: 18, overlapAll: 7 }; } },
-      { id: 'arc', name: '弧长链接图', type: 'arc', desc: '一维排序 + 弧线连接，看长距离关联',
-        data: function () { return { nodes: ['采购', '生产', '仓储', '物流', '门店', '客户'], links: [
-          ['采购', '生产'], ['采购', '仓储'], ['生产', '仓储'], ['仓储', '物流'], ['物流', '门店'], ['门店', '客户'], ['生产', '客户']] }; } }
-    ]
+]
   });
 
   CATS.push({
@@ -215,12 +197,7 @@
     charts: [
       { id: 'choropleth', name: '分级统计图', type: 'choropleth', desc: '按行政区着色，看区域指标高低',
         data: function () { return { metric: '人均 GDP（万元）' }; } },
-      { id: 'symbolMap', name: '符号地图', type: 'symbolMap', desc: '用气泡大小表达城市量级，位置不失真',
-        data: function () { return { points: [
-          { name: 'Shanghai', coord: [121.47, 31.23], value: 96 }, { name: 'New York', coord: [-74.01, 40.71], value: 92 },
-          { name: 'London', coord: [-0.13, 51.51], value: 88 }, { name: 'Tokyo', coord: [139.69, 35.69], value: 85 },
-          { name: 'Singapore', coord: [103.82, 1.35], value: 76 }, { name: 'Dubai', coord: [55.27, 25.20], value: 61 },
-          { name: 'Sydney', coord: [151.21, -33.87], value: 55 }, { name: 'São Paulo', coord: [-46.63, -23.55], value: 48 }] }; } },
+
       { id: 'heatMapGeo', name: '热力地图', type: 'heatMapGeo', desc: '空间密度热力，找聚集热点',
         data: function () { return { metric: '门店密度' }; } },
       { id: 'trajectory', name: '轨迹图', type: 'trajectory', desc: '路径与轨迹，看移动规律与线路',
@@ -229,12 +206,7 @@
         data: function () { return { flows: [
           { from: [121.47, 31.23], to: [-74.01, 40.71], value: 62 }, { from: [103.82, 1.35], to: [-0.13, 51.51], value: 48 },
           { from: [139.69, 35.69], to: [151.21, -33.87], value: 35 }, { from: [55.27, 25.20], to: [-46.63, -23.55], value: 29 }] }; } },
-      { id: 'hexMap', name: '六边形地图', type: 'hexMap', desc: '等面积网格聚合，避免面积偏差',
-        data: function () { return { points: [
-          { name: 'Shanghai', coord: [121.47, 31.23], value: 88 }, { name: 'New York', coord: [-74.01, 40.71], value: 94 },
-          { name: 'London', coord: [-0.13, 51.51], value: 79 }, { name: 'Dubai', coord: [55.27, 25.20], value: 58 },
-          { name: 'Tokyo', coord: [139.69, 35.69], value: 52 }, { name: 'Sydney', coord: [151.21, -33.87], value: 44 }] }; } }
-    ]
+]
   });
 
   CATS.push({
@@ -251,15 +223,7 @@
           { name: 'CTO', children: [{ name: '研发部' }, { name: '平台部' }] },
           { name: 'CFO', children: [{ name: '财务部' }, { name: '审计部' }] },
           { name: 'COO', children: [{ name: '运营部' }, { name: '供应链' }] }] } }; } },
-      { id: 'icicle', name: '冰柱图', type: 'icicle', desc: '层级占比的横向堆叠，比树图更省空间',
-        data: function () { return { tree: { name: '全部', children: [
-          { name: '消费', value: 38, children: [{ name: '家电', value: 15 }, { name: '食品', value: 13 }, { name: '服饰', value: 10 }] },
-          { name: '科技', value: 30, children: [{ name: '半导体', value: 14 }, { name: '软件', value: 16 }] },
-          { name: '医药', value: 18 }, { name: '其他', value: 14 }] } }; } },
-      { id: 'flowchart', name: '流程图', type: 'flowchart', desc: '步骤先后与分支判断，梳理业务链路',
-        data: function () { return { steps: [
-          { name: '提交申请', type: 'start' }, { name: '材料审核', type: 'process' },
-          { name: '是否齐全', type: 'decision' }, { name: '补充材料', type: 'process' }, { name: '通过', type: 'end' }] }; } },
+
       { id: 'swimlane', name: '泳道图', type: 'swimlane', desc: '按责任方分泳道，看跨部门协作流程',
         data: function () { return { lanes: ['客户', '销售', '风控', '财务'],
           tasks: [
@@ -273,10 +237,8 @@
     id: 'special', name: '特殊', icon: '✳',
     desc: '领域专用图形，或承担"状态/区间/诊断"等非通用表达任务的图表。',
     charts: [
-      { id: 'bulletSpecial', name: '子弹图（KPI）', type: 'bullet', desc: '单指标对照目标区间，仪表盘常用',
-        data: function () { return { rows: [
-          { name: '本月营收', value: 92, target: 100, ranges: [60, 85, 110] },
-          { name: '回款率', value: 78, target: 90, ranges: [55, 75, 95] }] }; } },
+      
+
       { id: 'control', name: '控制图', type: 'control', desc: '过程监控：均值线 + 上下控制限，识别异常',
         data: function () { var v = rndArr(111, 40, 88, 112); v[17] = 128; v[28] = 72;
           return { labels: months(40), values: v, mean: 100, ucl: 118, lcl: 82 }; } },

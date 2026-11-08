@@ -24,6 +24,10 @@
   }
 
   function create(container, theme) {
+    if (!global.LightweightCharts) {
+      container.innerHTML = '<div style="padding:40px;text-align:center;color:#8A8A99;font-size:13px">行情图表组件未加载</div>';
+      return null;
+    }
     var chart = LightweightCharts.createChart(container, {
       autoSize: true,
       width: container.clientWidth,
