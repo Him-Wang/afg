@@ -1140,6 +1140,48 @@
     });
   }
 
+
+  /* ---------- 数据按需加载：首屏只加载界面，数据用到时再拉 ---------- */
+  var DATA_SRC = { china: 'js/china-macro.js', intl: 'js/intl-macro.js', finance: 'js/finance-data.js', akshare: 'js/akshare-data.js' };
+  var DATA_GLOBAL = { china: 'CHINA_MACRO', intl: 'INTL_MACRO', finance: 'FINANCE_DATA', akshare: 'AKSHARE_DATA' };
+  var DATA_LABEL = { china: '中国宏观数据', intl: '国际宏观数据', finance: '金融数据', akshare: '行情数据' };
+  var _dataLoading = {};
+
+  function dataReady(k) { return !!window[DATA_GLOBAL[k]]; }
+
+  function loadData(keys) {
+    keys = [].concat(keys).filter(function (k) { return DATA_SRC[k]; });
+    return Promise.all(keys.map(function (k) {
+      if (dataReady(k)) return Promise.resolve();
+      if (_dataLoading[k]) return _dataLoading[k];
+      _dataLoading[k] = new Promise(function (resolve, reject) {
+        var sc = document.createElement('script');
+        sc.src = DATA_SRC[k];
+        sc.async = true;
+        sc.onload = function () {
+          try { normalizeSeriesData(window[DATA_GLOBAL[k]]); } catch (e) {}
+          resolve();
+        };
+        sc.onerror = function () { delete _dataLoading[k]; reject(new Error(k)); };
+        document.head.appendChild(sc);
+      });
+      return _dataLoading[k];
+    }));
+  }
+
+  /* 需要数据时展示加载态 */
+  function withData(keys, after) {
+    if ([].concat(keys).every(dataReady)) { after(); return; }
+    var stage = el('chart-stage');
+    if (stage) {
+      stage.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span>' +
+        '<span>' + tr('正在加载', 'Loading') + ' ' + ([].concat(keys).map(function (k) { return tr(DATA_LABEL[k] || '', k); }).join(' / ') ) + '…</span></div>';
+    }
+    loadData(keys).then(function () { after(); }).catch(function () {
+      if (stage) stage.innerHTML = '<div class="stage-loading"><span>' + tr('数据加载失败，请检查网络后重试', 'Failed to load data. Check your connection and retry.') + '</span></div>';
+    });
+  }
+
   function renderHome() {
     clearStage();
     state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
@@ -1166,6 +1208,21 @@
           '<button class="btn" id="home-demo">' + T('home.ai.demo') + '</button>' +
         '</div>' +
         '<div class="home-note">' + T('home.note') + '</div>' +
+        '<div class="home-browse" id="home-browse">' +
+          '<div class="home-browse-txt">' +
+            '<div class="home-browse-title">' + T('home.browse') + ' →</div>' +
+            '<div class="home-browse-desc">' + T('home.browse.desc') + '</div>' +
+          '</div>' +
+          '<div class="home-browse-cats" id="home-browse-cats"></div>' +
+        '</div>' +
+        '<div class="home-flow">' +
+          '<div class="home-flow-title">' + T('home.flow.title') + '</div>' +
+          '<div class="home-flow-steps">' +
+            '<div class="home-flow-step"><i>1</i><span>' + T('home.flow.1') + '</span></div>' +
+            '<div class="home-flow-step"><i>2</i><span>' + T('home.flow.2') + '</span></div>' +
+            '<div class="home-flow-step"><i>3</i><span>' + T('home.flow.3') + '</span></div>' +
+          '</div>' +
+        '</div>' +
         '<div class="home-mcp home-mcp-simple">' +
           '<h3>' + T('home.ai.title') + '</h3>' +
           '<p>' + T('home.ai.desc') + '</p>' +
@@ -1187,6 +1244,23 @@
     el('chart-stage').appendChild(h);
     setHead({ title: 'ADV', subtitle: '', unit: '', source: '' });
     h.querySelector('#home-import').addEventListener('click', openModal);
+    (function () {
+      var box = h.querySelector('#home-browse-cats');
+      if (box) {
+        (window.CHART_CATALOG || []).forEach(function (cat) {
+          var chip = document.createElement('span');
+          chip.className = 'home-cat-chip';
+          chip.textContent = (isEn() ? (ADV_EN.cat[cat.id] || cat.name) : cat.name) + ' ' + cat.charts.length;
+          chip.addEventListener('click', function (ev) { ev.stopPropagation(); renderCategoryDash(cat.id); });
+          box.appendChild(chip);
+        });
+      }
+      var browse = h.querySelector('#home-browse');
+      if (browse) browse.addEventListener('click', function () {
+        var first = (window.CHART_CATALOG || [])[0];
+        if (first) renderCategoryDash(first.id);
+      });
+    })();
     var demoBtn = h.querySelector('#home-demo');
     if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
     var copyBtn = h.querySelector('#home-ai-copy');
@@ -1249,6 +1323,7 @@
 
   /* ---------- 中国宏观数据一览（真实数据看板） ---------- */
   function renderChinaMacro() {
+    if (!dataReady('china')) { withData(['china'], renderChinaMacro); return; }
     clearStage();
     state.mode = 'macro';
     state.viewKey = 'china-macro';
@@ -1354,6 +1429,7 @@
 
   /* ---------- 金融数据一览（真实数据看板） ---------- */
   function renderFinance() {
+    if (!dataReady('finance')) { withData(['finance'], renderFinance); return; }
     clearStage();
     state.mode = 'macro';
     state.viewKey = 'finance';
@@ -1458,6 +1534,7 @@
 
   /* ---------- 国际宏观数据看板 ---------- */
   function renderIntlMacro() {
+    if (!dataReady('intl')) { withData(['intl'], renderIntlMacro); return; }
     clearStage();
     state.mode = 'macro';
     state.viewKey = 'intl-macro';
@@ -3087,7 +3164,7 @@
     buildPickSection();
     updateChartTypeHint();
     var splitBtn = el('btn-split');
-    if (splitBtn) splitBtn.style.display = (state.mapping.yCols.length >= 4) ? '' : 'none';
+    if (splitBtn) splitBtn.style.display = (state.mapping.yCols.length >= 2) ? '' : 'none';
 
     // X 列
     var xSel = el('x-col');
@@ -3865,21 +3942,32 @@
     state.dashboardDatasets = null; state.currentTemplate = null; state.dataset = null;
     state.splitCols = cols.slice();
     highlightNav(null);
-    var theme = getChartTheme();
+    var theme = getChartTheme(); theme._noZoom = true;
     var stage = el('chart-stage');
     var grid = document.createElement('div'); grid.className = 'dash-grid';
+    stage.appendChild(grid);   // 先挂载再渲染，否则容器尺寸为 0
     cols.forEach(function (col) {
       var panel = document.createElement('div'); panel.className = 'dash-panel split-panel';
-      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + col + '</span><span class="ds-badge">点击查看</span></div><div class="dash-panel-body"></div>';
+      var vals = table.rows.map(function (r) { return vnum(r[col]); });
+      var last = vals.length ? vals[vals.length - 1] : null;
+      var prev = vals.length > 1 ? vals[vals.length - 2] : null;
+      var delta = (last === null || prev === null || isNaN(prev) || isNaN(last)) ? null : (last - prev);
+      var dCls = delta === null ? '' : (delta >= 0 ? 'up' : 'down');
+      var dTxt = delta === null ? '' : ((delta >= 0 ? '▲ ' : '▼ ') + fmtNum(Math.abs(delta)));
+      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + DT(col) + '</span>' +
+        '<span class="dash-panel-val">' + fmtNum(last) + '</span>' +
+        '<span class="dash-panel-delta ' + dCls + '">' + dTxt + '</span></div>' +
+        '<div class="dash-panel-body"></div>';
       panel.addEventListener('click', function () { openSplitDetail(col); });
       grid.appendChild(panel);
       var body = panel.querySelector('.dash-panel-body');
-      var data = { labels: table.rows.map(function (r) { return String(r[timeCol]); }), series: [{ name: col, values: table.rows.map(function (r) { return vnum(r[col]); }) }], seriesColors: state.seriesColors };
-      ChartFactory.render(body, 'line', data, theme);
+      var data = { labels: table.rows.map(function (r) { return String(r[timeCol]); }), series: [{ name: col, values: vals }], seriesColors: state.seriesColors };
+      var st = state.mapping.chartType;
+      var t = ['line', 'area', 'bar', 'step'].indexOf(st) >= 0 ? st : 'line';
+      ChartFactory.render(body, t, data, theme);
     });
-    stage.appendChild(grid);
-    setHead({ title: '多指标拆分视图', subtitle: '点击任一卡片查看单个指标走势', unit: '', source: '用户数据' });
-    el('hint').textContent = '已拆分为 ' + cols.length + ' 个走势图';
+    setHead({ title: tr('多指标仪表盘', 'Multi-indicator dashboard'), subtitle: cols.length + ' ' + tr('个指标 · 点击任一卡片查看单图', 'indicators · click a card to open'), unit: '', source: tr('用户数据', 'User data') });
+    el('hint').textContent = tr('已拆分为 ', 'Split into ') + cols.length + tr(' 个走势图', ' charts');
     syncToolbar();
   }
 
@@ -4760,11 +4848,7 @@
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) state.currentTemplate = q.tpl;
     Themes.applyTheme(state.theme);
     if (window.WORLD_GEOJSON) { try { echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {} }
-    normalizeSeriesData(window.CHINA_MACRO);
-    normalizeSeriesData(window.INTL_MACRO);
-    normalizeSeriesData(window.FINANCE_DATA);
-    hydrateSamples();
-    hydrateEvents();
+    /* 数据改为按需加载，启动时不再预解析 */
     buildThemeSelect();
     buildSidebar();
     buildTabs();

@@ -781,3 +781,58 @@ body.is-home .chart-head { display: none; }
 @media (max-width: 600px) {
   .cat-palette-detail { margin: 8px 12px 0; }
 }
+
+/* 数据按需加载：加载态 */
+.stage-loading {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 320px; color: var(--muted); font-size: 13px;
+}
+.stage-spinner {
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid rgba(166,124,61,0.25); border-top-color: var(--accent);
+  animation: stageSpin .7s linear infinite;
+}
+@keyframes stageSpin { to { transform: rotate(360deg); } }
+
+/* 首页：图表分类入口 + 三步流程 */
+.home-browse {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  margin: 16px 0 4px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px;
+  background: linear-gradient(90deg, rgba(166,124,61,0.06), transparent 65%), var(--panel);
+  cursor: pointer; transition: border-color .15s;
+}
+.home-browse:hover { border-color: var(--accent); }
+.home-browse-txt { min-width: 190px; }
+.home-browse-title { font-size: 14px; font-weight: 700; color: var(--accent); }
+.home-browse-desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.home-browse-cats { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.home-cat-chip {
+  font-size: 11px; padding: 4px 9px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); white-space: nowrap;
+}
+.home-cat-chip:hover { border-color: var(--accent); color: var(--accent); }
+.home-flow { margin: 16px 0 4px; }
+.home-flow-title { font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+.home-flow-steps { display: flex; gap: 10px; flex-wrap: wrap; }
+.home-flow-step { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text); }
+.home-flow-step i {
+  width: 20px; height: 20px; border-radius: 50%; background: rgba(166,124,61,0.12);
+  color: var(--accent); font-style: normal; font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+@media (max-width: 600px) {
+  .home-browse { gap: 10px; padding: 12px; }
+  .home-browse-txt { min-width: 0; }
+  .home-flow-steps { flex-direction: column; gap: 7px; }
+}
+
+/* 多指标仪表盘卡片头部 */
+.dash-panel-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.dash-panel-val { margin-left: auto; font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text); }
+.dash-panel-delta { font-size: 11px; font-weight: 600; }
+.dash-panel-delta.up { color: var(--up); }
+.dash-panel-delta.down { color: var(--down); }
+
+/* 拆分仪表盘：卡片高度收紧 */
+.split-panel { min-height: 0; }
+.split-panel .dash-panel-body { flex: none; height: 240px; min-height: 240px; }
