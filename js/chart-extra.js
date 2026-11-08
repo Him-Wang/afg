@@ -1,690 +1,844 @@
-/* ADV 扩展图表构建器：覆盖 9 大分类的全部图表类型 */
+/* ADV 图表构建器 v2 —— 顶级咨询 / 金融机构 / 学术期刊风格
+   设计原则：最大化数据墨水比、去掉无意义网格与边框、直接标注、
+   克制的低饱和配色、精确的留白与字号层级。 */
 (function (global) {
   'use strict';
 
-  var B = {};   // type -> builder(el, data, theme)
+  var B = {};
 
-  /* ---------- 通用工具 ---------- */
+  /* ================= 设计系统 ================= */
+  var FONT = '"Inter","Helvetica Neue","PingFang SC","Hiragino Sans GB",sans-serif';
+
   function rgba(hex, a) {
     if (!hex) return 'rgba(26,26,46,' + a + ')';
     var h = hex.charAt(0) === '#' ? hex.slice(1) : hex;
     if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
     if (h.length !== 6) return 'rgba(26,26,46,' + a + ')';
-    var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+    return 'rgba(' + parseInt(h.slice(0, 2), 16) + ',' + parseInt(h.slice(2, 4), 16) + ',' + parseInt(h.slice(4, 6), 16) + ',' + a + ')';
   }
-  function axes(theme, opts) {
+  function ink(t) { return (t && t.text) || '#1A1A2E'; }
+  function muted(t) { return (t && t.muted) || '#8A8A99'; }
+  function accent(t) { return (t && t.accent) || '#A67C3D'; }
+  function rule(t) { return rgba(ink(t), 0.07); }
+  function seriesColor(t, i) {
+    var arr = (t && t.series && t.series.length) ? t.series : ['#1A1A2E', '#A67C3D', '#6F8FA8', '#7A5C3E', '#8A8A99', '#3E5A4E'];
+    return arr[i % arr.length];
+  }
+  function num(v) {
+    if (v === null || v === undefined || (typeof v === 'number' && isNaN(v))) return '—';
+    var n = Number(v);
+    if (!isFinite(n)) return String(v);
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (Math.abs(n) >= 1e4) return (n / 1e3).toFixed(1) + 'k';
+    if (Math.abs(n) >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return String(Math.round(n * 100) / 100);
+  }
+
+  /* 统一的坐标轴：无轴线、极浅横向网格、灰字 */
+  function xAxis(t, extra) {
     return Object.assign({
-      axisLine: { lineStyle: { color: rgba(theme.text, 0.25) } },
-      axisTick: { show: false },
-      axisLabel: { color: theme.muted, fontSize: 11 },
-      splitLine: { lineStyle: { color: theme.grid } }
-    }, opts || {});
+      type: 'category', axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 10, interval: 0, hideOverlap: true, overflow: 'break', width: 74, lineHeight: 11 },
+      splitLine: { show: false }
+    }, extra || {});
   }
-  function base(theme) { return { backgroundColor: theme.bg, animationDuration: 600 }; }
-  function tip(theme) {
-    return Object.assign({ trigger: 'item', confine: true }, {
-      backgroundColor: theme.panel, borderColor: rgba(theme.accent, 0.4), borderWidth: 1,
-      textStyle: { color: theme.text, fontSize: 11 }
-    });
+  function yAxis(t, extra) {
+    return Object.assign({
+      type: 'value', axisLine: { show: false }, axisTick: { show: false },
+      axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 8 },
+      splitNumber: 4,
+      splitLine: { show: true, lineStyle: { color: rule(t), width: 1 } }
+    }, extra || {});
   }
-  function legend(theme, opts) {
-    return Object.assign({ textStyle: { color: theme.muted, fontSize: 11 }, itemWidth: 10, itemHeight: 10, top: 4, left: 8 }, opts || {});
+  function grid(extra) {
+    return Object.assign({ left: 6, right: 18, top: 26, bottom: 6, containLabel: true }, extra || {});
   }
-  function color(theme, i) { return (theme.series && theme.series[i % theme.series.length]) || theme.accent; }
-  function num(v) { return (v === null || v === undefined || isNaN(v)) ? '—' : (Math.abs(v) >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 0 }) : String(Number(Number(v).toFixed(2)))); }
+  function tipBox(t) {
+    return {
+      backgroundColor: '#FFFFFF', borderColor: rgba(ink(t), 0.12), borderWidth: 1,
+      padding: [8, 11], extraCssText: 'box-shadow:0 8px 24px rgba(20,20,35,.12);border-radius:8px;',
+      textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT }
+    };
+  }
+  function tip(t, extra) { return Object.assign({ confine: true, backgroundColor: '#FFFFFF', borderColor: rgba(ink(t), 0.12), borderWidth: 1, textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT }, extraCssText: 'box-shadow:0 8px 24px rgba(20,20,35,.12);border-radius:8px;' }, extra || {}); }
+  function legend(t, extra) {
+    return Object.assign({
+      top: 0, left: 0, itemWidth: 8, itemHeight: 8, itemGap: 14,
+      icon: 'circle', textStyle: { color: muted(t), fontSize: 10.5, fontFamily: FONT }
+    }, extra || {});
+  }
+  function base(t, extra) {
+    return Object.assign({ backgroundColor: 'transparent', textStyle: { fontFamily: FONT }, animationDuration: 560, animationEasing: 'cubicOut' }, extra || {});
+  }
+  /* 末点标注：小圆点 + 数值 */
+  function endLabel(t, fmt) {
+    return {
+      show: true, position: 'right', distance: 6,
+      formatter: function (p) { return fmt ? fmt(p.value) : num(p.value); },
+      color: ink(t), fontSize: 11, fontWeight: 600, fontFamily: FONT
+    };
+  }
 
   /* ================= 1. 比较与排序 ================= */
-  B.groupedBar = function (el, d, theme) {
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'axis' }),
-      legend: legend(theme),
-      grid: { left: 40, right: 16, top: 34, bottom: 26 },
-      xAxis: Object.assign({ type: 'category', data: d.labels }, axes(theme, { splitLine: { show: false } })),
-      yAxis: Object.assign({ type: 'value' }, axes(theme)),
+  B.groupedBar = function (el, d, t) {
+    var n = d.series.length;
+    var showVal = d.labels.length * n <= 12;
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: rgba(ink(t), 0.04) } } }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      grid: grid({ top: 34 }),
+      xAxis: xAxis(t, { data: d.labels }),
+      yAxis: yAxis(t),
       series: d.series.map(function (s, i) {
-        return { name: s.name, type: 'bar', data: s.values, barGap: '10%', barWidth: '32%',
-          itemStyle: { color: color(theme, i), borderRadius: [3, 3, 0, 0] } };
+        return {
+          name: s.name, type: 'bar', data: s.values,
+          barGap: '28%', barWidth: n > 3 ? 9 : 14,
+          itemStyle: { color: seriesColor(t, i), borderRadius: [2, 2, 0, 0] },
+          label: showVal ? {
+            show: true, position: 'top', distance: 5, color: muted(t), fontSize: 9.5, fontFamily: FONT,
+            formatter: function (p) { return num(p.value); }
+          } : { show: false }
+        };
       })
     });
   };
 
-  B.tornado = function (el, d, theme) {
-    var n = d.labels.length;
-    return Object.assign(base(theme), {
-      tooltip: tip(theme), legend: legend(theme, { data: [d.leftName, d.rightName] }),
-      grid: { left: 10, right: 10, top: 34, bottom: 26, containLabel: true },
-      xAxis: Object.assign({ type: 'value', axisLabel: { color: theme.muted, fontSize: 10, formatter: function (v) { return Math.abs(v); } } }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: d.labels.slice().reverse(), axisLabel: { color: theme.text, fontSize: 11 } }, axes(theme, { splitLine: { show: false } })),
+  B.tornado = function (el, d, t) {
+    var labels = d.labels.slice().reverse();
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      legend: legend(t, { data: [d.leftName, d.rightName] }),
+      grid: grid({ left: 6, right: 6, top: 34, bottom: 18 }),
+      xAxis: yAxis(t, { type: 'value', axisLabel: { color: muted(t), fontSize: 10, fontFamily: FONT, margin: 8, formatter: function (v) { return Math.abs(v); } } }),
+      yAxis: xAxis(t, { data: labels, axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT, margin: 10 } }),
       series: [
-        { name: d.leftName, type: 'bar', stack: 't', data: d.left.slice().reverse().map(function (v) { return -v; }),
-          itemStyle: { color: color(theme, 0), borderRadius: [3, 0, 0, 3] }, label: { show: true, position: 'left', color: theme.muted, fontSize: 10, formatter: function (p) { return Math.abs(p.value); } } },
-        { name: d.rightName, type: 'bar', stack: 't', data: d.right.slice().reverse(),
-          itemStyle: { color: color(theme, 1), borderRadius: [0, 3, 3, 0] }, label: { show: true, position: 'right', color: theme.muted, fontSize: 10 } }
+        { name: d.leftName, type: 'bar', stack: 't', barWidth: 11,
+          data: d.left.slice().reverse().map(function (v) { return -v; }),
+          itemStyle: { color: seriesColor(t, 0) },
+          label: { show: true, position: 'left', distance: 6, color: muted(t), fontSize: 10, fontFamily: FONT, formatter: function (p) { return num(Math.abs(p.value)); } } },
+        { name: d.rightName, type: 'bar', stack: 't', barWidth: 11,
+          data: d.right.slice().reverse(), itemStyle: { color: seriesColor(t, 1) },
+          label: { show: true, position: 'right', distance: 6, color: muted(t), fontSize: 10, fontFamily: FONT, formatter: function (p) { return num(p.value); } } }
       ]
     });
   };
 
-  B.lollipop = function (el, d, theme) {
+  B.lollipop = function (el, d, t) {
     var idx = d.labels.map(function (_, i) { return i; });
-    return Object.assign(base(theme), {
-      tooltip: tip(theme),
-      grid: { left: 10, right: 30, top: 20, bottom: 26, containLabel: true },
-      xAxis: Object.assign({ type: 'value' }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: d.labels, axisLabel: { color: theme.text, fontSize: 11 } }, axes(theme, { splitLine: { show: false } })),
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item' }),
+      grid: grid({ left: 6, right: 34, top: 16, bottom: 18 }),
+      xAxis: yAxis(t, { type: 'value', splitLine: { show: true, lineStyle: { color: rule(t) } } }),
+      yAxis: xAxis(t, { data: d.labels, axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT } }),
       series: [
-        { type: 'bar', data: d.values, barWidth: 2.5, itemStyle: { color: rgba(theme.text, 0.22) }, silent: true, z: 1 },
-        { type: 'scatter', data: d.values, symbolSize: 13, itemStyle: { color: theme.accent }, z: 2,
-          label: { show: true, position: 'right', color: theme.text, fontSize: 11, fontWeight: 600, formatter: function (p) { return num(p.value); } } }
+        { type: 'bar', data: d.values.map(function (v, i) { return [i, v]; }), barWidth: 1.5,
+          itemStyle: { color: rgba(ink(t), 0.18) }, silent: true, z: 1 },
+        { type: 'scatter', data: idx.map(function (i) { return [d.values[i], i]; }), symbolSize: 9,
+          itemStyle: { color: accent(t) }, z: 3,
+          label: { show: true, position: 'right', distance: 8, color: ink(t), fontSize: 11, fontWeight: 600, fontFamily: FONT, formatter: function (p) { return num(p.value[0]); } } }
       ]
     });
   };
 
-  B.bullet = function (el, d, theme) {
+  B.bullet = function (el, d, t) {
     var rows = d.rows || [];
-    var names = rows.map(function (r) { return r.name; });
-    var maxV = 0;
-    rows.forEach(function (r) { maxV = Math.max(maxV, r.target, r.value, r.ranges[r.ranges.length - 1]); });
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'axis' }),
-      grid: { left: 10, right: 26, top: 16, bottom: 24, containLabel: true },
-      xAxis: Object.assign({ type: 'value', max: Math.ceil(maxV * 1.1) }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: names, axisLabel: { color: theme.text, fontSize: 11 } }, axes(theme, { splitLine: { show: false } })),
+    var maxV = 0; rows.forEach(function (r) { maxV = Math.max(maxV, r.target, r.value, r.ranges[r.ranges.length - 1]); });
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      grid: { left: 6, right: 46, top: 16, bottom: 18, containLabel: true },
+      xAxis: yAxis(t, { type: 'value', min: 0, max: Math.ceil(maxV * 1.06), splitLine: { show: false } }),
+      yAxis: xAxis(t, { data: rows.map(function (r) { return r.name; }), axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT } }),
       series: [
-        { type: 'bar', data: rows.map(function (r) { return r.ranges[2]; }), barWidth: 22, itemStyle: { color: rgba(theme.text, 0.06) }, silent: true, z: 1 },
-        { type: 'bar', data: rows.map(function (r) { return r.ranges[1]; }), barWidth: 22, itemStyle: { color: rgba(theme.text, 0.1) }, silent: true, z: 1 },
-        { type: 'bar', data: rows.map(function (r) { return r.value; }), barWidth: 11, itemStyle: { color: theme.accent, borderRadius: 2 }, z: 3,
-          label: { show: true, position: 'right', color: theme.text, fontSize: 11, fontWeight: 600, formatter: function (p) { return num(p.value); } } },
-        { type: 'scatter', data: rows.map(function (r) { return r.target; }), symbol: 'rect', symbolSize: [3, 20], itemStyle: { color: theme.text }, z: 4 }
+        { type: 'bar', data: rows.map(function (r) { return r.ranges[2]; }), barWidth: '58%', itemStyle: { color: rgba(ink(t), 0.05), borderRadius: 2 }, silent: true, z: 1 },
+        { type: 'bar', data: rows.map(function (r) { return r.ranges[1]; }), barWidth: '58%', itemStyle: { color: rgba(ink(t), 0.09), borderRadius: 2 }, silent: true, z: 1 },
+        { type: 'bar', data: rows.map(function (r) { return r.value; }), barWidth: 12, itemStyle: { color: accent(t), borderRadius: 1 }, z: 3 },
+        { type: 'scatter', data: rows.map(function (r) { return r.target; }), symbol: 'rect', symbolSize: [2, 22], itemStyle: { color: ink(t) }, z: 4 },
+        { type: 'scatter', data: rows.map(function (r, i) { return [r.value, i]; }), symbolSize: 0.1, silent: true, z: 5,
+          label: { show: true, position: 'insideRight', distance: 4, color: '#fff', fontSize: 9.5, fontWeight: 700, fontFamily: FONT,
+            formatter: function (p) { return num(p.value[0]); } } }
       ]
     });
   };
 
-  /* 词云：螺旋布局 + 粗略防重叠 */
-  B.wordcloud = function (el, d, theme) {
+  /* 词云：螺旋 + 旋转，视觉更接近出版物 */
+  B.wordcloud = function (el, d, t) {
     var words = (d.words || []).slice().sort(function (a, b) { return b.weight - a.weight; });
-    var W = (el && el.clientWidth) || 700, H = (el && el.clientHeight) || 380;
-    var maxW = words[0] ? words[0].weight : 100;
-    var minW = words[words.length - 1] ? words[words.length - 1].weight : 10;
-    var boxes = [];
-    var els = [];
-    var colors = theme.series;
+    var W = (el && el.clientWidth) || 700, H = (el && el.clientHeight) || 190;
+    var maxW = words[0] ? words[0].weight : 100, minW = words[words.length - 1] ? words[words.length - 1].weight : 10;
+    var boxes = [], els = [];
+    var palette = (t && t.series) || ['#1A1A2E', '#A67C3D', '#6F8FA8'];
     words.forEach(function (w, i) {
-      var fs = Math.round(12 + (w.weight - minW) / Math.max(1, maxW - minW) * 26);
-      var tw = w.text.length * fs * 1.05, th = fs * 1.25;
-      var placed = false, a = 0, r = 0;
+      var ratio = (w.weight - minW) / Math.max(1, maxW - minW);
+      var fs = Math.round((H < 240 ? 10 : 12) + ratio * (H < 240 ? 16 : 24));
+      var rotate = (i > 4 && i % 3 === 0) ? 90 : 0;
+      var tw = w.text.length * fs * (rotate ? 0.62 : 1.02), th = fs * (rotate ? 2.4 : 1.3);
+      var placed = false, a = i * 0.7, r = 0;
       while (!placed && r < Math.max(W, H)) {
-        var x = W / 2 + r * Math.cos(a) - tw / 2;
-        var y = H / 2 + r * Math.sin(a) * 0.62 - th / 2;
-        var ok = x > 4 && y > 4 && x + tw < W - 4 && y + th < H - 4 &&
-          !boxes.some(function (b) { return x < b.x + b.w + 3 && x + tw + 3 > b.x && y < b.y + b.h + 3 && y + th + 3 > b.y; });
+        var x = W / 2 + r * Math.cos(a) - tw / 2, y = H / 2 + r * Math.sin(a) * 0.55 - th / 2;
+        var ok = x > 2 && y > 2 && x + tw < W - 2 && y + th < H - 2 &&
+          !boxes.some(function (b) { return x < b.x + b.w + 2 && x + tw + 2 > b.x && y < b.y + b.h + 2 && y + th + 2 > b.y; });
         if (ok) {
           boxes.push({ x: x, y: y, w: tw, h: th });
-          els.push({ type: 'text', left: Math.round(x), top: Math.round(y),
-            style: { text: w.text, fill: colors[i % colors.length], font: (i < 3 ? '700 ' : '500 ') + fs + 'px Inter, "PingFang SC", sans-serif' } });
+          els.push({ type: 'text', left: Math.round(x), top: Math.round(y), rotation: rotate ? Math.PI / 2 : 0,
+            style: { text: w.text, fill: i === 0 ? ink(t) : (i < 4 ? palette[i % palette.length] : rgba(ink(t), 0.55)),
+              font: (i < 3 ? '700 ' : '500 ') + fs + 'px ' + FONT } });
           placed = true;
-        } else { a += 0.45; r += 0.55; }
+        } else { a += 0.4; r += 0.5; }
       }
     });
-    return Object.assign(base(theme), {
-      tooltip: { show: false },
-      graphic: els,
-      _noPolish: true
-    });
+    return base(t, { tooltip: { show: false }, graphic: els });
   };
 
-  /* ================= 3. 构成与占比 ================= */
-  B.pie = function (el, d, theme) {
-    var data = d.data || [];
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { formatter: function (p) { return p.name + '：' + p.value + '%'; } }),
-      legend: legend(theme, { orient: 'vertical', right: 10, top: 'middle' }),
+  B.radar = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item' }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      radar: {
+        center: ['50%', '56%'], radius: '64%',
+        indicator: d.indicators.map(function (n) { return { name: n, max: 100 }; }),
+        axisName: { color: muted(t), fontSize: 10.5, fontFamily: FONT },
+        axisLine: { lineStyle: { color: rule(t) } },
+        splitLine: { lineStyle: { color: rule(t) } },
+        splitArea: { show: false }
+      },
       series: [{
-        type: 'pie', radius: ['0%', '68%'], center: ['38%', '52%'], roseType: false,
-        itemStyle: { borderColor: theme.bg, borderWidth: 2 },
-        label: { color: theme.text, fontSize: 11, formatter: '{b}\n{d}%' },
-        labelLine: { lineStyle: { color: rgba(theme.text, 0.3) } },
-        data: data.map(function (x, i) { return { name: x.name, value: x.value, itemStyle: { color: color(theme, i) } }; })
+        type: 'radar', symbolSize: 3,
+        data: d.series.map(function (s, i) {
+          return { name: s.name, value: s.values,
+            lineStyle: { color: seriesColor(t, i), width: 1.6 },
+            itemStyle: { color: seriesColor(t, i) },
+            areaStyle: { color: rgba(seriesColor(t, i), 0.12) } };
+        })
       }]
     });
   };
 
-  B.percentBar = function (el, d, theme) {
-    var totals = d.labels.map(function (_, i) { return d.series.reduce(function (s, se) { return s + se.values[i]; }, 0); });
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'axis', valueFormatter: function (v) { return v + '%'; } }),
-      legend: legend(theme),
-      grid: { left: 10, right: 16, top: 34, bottom: 24, containLabel: true },
-      xAxis: Object.assign({ type: 'value', max: 100, axisLabel: { color: theme.muted, fontSize: 10, formatter: '{value}%' } }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: d.labels, axisLabel: { color: theme.text, fontSize: 11 } }, axes(theme, { splitLine: { show: false } })),
+  /* ================= 2. 趋势与时间 ================= */
+  function timeAxis(t, labels) {
+    return xAxis(t, {
+      data: labels, boundaryGap: false,
+      axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 10,
+        hideOverlap: true,
+        interval: function (idx, val) {
+          var s = String(val);
+          if (idx === 0) return false;
+          var m = s.match(/^(\d{4})-(\d{2})$/);
+          if (m) return m[2] === '01';
+          return idx % Math.ceil(labels.length / 6) === 0;
+        },
+        formatter: function (v) {
+          var s = String(v);
+          var m = s.match(/^(\d{4})-(\d{2})$/);
+          return m ? (m[2] === '01' ? m[1] : '') : s;
+        } }
+    });
+  }
+  function lineSeries(t, s, i, opts) {
+    return Object.assign({
+      name: s.name, type: 'line', data: s.values, showSymbol: false, smooth: false,
+      lineStyle: { color: seriesColor(t, i), width: 1.8 }, itemStyle: { color: seriesColor(t, i) },
+      emphasis: { focus: 'series', lineStyle: { width: 2.6 } }
+    }, opts || {});
+  }
+
+  B.line = function (el, d, t) {
+    var zero = d.values && d.values.some(function (v) { return v < 0; });
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: rgba(ink(t), 0.2), width: 1 } } }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      grid: grid({ left: 8, right: 46, top: 30, bottom: 10 }),
+      xAxis: timeAxis(t, d.labels),
+      yAxis: yAxis(t, { scale: !zero }),
       series: d.series.map(function (s, i) {
-        return { name: s.name, type: 'bar', stack: 'p', barWidth: '46%',
-          data: s.values.map(function (v, j) { return Math.round(v / totals[j] * 1000) / 10; }),
-          itemStyle: { color: color(theme, i) },
-          label: { show: true, color: '#fff', fontSize: 10, formatter: function (p) { return p.value >= 8 ? p.value + '%' : ''; } } };
+        var last = s.values.length - 1;
+        return lineSeries(t, s, i, {
+          markPoint: { silent: true, symbol: 'circle', symbolSize: 5, data: [{ coord: [last, s.values[last]], itemStyle: { color: seriesColor(t, i) } }] },
+          endLabel: endLabel(t)
+        });
       })
     });
   };
 
-  B.sunburst = function (el, d, theme) {
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'item', formatter: function (p) { return p.name + '：' + num(p.value); } },
+  B.area = function (el, d, t) {
+    var W = (el && el.clientWidth) || 700;
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      grid: grid({ left: 8, right: 46, top: 28, bottom: 10 }),
+      xAxis: timeAxis(t, d.labels),
+      yAxis: yAxis(t, { scale: true }),
+      series: d.series.map(function (s, i) {
+        var c = seriesColor(t, i);
+        return lineSeries(t, s, i, {
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: rgba(c, 0.28) }, { offset: 1, color: rgba(c, 0.02) }]) },
+          markPoint: { silent: true, symbol: 'circle', symbolSize: 5, data: [{ coord: [s.values.length - 1, s.values[s.values.length - 1]], itemStyle: { color: c } }] },
+          endLabel: endLabel(t)
+        });
+      })
+    });
+  };
+
+  B.stacked = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      grid: grid({ left: 6, right: 20, top: 34, bottom: 12 }),
+      xAxis: timeAxis(t, d.labels),
+      yAxis: yAxis(t),
+      series: d.series.map(function (s, i) {
+        var c = seriesColor(t, i);
+        return lineSeries(t, s, i, {
+          stack: 'st', areaStyle: { color: rgba(c, 0.55) }, lineStyle: { color: rgba(c, 0.9), width: 1 },
+          emphasis: { focus: 'series' }
+        });
+      })
+    });
+  };
+
+  B.waterfall = function (el, d, t) {
+    var vals = d.values, labels = d.labels;
+    var helper = [], bars = [];
+    var running = 0;
+    vals.forEach(function (v, i) {
+      var isTotal = (i === 0 || i === vals.length - 1);
+      if (isTotal) { helper.push(0); bars.push(v); running = v; }
+      else if (v >= 0) { helper.push(running); bars.push(v); running += v; }
+      else { helper.push(running + v); bars.push(-v); running += v; }
+    });
+    var up = '#3E7A5A', down = '#B5484B';
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: rgba(ink(t), 0.04) } },
+        formatter: function (ps) {
+          var i = ps[0].dataIndex, v = vals[i];
+          return labels[i] + '<br/>' + (v >= 0 ? '+' : '') + num(v);
+        } }),
+      grid: grid({ left: 6, right: 14, top: 20, bottom: 10 }),
+      xAxis: xAxis(t, { data: labels }),
+      yAxis: yAxis(t),
+      series: [
+        { type: 'bar', stack: 'w', silent: true, itemStyle: { color: 'transparent' }, data: helper, barWidth: '46%' },
+        { type: 'bar', stack: 'w', barWidth: '46%', data: bars,
+          itemStyle: {
+            borderRadius: 2,
+            color: function (p) {
+              var i = p.dataIndex, v = vals[i];
+              if (i === 0 || i === vals.length - 1) return ink(t);
+              return v >= 0 ? up : down;
+            }
+          },
+          label: { show: true, position: 'top', distance: 5, color: ink(t), fontSize: 10, fontWeight: 600, fontFamily: FONT,
+            formatter: function (p) { var v = vals[p.dataIndex]; return (v >= 0 ? '+' : '−') + num(Math.abs(v)); } },
+          labelLayout: { hideOverlap: true } }
+      ]
+    });
+  };
+
+  B.heatmap = function (el, d, t) {
+    var data = [];
+    d.yLabels.forEach(function (y, yi) { d.xLabels.forEach(function (x, xi) { data.push([xi, yi, d.values[yi][xi]]); }); });
+    var vals = data.map(function (p) { return p[2]; });
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) { return d.yLabels[p.value[1]] + ' · ' + d.xLabels[p.value[0]] + '<br/>' + num(p.value[2]); } }),
+      grid: { left: 6, right: 16, top: 14, bottom: 18, containLabel: true },
+      xAxis: xAxis(t, { data: d.xLabels, splitArea: { show: false } }),
+      yAxis: xAxis(t, { data: d.yLabels, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
+      visualMap: {
+        min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), show: false,
+        inRange: { color: [rgba(ink(t), 0.05), rgba(accent(t), 0.45), accent(t)] }
+      },
       series: [{
-        type: 'sunburst', data: d.data, radius: ['16%', '86%'], center: ['50%', '52%'],
-        itemStyle: { borderColor: theme.bg, borderWidth: 2 },
-        label: { color: theme.text, fontSize: 10, rotate: 'radial' },
-        levels: [{}, { r0: '16%', r: '48%', label: { rotate: 0 } }, { r0: '48%', r: '86%' }],
-        color: theme.series
+        type: 'heatmap', data: data, itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
+        label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT, formatter: function (p) { return num(p.value[2]); } }
+      }]
+    });
+  };
+
+  /* ================= 3. 构成与占比 ================= */
+  B.pie = function (el, d, t) {
+    var data = d.data || [];
+    var sum = data.reduce(function (a, b) { return a + b.value; }, 0) || 1;
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return p.name + '<br/>' + p.value + ' (' + (p.value / sum * 100).toFixed(1) + '%)'; } }),
+      series: [{
+        type: 'pie', radius: ['0%', '72%'], center: ['50%', '52%'],
+        itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
+        label: { color: ink(t), fontSize: 10.5, fontFamily: FONT, lineHeight: 15,
+          formatter: function (p) { return p.name + '\n' + (p.value / sum * 100).toFixed(1) + '%'; } },
+        labelLine: { length: 8, length2: 10, lineStyle: { color: rgba(ink(t), 0.25) } },
+        data: data.map(function (x, i) { return { name: x.name, value: x.value, itemStyle: { color: seriesColor(t, i) } }; })
+      }]
+    });
+  };
+
+  B.donut = function (el, d, t) {
+    var data = d.data || [], sum = data.reduce(function (a, b) { return a + b.value; }, 0) || 1;
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return p.name + '<br/>' + p.value + ' (' + (p.value / sum * 100).toFixed(1) + '%)'; } }),
+      graphic: [
+        { type: 'text', left: 'center', top: '44%', z: 10,
+          style: { text: num(sum), fill: ink(t), font: '700 20px ' + FONT, textAlign: 'center' } },
+        { type: 'text', left: 'center', top: '54%', z: 10,
+          style: { text: d.unit || 'total', fill: muted(t), font: '10px ' + FONT, textAlign: 'center' } }
+      ],
+      series: [{
+        type: 'pie', radius: ['56%', '76%'], center: ['50%', '50%'],
+        itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
+        label: { color: ink(t), fontSize: 10.5, fontFamily: FONT,
+          formatter: function (p) { return p.name + ' ' + (p.value / sum * 100).toFixed(1) + '%'; } },
+        labelLine: { length: 6, length2: 8, lineStyle: { color: rgba(ink(t), 0.25) } },
+        data: data.map(function (x, i) { return { name: x.name, value: x.value, itemStyle: { color: seriesColor(t, i) } }; })
+      }]
+    });
+  };
+
+  B.stackedBar = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: rgba(ink(t), 0.04) } } }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      grid: grid({ top: 32 }),
+      xAxis: xAxis(t, { data: d.labels }),
+      yAxis: yAxis(t),
+      series: d.series.map(function (s, i) {
+        return { name: s.name, type: 'bar', stack: 'b', barWidth: 22,
+          itemStyle: { color: seriesColor(t, i) },
+          label: { show: i === d.series.length - 1, position: 'top', color: ink(t), fontSize: 10, fontWeight: 600, fontFamily: FONT,
+            formatter: function (p) { var tot = 0; d.series.forEach(function (ss) { tot += ss.values[p.dataIndex]; }); return num(tot); } } };
+      })
+    });
+  };
+
+  B.percentBar = function (el, d, t) {
+    var totals = d.labels.map(function (_, i) { return d.series.reduce(function (s, se) { return s + se.values[i]; }, 0) || 1; });
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis', valueFormatter: function (v) { return v + '%'; } }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      grid: grid({ top: 32 }),
+      xAxis: yAxis(t, { type: 'value', max: 100, axisLabel: { color: muted(t), fontSize: 10, fontFamily: FONT, formatter: '{value}%' } }),
+      yAxis: xAxis(t, { data: d.labels, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
+      series: d.series.map(function (s, i) {
+        return { name: s.name, type: 'bar', stack: 'p', barWidth: 18,
+          data: s.values.map(function (v, j) { return Math.round(v / totals[j] * 1000) / 10; }),
+          itemStyle: { color: seriesColor(t, i) },
+          label: { show: true, color: '#fff', fontSize: 9.5, fontFamily: FONT, formatter: function (p) { return p.value >= 10 ? Math.round(p.value) + '%' : ''; } } };
+      })
+    });
+  };
+
+  B.treemap = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return p.name + ' · ' + num(p.value); } }),
+      series: [{
+        type: 'treemap', data: d.data, roam: false, nodeClick: false, breadcrumb: { show: false },
+        left: 0, right: 0, top: 0, bottom: 0,
+        width: '100%', height: '100%',
+        itemStyle: { borderColor: '#FFFFFF', borderWidth: 2, gapWidth: 2 },
+        levels: [
+          { itemStyle: { borderWidth: 0, gapWidth: 3 } },
+          { colorSaturation: [0.35, 0.6], itemStyle: { borderWidth: 1, gapWidth: 1, borderColorSaturation: 0.6 } }
+        ],
+        label: { color: '#FFFFFF', fontSize: 10.5, fontFamily: FONT, overflow: 'truncate' },
+        color: (t.series || ['#1A1A2E', '#A67C3D', '#6F8FA8', '#7A5C3E', '#8A8A99', '#3E5A4E'])
+      }]
+    });
+  };
+
+  B.sunburst = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return p.name + ' · ' + num(p.value); } }),
+      series: [{
+        type: 'sunburst', data: d.data, radius: ['18%', '88%'], center: ['50%', '52%'],
+        itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
+        label: { color: ink(t), fontSize: 10, fontFamily: FONT, rotate: 0, minAngle: 6 },
+        levels: [{}, { r0: '18%', r: '52%', label: { rotate: 0 } }, { r0: '52%', r: '88%', label: { rotate: 'tangential' } }],
+        color: (t.series || ['#1A1A2E', '#A67C3D', '#6F8FA8', '#7A5C3E', '#8A8A99'])
       }]
     });
   };
 
   /* ================= 4. 分布 ================= */
-  function bin(values, n) {
+  function bins(values, n) {
     var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
     var step = (max - min) / n || 1;
-    var bins = [], counts = [];
-    for (var i = 0; i < n; i++) { bins.push(Math.round((min + step * i) * 10) / 10 + '–' + Math.round((min + step * (i + 1)) * 10) / 10); counts.push(0); }
+    var edges = [], counts = [];
+    for (var i = 0; i <= n; i++) edges.push(Math.round((min + step * i) * 10) / 10);
+    for (var j = 0; j < n; j++) counts.push(0);
     values.forEach(function (v) { var k = Math.min(n - 1, Math.floor((v - min) / step)); counts[k]++; });
-    return { bins: bins, counts: counts };
+    return { edges: edges, counts: counts, step: step, min: min, max: max };
   }
-  B.histogram = function (el, d, theme) {
-    var h = bin(d.values, 12);
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'axis' }),
-      grid: { left: 40, right: 16, top: 20, bottom: 30 },
-      xAxis: Object.assign({ type: 'category', data: h.bins, axisLabel: { color: theme.muted, fontSize: 9, interval: 1, rotate: 30 } }, axes(theme, { splitLine: { show: false } })),
-      yAxis: Object.assign({ type: 'value', name: '频数', nameTextStyle: { color: theme.muted, fontSize: 10 } }, axes(theme)),
-      series: [{ type: 'bar', data: h.counts, barWidth: '86%', itemStyle: { color: theme.accent, borderRadius: [2, 2, 0, 0] } }]
-    });
-  };
-
-  B.boxplot = function (el, d, theme) {
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item' }),
-      grid: { left: 44, right: 16, top: 20, bottom: 26 },
-      xAxis: Object.assign({ type: 'category', data: d.categories, boundaryGap: true }, axes(theme, { splitLine: { show: false } })),
-      yAxis: Object.assign({ type: 'value', scale: true }, axes(theme)),
-      series: [{ type: 'boxplot', data: d.boxes, boxWidth: [12, 34],
-        itemStyle: { color: rgba(theme.accent, 0.22), borderColor: theme.accent, borderWidth: 1.4 } }]
-    });
-  };
-
-  function kde(values, min, max, n) {
+  function std(v) { var m = v.reduce(function (a, b) { return a + b; }, 0) / v.length; return Math.sqrt(v.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / v.length); }
+  function kdePts(values, min, max, n) {
     var h = 1.06 * std(values) * Math.pow(values.length, -0.2) || 1;
     var out = [];
     for (var i = 0; i < n; i++) {
       var x = min + (max - min) * i / (n - 1), s = 0;
-      values.forEach(function (v) { s += Math.exp(-0.5 * Math.pow((x - v) / h, 2)); });
+      for (var k = 0; k < values.length; k++) s += Math.exp(-0.5 * Math.pow((x - values[k]) / h, 2));
       out.push([x, s / (values.length * h * Math.sqrt(2 * Math.PI))]);
     }
     return out;
   }
-  function std(v) {
-    var m = v.reduce(function (a, b) { return a + b; }, 0) / v.length;
-    return Math.sqrt(v.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / v.length);
-  }
-  B.violin = function (el, d, theme) {
-    var cats = d.categories || [], groups = d.groups || [];
-    var all = [].concat.apply([], groups);
-    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
-    var series = [];
-    groups.forEach(function (g, gi) {
-      var pts = kde(g, lo, hi, 24);
-      var maxD = Math.max.apply(null, pts.map(function (p) { return p[1]; }));
-      var right = pts.map(function (p) { return [p[0], gi + 0.34 * p[1] / maxD]; });
-      var left = pts.map(function (p) { return [p[0], gi - 0.34 * p[1] / maxD]; }).reverse();
-      series.push({ type: 'line', data: right, showSymbol: false, smooth: true, silent: true,
-        lineStyle: { color: color(theme, gi), width: 1.4 }, areaStyle: { color: rgba(color(theme, gi), 0.25), origin: 'start' }, z: 2 });
-      series.push({ type: 'line', data: left, showSymbol: false, smooth: true, silent: true,
-        lineStyle: { color: color(theme, gi), width: 1.4 }, z: 2 });
-      var q1 = quantile(g, .25), q2 = quantile(g, .5), q3 = quantile(g, .75);
-      series.push({ type: 'scatter', data: [[q2, gi]], symbolSize: 5, itemStyle: { color: theme.text }, z: 5 });
-      series.push({ type: 'line', data: [[q1, gi], [q3, gi]], silent: true, lineStyle: { color: theme.text, width: 8, opacity: .25 }, z: 4 });
-    });
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'item', backgroundColor: theme.panel, borderColor: rgba(theme.accent, .4), textStyle: { color: theme.text, fontSize: 11 } },
-      grid: { left: 50, right: 18, top: 18, bottom: 26 },
-      xAxis: Object.assign({ type: 'value', scale: true }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: cats, axisLabel: { color: theme.text, fontSize: 11 } }, axes(theme, { splitLine: { show: false } })),
-      series: series
-    });
-  };
-  function quantile(arr, q) {
-    var a = arr.slice().sort(function (x, y) { return x - y; });
-    var pos = (a.length - 1) * q, base = Math.floor(pos), rest = pos - base;
-    return a[base + 1] !== undefined ? a[base] + rest * (a[base + 1] - a[base]) : a[base];
-  }
 
-  B.beeswarm = function (el, d, theme) {
-    var cats = d.categories || [], groups = d.groups || [];
-    var pts = [];
-    groups.forEach(function (g, gi) {
-      var sorted = g.slice().sort(function (a, b) { return a - b; });
-      var offsets = [];
-      sorted.forEach(function (v, i) {
-        var jx = 0, k = 0;
-        while (offsets.some(function (o) { return Math.abs(o.v - v) < 2 && Math.abs(o.jx - jx) < 0.09; }) && k < 20) { jx = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.09; k++; }
-        offsets.push({ v: v, jx: jx });
-        pts.push([v, gi + jx]);
-      });
+  B.histogram = function (el, d, t) {
+    var h = bins(d.values, 14);
+    var labels = h.edges.slice(0, -1).map(function (e, i) { return Math.round(e) + '–' + Math.round(h.edges[i + 1]); });
+    var dens = kdePts(d.values, h.min, h.max, 80);
+    /* 把密度曲线映射到「柱高」尺度，叠加在直方图上 */
+    var maxC = Math.max.apply(null, h.counts) || 1;
+    var peak = Math.max.apply(null, dens.map(function (p) { return p[1]; })) || 1;
+    var curve = dens.map(function (p) {
+      var idx = (p[0] - h.min) / (h.max - h.min) * 14 - 0.5;
+      return [idx, p[1] / peak * maxC * 0.92];
     });
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'item', formatter: function (p) { return num(p.value[0]); }, backgroundColor: theme.panel, borderColor: rgba(theme.accent, .4), textStyle: { color: theme.text, fontSize: 11 } },
-      grid: { left: 52, right: 18, top: 18, bottom: 26 },
-      xAxis: Object.assign({ type: 'value', scale: true }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: cats, axisLabel: { color: theme.text, fontSize: 11 } }, axes(theme, { splitLine: { show: false } })),
-      series: [{ type: 'scatter', data: pts, symbolSize: 5, itemStyle: { color: rgba(theme.accent, 0.75) } }]
-    });
-  };
-
-  B.ridge = function (el, d, theme) {
-    var labels = d.labels || [], groups = d.groups || [];
-    var all = [].concat.apply([], groups);
-    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
-    var series = [];
-    groups.forEach(function (g, gi) {
-      var pts = kde(g, lo, hi, 40);
-      var maxD = Math.max.apply(null, pts.map(function (p) { return p[1]; }));
-      var offset = (groups.length - 1 - gi) * 1.0;
-      series.push({
-        type: 'line', smooth: true, showSymbol: false, silent: true,
-        data: pts.map(function (p) { return [p[0], offset + 0.85 * p[1] / maxD]; }),
-        lineStyle: { color: color(theme, gi), width: 1.3 },
-        areaStyle: { color: rgba(color(theme, gi), 0.35), origin: 'start' },
-        z: 2 + gi
-      });
-    });
-    return Object.assign(base(theme), {
-      tooltip: { show: false },
-      grid: { left: 50, right: 20, top: 14, bottom: 24 },
-      xAxis: Object.assign({ type: 'value', scale: true }, axes(theme, { splitLine: { show: false } })),
-      yAxis: Object.assign({ type: 'value', min: 0, max: groups.length + 0.2, show: false }, axes(theme, { splitLine: { show: false } })),
-      graphic: labels.map(function (lb, i) {
-        return { type: 'text', left: 6, top: (14 + (groups.length - 1 - i) * ((el && el.clientHeight || 380) - 40) / Math.max(1, groups.length)) + 'px',
-          style: { text: lb, fill: theme.muted, font: '11px Inter, "PingFang SC", sans-serif' } };
-      }),
-      series: series
-    });
-  };
-
-  B.ecdf = function (el, d, theme) {
-    var s = (d.samples || []).slice().sort(function (a, b) { return a - b; });
-    var n = s.length;
-    var ecdf = s.map(function (v, i) { return [v, Math.round((i + 1) / n * 1000) / 10]; });
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'axis', backgroundColor: theme.panel, borderColor: rgba(theme.accent, .4), textStyle: { color: theme.text, fontSize: 11 } },
-      legend: legend(theme),
-      grid: { left: 46, right: 20, top: 32, bottom: 28 },
-      xAxis: Object.assign({ type: 'value', scale: true, name: '样本值', nameTextStyle: { color: theme.muted, fontSize: 10 } }, axes(theme)),
-      yAxis: Object.assign({ type: 'value', max: 100, axisLabel: { color: theme.muted, fontSize: 10, formatter: '{value}%' } }, axes(theme)),
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      grid: grid({ left: 6, right: 16, top: 14, bottom: 16 }),
+      xAxis: xAxis(t, { data: labels, axisLabel: { color: muted(t), fontSize: 8.5, fontFamily: FONT, interval: 2, margin: 8 } }),
+      yAxis: yAxis(t, { max: Math.ceil(maxC * 1.18) }),
       series: [
-        { name: 'ECDF', type: 'line', data: ecdf, showSymbol: false, step: 'end',
-          lineStyle: { color: theme.accent, width: 2 }, areaStyle: { color: rgba(theme.accent, 0.12) } },
-        { name: '理论分位', type: 'line', showSymbol: false,
-          data: [[s[0], 0], [s[Math.floor(n / 2)], 50], [s[n - 1], 100]],
-          lineStyle: { color: rgba(theme.text, 0.35), type: 'dashed', width: 1.2 } }
+        { type: 'bar', data: h.counts, barWidth: '88%', silent: true,
+          itemStyle: { color: rgba(accent(t), 0.28), borderColor: rgba(accent(t), 0.5), borderWidth: 0.6 } },
+        { type: 'line', data: curve, showSymbol: false, smooth: true, silent: true,
+          lineStyle: { color: ink(t), width: 1.6 } }
       ]
     });
   };
 
-  /* ================= 5. 关系与相关 ================= */
-  B.scatter = function (el, d, theme) {
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item', formatter: function (p) { return p.seriesName + '<br/>' + d.xName + '：' + p.value[0] + '<br/>' + d.yName + '：' + p.value[1]; } }),
-      grid: { left: 48, right: 20, top: 22, bottom: 40 },
-      xAxis: Object.assign({ type: 'value', scale: true, name: d.xName, nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: theme.muted, fontSize: 11 } }, axes(theme)),
-      yAxis: Object.assign({ type: 'value', scale: true, name: d.yName, nameTextStyle: { color: theme.muted, fontSize: 11 } }, axes(theme)),
-      series: [{ name: d.seriesName || '样本', type: 'scatter', data: d.points, symbolSize: 9,
-        itemStyle: { color: rgba(theme.accent, 0.7), borderColor: theme.panel, borderWidth: 1 } }]
-    });
-  };
-
-  B.corrMatrix = function (el, d, theme) {
-    var names = d.names, m = d.matrix;
-    var data = [];
-    for (var i = 0; i < names.length; i++) for (var j = 0; j < names.length; j++) data.push([j, i, m[i][j]]);
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'item', backgroundColor: theme.panel, borderColor: rgba(theme.accent, .4), textStyle: { color: theme.text, fontSize: 11 },
-        formatter: function (p) { return names[p.value[1]] + ' × ' + names[p.value[0]] + '<br/>相关系数：' + p.value[2].toFixed(2); } },
-      grid: { left: 90, right: 20, top: 20, bottom: 70 },
-      xAxis: Object.assign({ type: 'category', data: names, splitArea: { show: false }, axisLabel: { color: theme.muted, fontSize: 10, rotate: 35 } }, axes(theme, { splitLine: { show: false } })),
-      yAxis: Object.assign({ type: 'category', data: names, axisLabel: { color: theme.muted, fontSize: 10 } }, axes(theme, { splitLine: { show: false } })),
-      visualMap: { min: -1, max: 1, calculable: false, orient: 'horizontal', left: 'center', bottom: 6, itemWidth: 10, itemHeight: 80,
-        textStyle: { color: theme.muted, fontSize: 9 }, inRange: { color: ['#6F8FA8', '#F5F2EA', '#C9A96A'] } },
-      series: [{ type: 'heatmap', data: data,
-        label: { show: true, color: theme.text, fontSize: 10, formatter: function (p) { return p.value[2].toFixed(2); } },
-        itemStyle: { borderColor: theme.bg, borderWidth: 2 } }]
-    });
-  };
-
-  B.venn = function (el, d, theme) {
-    var W = (el && el.clientWidth) || 700, H = (el && el.clientHeight) || 380;
-    var cx = W / 2, cy = H / 2 + 6, R = Math.min(W, H) * 0.26;
-    var sets = d.sets || [];
-    var centers = [[cx - R * 0.55, cy - R * 0.32], [cx + R * 0.55, cy - R * 0.32], [cx, cy + R * 0.55]];
-    var els = sets.slice(0, 3).map(function (s, i) {
-      return { type: 'circle', shape: { cx: centers[i][0], cy: centers[i][1], r: R },
-        style: { fill: rgba(color(theme, i), 0.28), stroke: color(theme, i), lineWidth: 1.4 }, silent: true };
-    });
-    sets.slice(0, 3).forEach(function (s, i) {
-      els.push({ type: 'text', left: centers[i][0] - s.name.length * 6, top: centers[i][1] - 26,
-        style: { text: s.name + ' (' + s.value + ')', fill: theme.text, font: '600 12px Inter, "PingFang SC", sans-serif' } });
-    });
-    els.push({ type: 'text', left: cx - 34, top: cy - R * 0.5, style: { text: d.overlapAB || '', fill: theme.text, font: '700 12px Inter' } });
-    els.push({ type: 'text', left: cx - 16, top: cy + R * 0.22, style: { text: d.overlapAll || '', fill: theme.text, font: '700 12px Inter' } });
-    return Object.assign(base(theme), { tooltip: { show: false }, graphic: els, _noPolish: true });
-  };
-
-  B.arc = function (el, d, theme) {
-    var nodes = (d.nodes || []).map(function (n, i) {
-      return { name: n, x: i * 100, y: 0, symbolSize: 12, itemStyle: { color: theme.accent } };
-    });
-    var idx = {};
-    d.nodes.forEach(function (n, i) { idx[n] = i; });
-    var links = (d.links || []).map(function (l) {
-      return { source: l[0], target: l[1], lineStyle: { color: rgba(theme.text, 0.4), width: 1.5, curveness: 0.5 } };
-    });
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item' }),
+  B.boxplot = function (el, d, t) {
+    var boxes = d.boxes || [];
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) {
+        var v = p.value;
+        return p.name + '<br/>max ' + num(v[5]) + ' · Q3 ' + num(v[4]) + ' · med ' + num(v[3]) + ' · Q1 ' + num(v[2]) + ' · min ' + num(v[1]);
+      } }),
+      grid: grid({ left: 6, right: 16, top: 16, bottom: 18 }),
+      xAxis: xAxis(t, { data: d.categories, boundaryGap: true, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
+      yAxis: yAxis(t, { scale: true }),
       series: [{
-        type: 'graph', layout: 'none', data: nodes, links: links,
-        roam: false, symbolSize: 12, edgeSymbol: ['none', 'none'],
-        lineStyle: { color: rgba(theme.text, 0.35), curveness: 0.5, width: 1.4 },
-        label: { show: true, position: 'bottom', color: theme.text, fontSize: 11 },
-        itemStyle: { color: theme.accent, borderColor: theme.bg, borderWidth: 2 },
-        top: '42%', bottom: '42%', left: 30, right: 30
+        type: 'boxplot', boxWidth: [10, 22],
+        data: boxes,  /* [min, Q1, med, Q3, max] */
+        itemStyle: { color: rgba(accent(t), 0.16), borderColor: rgba(accent(t), 0.9), borderWidth: 1.1 },
+        emphasis: { itemStyle: { borderColor: accent(t), borderWidth: 1.6 } }
+      }, {
+        /* 中位数标注 */
+        type: 'scatter', symbolSize: 0.1, silent: true,
+        data: boxes.map(function (b, i) { return [i, b[2]]; }),
+        label: { show: true, position: 'right', distance: 8, color: ink(t), fontSize: 9.5, fontFamily: FONT,
+          formatter: function (p) { return num(p.value[1]); } }
+      }]
+    });
+  };
+
+  /* 小提琴图：custom 系列绘制密度多边形 */
+  B.violin = function (el, d, t) {
+    var groups = d.groups || [], cats = d.categories || [];
+    var all = [].concat.apply([], groups);
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    var W = (el && el.clientWidth) || 640, H = (el && el.clientHeight) || 190;
+    var halfW = Math.min(20, (H - 60) / Math.max(1, cats.length) / 2.6);
+    var seriesData = groups.map(function (g, gi) {
+      var pts = kdePts(g, lo, hi, 40);
+      var maxD = Math.max.apply(null, pts.map(function (p) { return p[1]; })) || 1;
+      var q1 = quantile(g, 0.25), q2 = quantile(g, 0.5), q3 = quantile(g, 0.75);
+      return { value: [gi, ...pts.map(function (p) { return p[1] / maxD; }), { q1: q1, q2: q2, q3: q3 }], xs: pts.map(function (p) { return p[0]; }),
+        q1: q1, q2: q2, q3: q3 };
+    });
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return cats[p.value[0]] + '<br/>中位数 ' + num(p.data.q2); } }),
+      grid: grid({ left: 6, right: 18, top: 14, bottom: 18 }),
+      xAxis: yAxis(t, { type: 'value', min: lo, max: hi, splitLine: { show: true, lineStyle: { color: rule(t) } } }),
+      yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT } }),
+      series: [{
+        type: 'custom',
+        renderItem: function (params, api) {
+          var gi = api.value(0);
+          var cy = api.coord([0, gi])[1];
+          var half = api.size([0, 1])[1] * 0.24;
+          var item = seriesData[params.dataIndex];
+          var pts = [];
+          var n = item.xs.length;
+          for (var i = 0; i < n; i++) {
+            var x = api.coord([item.xs[i], gi])[0];
+            pts.push([x, cy - item.value[i + 1] * half]);
+          }
+          var right = pts.slice();
+          var left = [];
+          for (var k = n - 1; k >= 0; k--) {
+            var x2 = api.coord([item.xs[k], gi])[0];
+            left.push([x2, cy + item.value[k + 1] * half]);
+          }
+          var poly = right.concat(left);
+          var c = seriesColor(t, params.dataIndex);
+          return {
+            type: 'group', children: [
+              { type: 'polygon', shape: { points: poly }, style: { fill: rgba(c, 0.22), stroke: rgba(c, 0.85), lineWidth: 1.2 } },
+              { type: 'line', shape: { x1: api.coord([item.q1, gi])[0], y1: cy, x2: api.coord([item.q3, gi])[0], y2: cy },
+                style: { stroke: rgba(ink(t), 0.5), lineWidth: 3 } },
+              { type: 'circle', shape: { cx: api.coord([item.q2, gi])[0], cy: cy, r: 2.4 }, style: { fill: ink(t) } }
+            ]
+          };
+        },
+        data: seriesData, encode: { x: 0, y: 1 }
+      }]
+    });
+  };
+  function quantile(arr, q) {
+    var a = arr.slice().sort(function (x, y) { return x - y; });
+    var pos = (a.length - 1) * q, b = Math.floor(pos), rest = pos - b;
+    return a[b + 1] !== undefined ? a[b] + rest * (a[b + 1] - a[b]) : a[b];
+  }
+
+  B.beeswarm = function (el, d, t) {
+    var cats = d.categories || [], groups = d.groups || [];
+    var pts = [];
+    groups.forEach(function (g, gi) {
+      var sorted = g.slice().sort(function (a, b) { return a - b; });
+      var placed = [];
+      sorted.forEach(function (v) {
+        var jx = 0, k = 0;
+        while (placed.some(function (o) { return Math.abs(o.v - v) < 1.6 && Math.abs(o.jx - jx) < 0.10; }) && k < 26) {
+          jx = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.10; k++;
+        }
+        placed.push({ v: v, jx: jx });
+        pts.push([v, gi + Math.max(-0.36, Math.min(0.36, jx)) * 1.2]);
+      });
+    });
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return num(p.value[0]); } }),
+      grid: grid({ left: 6, right: 18, top: 14, bottom: 18 }),
+      xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: true, lineStyle: { color: rule(t) } } }),
+      yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT } }),
+      series: [
+        { type: 'scatter', data: pts, symbolSize: 4,
+          itemStyle: { color: rgba(accent(t), 0.55), borderColor: rgba(accent(t), 0.9), borderWidth: 0.5 } },
+        { type: 'scatter', silent: true, symbolSize: 0.1,
+          data: groups.map(function (g, gi) { return [quantile(g, 0.5), gi]; }),
+          label: { show: true, position: 'top', distance: 4, color: accent(t), fontSize: 9, fontWeight: 700, fontFamily: FONT,
+            backgroundColor: '#fff', padding: [1, 3], borderRadius: 2,
+            formatter: function (p) { return 'med ' + num(p.value[0]); } } }
+      ]
+    });
+  };
+
+  B.ridge = function (el, d, t) {
+    var labels = d.labels || [], groups = d.groups || [];
+    var all = [].concat.apply([], groups);
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    var rows = groups.map(function (g, gi) {
+      var pts = kdePts(g, lo, hi, 48);
+      var maxD = Math.max.apply(null, pts.map(function (p) { return p[1]; })) || 1;
+      return { gi: gi, xs: pts.map(function (p) { return p[0]; }), ys: pts.map(function (p) { return p[1] / maxD; }) };
+    });
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return labels[p.value[0]] || ''; } }),
+      grid: { left: 8, right: 14, top: 10, bottom: 18 },
+      xAxis: yAxis(t, { type: 'value', min: lo, max: hi, splitLine: { show: false },
+        axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT } }),
+      yAxis: yAxis(t, { type: 'value', min: -0.2, max: groups.length, show: false, splitLine: { show: false } }),
+      graphic: labels.map(function (lb, i) {
+        var H0 = (el && el.clientHeight) || 190;
+        var top = 10 + (1 - (i + 0.5) / labels.length) * (H0 - 28);
+        return { type: 'text', left: 'right', top: Math.round(top), z: 20,
+          style: { text: lb, fill: muted(t), font: '9.5px ' + FONT, textAlign: 'right' } };
+      }),
+      series: [{
+        type: 'custom',
+        renderItem: function (params, api) {
+          var row = rows[params.dataIndex];
+          var baseY = groups.length - 1 - row.gi;
+          var pts = [];
+          for (var i = 0; i < row.xs.length; i++) {
+            var p = api.coord([row.xs[i], baseY + row.ys[i] * 0.95]);
+            pts.push([p[0], p[1]]);
+          }
+          var bottomRight = api.coord([row.xs[row.xs.length - 1], baseY]);
+          var bottomLeft = api.coord([row.xs[0], baseY]);
+          pts.push([bottomRight[0], bottomRight[1]]);
+          pts.push([bottomLeft[0], bottomLeft[1]]);
+          var c = seriesColor(t, row.gi);
+          return { type: 'polygon', shape: { points: pts },
+            style: { fill: rgba(c, 0.30), stroke: rgba(c, 0.95), lineWidth: 1.1 },
+            emphasis: { style: { fill: rgba(c, 0.45) } } };
+        },
+        data: rows.map(function (r) { return { value: [r.gi] }; })
+      }]
+    });
+  };
+
+  B.ecdf = function (el, d, t) {
+    var s = (d.samples || []).slice().sort(function (a, b) { return a - b; });
+    var n = s.length;
+    var ecdf = s.map(function (v, i) { return [v, (i + 1) / n * 100]; });
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      grid: grid({ left: 6, right: 24, top: 16, bottom: 20 }),
+      xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
+        name: 'sample', nameLocation: 'end', nameGap: 6, nameTextStyle: { color: muted(t), fontSize: 9.5, fontFamily: FONT, align: 'right' } }),
+      yAxis: yAxis(t, { type: 'value', max: 100, axisLabel: { color: muted(t), fontSize: 10, fontFamily: FONT, formatter: '{value}%' } }),
+      series: [
+        { type: 'line', data: ecdf, showSymbol: false, step: 'end', silent: false,
+          lineStyle: { color: ink(t), width: 2 }, areaStyle: { color: rgba(ink(t), 0.05) } },
+        { type: 'line', data: [[s[0], 0], [s[Math.floor(n / 2)], 50], [s[n - 1], 100]], showSymbol: false,
+          lineStyle: { color: rgba(accent(t), 0.9), type: 'dashed', width: 1.2 }, silent: true }
+      ]
+    });
+  };
+
+  B.matrixHeat = function (el, d, t) {
+    var names = d.names, m = d.matrix;
+    var cells = [];
+    for (var i = 0; i < names.length; i++) for (var j = 0; j < names.length; j++) cells.push([j, i, Math.round(m[i][j] * 100) / 100]);
+    var vals = cells.map(function (c) { return c[2]; });
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return names[p.value[1]] + ' · ' + names[p.value[0]] + '<br/>' + num(p.value[2]); } }),
+      grid: { left: 6, right: 14, top: 14, bottom: 16, containLabel: true },
+      xAxis: xAxis(t, { data: names, axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT, interval: 0 } }),
+      yAxis: xAxis(t, { data: names, axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT } }),
+      visualMap: { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), show: false,
+        inRange: { color: [rgba(ink(t), 0.04), rgba(accent(t), 0.35), accent(t)] } },
+      series: [{ type: 'heatmap', data: cells, itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
+        label: { show: true, color: ink(t), fontSize: 9, fontFamily: FONT,
+          formatter: function (p) { return p.value[2] >= 10 ? Math.round(p.value[2]) : p.value[2].toFixed(1); } } }]
+    });
+  };
+
+  /* ================= 5. 关系与相关 ================= */
+  B.scatter = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) { return d.xName + ' ' + num(p.value[0]) + '<br/>' + d.yName + ' ' + num(p.value[1]); } }),
+      grid: grid({ left: 6, right: 24, top: 18, bottom: 24 }),
+      xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
+        name: d.xName, nameLocation: 'middle', nameGap: 24, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
+      yAxis: yAxis(t, { type: 'value', scale: true, name: d.yName, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
+      series: [{
+        type: 'scatter', data: d.points, symbolSize: 7,
+        itemStyle: { color: rgba(accent(t), 0.55), borderColor: rgba(accent(t), 0.95), borderWidth: 0.6 },
+        emphasis: { itemStyle: { color: accent(t) } }
+      }]
+    });
+  };
+
+  B.bubble = function (el, d, t) {
+    var maxS = Math.max.apply(null, d.data.map(function (x) { return x.size; }));
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return p.name + '<br/>' + d.xName + ' ' + p.value[0] + '<br/>' + d.yName + ' ' + p.value[1]; } }),
+      grid: grid({ left: 6, right: 24, top: 18, bottom: 24 }),
+      xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
+        name: d.xName, nameLocation: 'middle', nameGap: 24, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
+      yAxis: yAxis(t, { type: 'value', scale: true, name: d.yName, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
+      series: [{
+        type: 'scatter',
+        data: d.data.map(function (x, i) { return { name: x.name, value: [x.x, x.y], symbolSize: 12 + Math.sqrt(x.size / maxS) * 26, itemStyle: { color: rgba(seriesColor(t, i), 0.55), borderColor: seriesColor(t, i), borderWidth: 0.8 } }; }),
+        label: { show: true, position: 'inside', color: '#fff', fontSize: 9, fontFamily: FONT, formatter: '{b}' }
+      }]
+    });
+  };
+
+  B.corrMatrix = function (el, d, t) {
+    var names = d.names, m = d.matrix, data = [];
+    for (var i = 0; i < names.length; i++) for (var j = 0; j < names.length; j++) data.push([j, i, m[i][j]]);
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return names[p.value[1]] + ' × ' + names[p.value[0]] + '<br/>r = ' + p.value[2].toFixed(2); } }),
+      grid: { left: 6, right: 14, top: 14, bottom: 40, containLabel: true },
+      xAxis: xAxis(t, { data: names, axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT, rotate: 30, margin: 6 } }),
+      yAxis: xAxis(t, { data: names, axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT } }),
+      visualMap: { min: -1, max: 1, show: false, inRange: { color: ['#6F8FA8', '#F7F4EC', '#A67C3D'] } },
+      series: [{ type: 'heatmap', data: data, itemStyle: { borderColor: '#FFF', borderWidth: 1.5 },
+        label: { show: true, color: ink(t), fontSize: 8.5, fontFamily: FONT, formatter: function (p) { return Math.abs(p.value[2]) > 0.05 ? p.value[2].toFixed(1) : '·'; } } }]
+    });
+  };
+
+  B.venn = function (el, d, t) {
+    var W = (el && el.clientWidth) || 640, H = (el && el.clientHeight) || 190;
+    var R = Math.min(W * 0.17, H * 0.30);
+    var cx = W / 2, cy = H / 2 + 2;
+    var sets = (d.sets || []).slice(0, 3);
+    var centers = [[cx - R * 0.52, cy - R * 0.34], [cx + R * 0.52, cy - R * 0.34], [cx, cy + R * 0.58]];
+    var els = [];
+    sets.forEach(function (s, i) {
+      els.push({ type: 'circle', shape: { cx: centers[i][0], cy: centers[i][1], r: R },
+        style: { fill: rgba(seriesColor(t, i), 0.22), stroke: seriesColor(t, i), lineWidth: 1.1 }, silent: true });
+    });
+    sets.forEach(function (s, i) {
+      var ly = i < 2 ? centers[i][1] - R - 4 : centers[i][1] + R + 4;
+      els.push({ type: 'text', left: Math.round(centers[i][0] - s.name.length * 5), top: Math.round(ly),
+        style: { text: s.name + '  ' + s.value, fill: ink(t), font: '600 10.5px ' + FONT } });
+    });
+    els.push({ type: 'text', left: cx - 10, top: cy - R * 0.55, style: { text: String(d.overlapAB || ''), fill: ink(t), font: '700 10px ' + FONT } });
+    els.push({ type: 'text', left: cx - 6, top: cy + R * 0.18, style: { text: String(d.overlapAll || ''), fill: ink(t), font: '700 10px ' + FONT } });
+    return base(t, { tooltip: { show: false }, graphic: els });
+  };
+
+  B.arc = function (el, d, t) {
+    var nodes = (d.nodes || []).map(function (n, i) { return { name: n, x: i * 100, y: 0, symbolSize: 8, itemStyle: { color: ink(t) } }; });
+    var links = (d.links || []).map(function (l) {
+      return { source: l[0], target: l[1], lineStyle: { color: rgba(accent(t), 0.55), width: 1.4, curveness: 0.6 } };
+    });
+    return base(t, {
+      tooltip: tip(t),
+      series: [{
+        type: 'graph', layout: 'none', data: nodes, links: links, roam: false,
+        symbol: 'circle', symbolSize: 8,
+        lineStyle: { color: rgba(accent(t), 0.5), curveness: 0.6, width: 1.3 },
+        label: { show: true, position: 'bottom', distance: 8, color: muted(t), fontSize: 10, fontFamily: FONT },
+        itemStyle: { color: ink(t), borderColor: '#FFF', borderWidth: 1.5 },
+        top: '30%', bottom: '30%', left: 26, right: 26
       }]
     });
   };
 
   /* ================= 6. 流动与转化 ================= */
-  B.funnel = function (el, d, theme) {
+  B.funnel = function (el, d, t) {
     var steps = d.steps || [];
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { formatter: function (p) { return p.name + '：' + p.value; } }),
-      legend: legend(theme, { orient: 'vertical', right: 10, top: 'middle' }),
+    var first = steps[0] ? steps[0].value : 1;
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) { return p.name + ' ' + num(p.value) + ' (' + (p.value / first * 100).toFixed(1) + '%)'; } }),
       series: [{
-        type: 'funnel', left: '8%', right: '28%', top: 26, bottom: 20,
-        minSize: '22%', maxSize: '96%', sort: 'descending', gap: 3,
-        label: { show: true, position: 'inside', color: '#fff', fontSize: 11, formatter: function (p) { return p.name + ' ' + p.value; } },
-        itemStyle: { borderColor: theme.bg, borderWidth: 1 },
-        data: steps.map(function (s, i) { return { name: s.name, value: s.value, itemStyle: { color: color(theme, i) } }; })
+        type: 'funnel', left: '12%', right: '12%', top: 16, bottom: 12,
+        minSize: '18%', maxSize: '94%', sort: 'descending', gap: 2,
+        itemStyle: { borderColor: '#FFF', borderWidth: 2 },
+        label: { show: true, position: 'inside', color: '#fff', fontSize: 10.5, fontFamily: FONT,
+          formatter: function (p) { return p.name + '  ' + (p.value / first * 100).toFixed(0) + '%'; } },
+        data: steps.map(function (s, i) { return { name: s.name, value: s.value, itemStyle: { color: rgba(seriesColor(t, i), 0.9) } }; })
       }]
     });
   };
 
-  B.chord = function (el, d, theme) {
+  B.chord = function (el, d, t) {
     var names = d.names, m = d.matrix;
-    var nodes = names.map(function (n, i) {
-      return { name: n, symbolSize: 10, itemStyle: { color: color(theme, i) }, label: { color: theme.text, fontSize: 11 } };
-    });
+    var nodes = names.map(function (n, i) { return { name: n, symbolSize: 9, itemStyle: { color: seriesColor(t, i) }, label: { color: ink(t), fontSize: 10, fontFamily: FONT } }; });
     var links = [];
-    for (var i = 0; i < names.length; i++) {
-      for (var j = i + 1; j < names.length; j++) {
-        var v = m[i][j] + m[j][i];
-        if (v > 0) links.push({ source: names[i], target: names[j], value: v,
-          lineStyle: { color: color(theme, i), width: Math.max(1, v / 6), opacity: 0.45 } });
-      }
+    for (var i = 0; i < names.length; i++) for (var j = i + 1; j < names.length; j++) {
+      var v = m[i][j] + m[j][i];
+      if (v > 0) links.push({ source: names[i], target: names[j], value: v,
+        lineStyle: { color: rgba(seriesColor(t, i), 0.35), width: Math.max(0.8, v / 7), curveness: 0.45, opacity: 0.5 } });
     }
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item' }),
+    return base(t, {
+      tooltip: tip(t),
       series: [{
         type: 'graph', layout: 'circular', circular: { rotateLabel: true },
-        data: nodes, links: links, roam: false, symbolSize: 10,
-        lineStyle: { curveness: 0.4, opacity: 0.5 },
-        label: { show: true, color: theme.text, fontSize: 11 },
-        itemStyle: { borderColor: theme.bg, borderWidth: 2 },
-        top: 30, bottom: 30
+        data: nodes, links: links, roam: false, symbolSize: 9,
+        lineStyle: { curveness: 0.45, opacity: 0.5 },
+        label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT },
+        itemStyle: { borderColor: '#FFF', borderWidth: 1.5 },
+        top: 26, bottom: 26
       }]
     });
   };
 
   /* ================= 7. 地理空间 ================= */
-  function geoBase(theme, series) {
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'item', backgroundColor: theme.panel, borderColor: rgba(theme.accent, .4), textStyle: { color: theme.text, fontSize: 11 } },
+  function geo(t, series, extra) {
+    return base(t, Object.assign({
+      tooltip: tip(t),
       geo: {
-        map: 'world', roam: true, zoom: 1.15, center: [30, 22],
-        itemStyle: { areaColor: rgba(theme.text, 0.05), borderColor: rgba(theme.text, 0.16), borderWidth: 0.5 },
-        emphasis: { itemStyle: { areaColor: rgba(theme.accent, 0.18) }, label: { show: false } },
-        silent: false
+        map: 'world', roam: true, zoom: 1.1, center: [24, 20],
+        itemStyle: { areaColor: rgba(ink(t), 0.045), borderColor: rgba(ink(t), 0.13), borderWidth: 0.4 },
+        emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.16) }, label: { show: false } },
+        select: { itemStyle: { areaColor: rgba(accent(t), 0.16) } }
       },
       series: series
-    });
+    }, extra || {}));
   }
-  B.symbolMap = function (el, d, theme) {
-    var pts = d.points || [];
-    var max = Math.max.apply(null, pts.map(function (p) { return p.value; }));
-    return geoBase(theme, [{
-      type: 'scatter', coordinateSystem: 'geo', data: pts.map(function (p) { return { name: p.name, value: p.coord.concat(p.value) }; }),
-      symbolSize: function (v) { return 8 + Math.sqrt(v[2] / max) * 24; },
-      itemStyle: { color: rgba(theme.accent, 0.65), borderColor: theme.accent, borderWidth: 1 },
-      label: { show: true, position: 'right', formatter: function (p) { return p.name; }, color: theme.text, fontSize: 10 }
-    }]);
-  };
-  B.heatMapGeo = function (el, d, theme) {
-    var pts = [];
-    var hubs = [[121.47, 31.23], [-74.01, 40.71], [-0.13, 51.51], [139.69, 35.69], [103.82, 1.35], [55.27, 25.20], [151.21, -33.87], [-46.63, -23.55]];
-    hubs.forEach(function (h, i) {
-      for (var k = 0; k < 22; k++) pts.push([h[0] + (Math.sin(k * 7 + i) * 6), h[1] + (Math.cos(k * 5 + i) * 5), Math.round(30 + Math.abs(Math.sin(k + i)) * 90)]);
-    });
-    var opt = geoBase(theme, [{
-      type: 'heatmap', coordinateSystem: 'geo', data: pts, pointSize: 8, blurSize: 12,
-      minOpacity: 0.15, maxOpacity: 0.85
-    }]);
-    opt.visualMap = { min: 0, max: 120, calculable: false, show: false,
-      inRange: { color: ['rgba(201,169,106,0.05)', 'rgba(201,169,106,0.55)', 'rgba(168,118,62,0.9)'] } };
-    return opt;
-  };
-  B.trajectory = function (el, d, theme) {
-    var path = d.path || [];
-    var pts = path.map(function (p, i) { return { name: 'P' + (i + 1), value: p }; });
-    return geoBase(theme, [
-      { type: 'lines', coordinateSystem: 'geo', polyline: true, data: [{ coords: path }],
-        lineStyle: { color: theme.accent, width: 2, opacity: 0.8, curveness: 0 }, effect: { show: true, period: 5, trailLength: 0.25, symbol: 'arrow', symbolSize: 7 } },
-      { type: 'scatter', coordinateSystem: 'geo', data: pts, symbolSize: 7, itemStyle: { color: theme.text } }
-    ]);
-  };
-  B.migration = function (el, d, theme) {
-    var flows = d.flows || [];
-    return geoBase(theme, [{
-      type: 'lines', coordinateSystem: 'geo', zlevel: 2,
-      data: flows.map(function (f) { return { coords: [f.from, f.to], value: f.value }; }),
-      lineStyle: { color: theme.accent, width: 1.6, opacity: 0.6, curveness: 0.25 },
-      effect: { show: true, period: 4, trailLength: 0.2, symbol: 'circle', symbolSize: 4 }
-    }]);
-  };
-  B.flowMap = function (el, d, theme) {
-    var flows = d.flows || [];
-    return geoBase(theme, [
-      { type: 'lines', coordinateSystem: 'geo', data: flows.map(function (f) { return { coords: [f.from, f.to], value: f.value }; }),
-        lineStyle: { color: theme.accent, width: 1.8, opacity: 0.65, curveness: 0.28 },
-        effect: { show: true, period: 4.5, trailLength: 0.22, symbol: 'arrow', symbolSize: 6 } },
-      { type: 'effectScatter', coordinateSystem: 'geo', data: (d.hubs || []).map(function (h) { return { name: h.name, value: h.coord }; }),
-        symbolSize: 9, rippleEffect: { brushType: 'stroke', scale: 3 }, itemStyle: { color: theme.accent } }
-    ]);
-  };
-  B.hexMap = function (el, d, theme) {
-    var pts = d.points || [];
-    var max = Math.max.apply(null, pts.map(function (p) { return p.value; }));
-    return geoBase(theme, [{
-      type: 'scatter', coordinateSystem: 'geo',
-      data: pts.map(function (p) { return { name: p.name, value: p.coord.concat(p.value) }; }),
-      symbol: 'hexagon', symbolSize: function (v) { return 14 + (v[2] / max) * 26; },
-      itemStyle: { color: rgba(theme.accent, 0.7), borderColor: theme.bg, borderWidth: 1 },
-      label: { show: true, formatter: function (p) { return p.name; }, color: theme.text, fontSize: 9, position: 'bottom' }
-    }]);
-  };
-
-  /* ================= 8. 层级与流程 ================= */
-  B.tree = function (el, d, theme) {
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item' }),
-      series: [{
-        type: 'tree', data: [d.tree], layout: 'orthogonal', orient: 'LR',
-        left: 24, right: 90, top: 20, bottom: 20,
-        symbol: 'circle', symbolSize: 8,
-        lineStyle: { color: rgba(theme.text, 0.28), width: 1.4, curveness: 0.4 },
-        label: { position: 'left', verticalAlign: 'middle', align: 'right', color: theme.text, fontSize: 11 },
-        leaves: { label: { position: 'right', align: 'left' } },
-        itemStyle: { color: theme.accent, borderColor: theme.bg, borderWidth: 1 },
-        expandAndCollapse: false, initialTreeDepth: -1
-      }]
-    });
-  };
-  B.orgChart = function (el, d, theme) {
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item' }),
-      series: [{
-        type: 'tree', data: [d.tree], layout: 'orthogonal', orient: 'TB',
-        top: 30, bottom: 60, left: 40, right: 40,
-        symbol: 'roundRect', symbolSize: [76, 26],
-        lineStyle: { color: rgba(theme.text, 0.3), width: 1.4, curveness: 0 },
-        label: { position: 'inside', color: theme.text, fontSize: 10 },
-        itemStyle: { color: rgba(theme.accent, 0.16), borderColor: theme.accent, borderWidth: 1 },
-        expandAndCollapse: false, initialTreeDepth: -1
-      }]
-    });
-  };
-  B.icicle = function (el, d, theme) {
-    /* 用横向堆叠条模拟冰柱图（层级占比） */
-    var rows = [];
-    function walk(node, depth, start) {
-      var total = node.value || (node.children || []).reduce(function (a, c) { return a + (c.value || 0); }, 0);
-      rows.push({ name: node.name, depth: depth, start: start, value: total });
-      var acc = start;
-      (node.children || []).forEach(function (c) { walk(c, depth + 1, acc); acc += (c.value || 0); });
-      return total;
-    }
-    walk(d.tree, 0, 0);
-    var series = [];
-    var maxDepth = Math.max.apply(null, rows.map(function (r) { return r.depth; }));
-    for (var dep = 0; dep <= maxDepth; dep++) {
-      var items = rows.filter(function (r) { return r.depth === dep; });
-      series.push({
-        name: 'L' + (dep + 1), type: 'bar', stack: 'ic', barWidth: '52%',
-        data: items.map(function (it) {
-          var arr = [];
-          return { value: [it.start, it.start + it.value], name: it.name };
-        }),
-        encode: { x: [0, 1] },
-        itemStyle: { color: rgba(theme.accent, 0.85 - dep * 0.22), borderColor: theme.bg, borderWidth: 1 },
-        label: { show: true, position: 'inside', color: dep === 0 ? '#fff' : theme.text, fontSize: 10, formatter: function (p) { return p.name; } }
-      });
-    }
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item' }),
-      grid: { left: 20, right: 20, top: 20, bottom: 20 },
-      xAxis: Object.assign({ type: 'value', show: false }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: ['层级'], show: false }, axes(theme)),
-      series: series
-    });
-  };
-  B.flowchart = function (el, d, theme) {
-    var steps = d.steps || [];
-    var n = steps.length;
-    var W = (el && el.clientWidth) || 700;
-    var gap = (W - 60) / Math.max(1, n);
-    var nodes = steps.map(function (s, i) {
-      var shape = s.type === 'decision' ? 'diamond' : (s.type === 'start' || s.type === 'end' ? 'roundRect' : 'rect');
-      return { name: s.name, x: 30 + gap * i + gap / 2, y: 1, symbol: shape,
-        symbolSize: s.type === 'decision' ? [64, 44] : [gap * 0.72, 34],
-        itemStyle: { color: s.type === 'decision' ? rgba(theme.accent, 0.18) : rgba(theme.text, 0.06),
-          borderColor: s.type === 'decision' ? theme.accent : rgba(theme.text, 0.3), borderWidth: 1.2 },
-        label: { color: theme.text, fontSize: 10 } };
-    });
-    var idx = {}; steps.forEach(function (s, i) { idx[s.name] = i; });
-    var links = [];
-    for (var i = 0; i < n - 1; i++) links.push({ source: steps[i].name, target: steps[i + 1].name });
-    return Object.assign(base(theme), {
-      tooltip: { show: false },
-      series: [{
-        type: 'graph', layout: 'none', data: nodes, links: links, roam: false,
-        lineStyle: { color: rgba(theme.text, 0.35), width: 1.4, curveness: 0 },
-        edgeSymbol: ['none', 'arrow'], edgeSymbolSize: 7,
-        label: { show: true, position: 'inside', color: theme.text, fontSize: 10 }
-      }]
-    });
-  };
-  B.swimlane = function (el, d, theme) {
-    var lanes = d.lanes || [], tasks = d.tasks || [];
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'item', formatter: function (p) { return p.name; } }),
-      grid: { left: 70, right: 20, top: 20, bottom: 26 },
-      xAxis: Object.assign({ type: 'value', min: 0, max: Math.max.apply(null, tasks.map(function (t) { return t.start + t.span; })) + 1, show: true, axisLabel: { color: theme.muted, fontSize: 10 } }, axes(theme)),
-      yAxis: Object.assign({ type: 'category', data: lanes, axisLabel: { color: theme.text, fontSize: 11 } }, axes(theme, { splitLine: { show: true } })),
-      series: [{
-        type: 'custom', renderItem: function (params, api) {
-          var lane = api.value(0), start = api.value(1), span = api.value(2);
-          var p0 = api.coord([start, lane]), p1 = api.coord([start + span, lane]);
-          var h = api.size([0, 1])[1] * 0.42;
-          return { type: 'rect', shape: { x: p0[0] + 1, y: p0[1] - h / 2, width: Math.max(6, p1[0] - p0[0] - 2), height: h },
-            style: api.style({ fill: rgba(theme.accent, 0.75) }), styleEmphasis: api.styleEmphasis() };
-        },
-        encode: { x: [1, 2], y: 0 },
-        data: tasks.map(function (t) { return { name: t.name, value: [t.lane, t.start, t.span],
-          itemStyle: { color: rgba(color(theme, t.lane), 0.8) } }; }),
-        label: { show: true, position: 'inside', color: '#fff', fontSize: 10, formatter: function (p) { return p.name; } }
-      }]
-    });
-  };
-
-  /* ================= 9. 特殊 ================= */
-  B.control = function (el, d, theme) {
-    var line = { type: 'line', data: d.values, showSymbol: false, smooth: true, lineStyle: { color: theme.accent, width: 2 }, z: 3 };
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'axis' }),
-      grid: { left: 44, right: 46, top: 24, bottom: 26 },
-      xAxis: Object.assign({ type: 'category', data: d.labels, axisLabel: { color: theme.muted, fontSize: 9, interval: 5 } }, axes(theme, { splitLine: { show: false } })),
-      yAxis: Object.assign({ type: 'value', scale: true }, axes(theme)),
-      series: [line,
-        { type: 'line', data: d.values.map(function () { return d.ucl; }), showSymbol: false, silent: true, lineStyle: { color: rgba(theme.down, 0.7), type: 'dashed', width: 1.3 },
-          endLabel: { show: true, formatter: 'UCL', color: theme.down, fontSize: 9 } },
-        { type: 'line', data: d.values.map(function () { return d.lcl; }), showSymbol: false, silent: true, lineStyle: { color: rgba(theme.down, 0.7), type: 'dashed', width: 1.3 },
-          endLabel: { show: true, formatter: 'LCL', color: theme.down, fontSize: 9 } },
-        { type: 'line', data: d.values.map(function () { return d.mean; }), showSymbol: false, silent: true, lineStyle: { color: rgba(theme.text, 0.45), width: 1.2 },
-          endLabel: { show: true, formatter: 'CL', color: theme.muted, fontSize: 9 } },
-        { type: 'scatter', data: d.values.map(function (v, i) { return (v > d.ucl || v < d.lcl) ? [i, v] : null; }).filter(Boolean),
-          symbolSize: 8, itemStyle: { color: theme.down }, z: 4 }
-      ]
-    });
-  };
-  B.parallel = function (el, d, theme) {
-    var dims = d.dims || [];
-    var schema = dims.map(function (n) { return { name: n, min: 0, max: 100 }; });
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'item', backgroundColor: theme.panel, borderColor: rgba(theme.accent, .4), textStyle: { color: theme.text, fontSize: 11 } },
-      legend: legend(theme),
-      parallelAxis: dims.map(function (n) { return { dim: dims.indexOf(n), name: n, nameTextStyle: { color: theme.muted, fontSize: 10 },
-        axisLine: { lineStyle: { color: rgba(theme.text, 0.25) } }, axisLabel: { color: theme.muted, fontSize: 9 }, axisTick: { show: false } }; }),
-      parallel: { left: 50, right: 40, top: 40, bottom: 24, parallelAxisDefault: {} },
-      series: (d.rows || []).map(function (r, i) {
-        return { name: r.name, type: 'parallel', data: [r.values], lineStyle: { width: 2, color: color(theme, i), opacity: 0.85 }, smooth: true };
-      })
-    });
-  };
-  B.streamgraph = function (el, d, theme) {
-    var data = [];
-    d.topics.forEach(function (t) {
-      t.values.forEach(function (v, i) { data.push([d.labels[i], v, t.name]); });
-    });
-    return Object.assign(base(theme), {
-      tooltip: Object.assign(tip(theme), { trigger: 'axis' }),
-      legend: legend(theme),
-      singleAxis: { type: 'category', data: d.labels, bottom: 26, top: 40, left: 30, right: 30,
-        axisLabel: { color: theme.muted, fontSize: 9, interval: 4 }, axisLine: { lineStyle: { color: rgba(theme.text, 0.2) } }, axisTick: { show: false } },
-      series: [{
-        type: 'themeRiver', data: data, emphasis: { focus: 'series' },
-        label: { show: false },
-        itemStyle: { opacity: 0.85 },
-        color: theme.series
-      }]
-    });
-  };
-
-  /* 分级统计图（世界地图着色） */
-  B.choropleth = function (el, d, theme) {
+  B.choropleth = function (el, d, t) {
     var vals = [
       { name: 'China', value: 5.2 }, { name: 'United States', value: 2.8 }, { name: 'Germany', value: 1.6 },
       { name: 'Japan', value: 1.2 }, { name: 'India', value: 6.8 }, { name: 'Brazil', value: 2.9 },
@@ -694,20 +848,265 @@
       { name: 'Nigeria', value: 3.1 }, { name: 'Egypt', value: 4.2 }, { name: 'Argentina', value: -1.2 },
       { name: 'South Korea', value: 2.2 }, { name: 'Italy', value: 0.8 }
     ];
-    return Object.assign(base(theme), {
-      tooltip: { trigger: 'item', formatter: function (p) { return p.name + '：' + (p.value !== undefined && !isNaN(p.value) ? p.value + '%' : '无数据'); },
-        backgroundColor: theme.panel, borderColor: rgba(theme.accent, .4), textStyle: { color: theme.text, fontSize: 11 } },
-      visualMap: { min: -2, max: 7, calculable: false, orient: 'vertical', right: 10, top: 'middle',
-        itemWidth: 10, itemHeight: 110, textStyle: { color: theme.muted, fontSize: 10 },
-        inRange: { color: ['#8FA8C8', '#EDE9DF', '#C9A96A', '#A8763E'] } },
+    return base(t, Object.assign(geo(t, [{
+      type: 'map', map: 'world', roam: true, zoom: 1.15, nameProperty: 'name',
+      itemStyle: { areaColor: rgba(ink(t), 0.04), borderColor: rgba(ink(t), 0.12), borderWidth: 0.4 },
+      emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.3) }, label: { show: true, color: ink(t), fontSize: 10 } },
+      label: { show: false }, data: vals
+    }]), {
+      visualMap: { min: -2, max: 7, show: false, inRange: { color: ['#8FA8C8', '#EFEBE1', '#D9C08A', '#A67C3D'] } },
+      geo: undefined
+    }));
+  };
+  B.symbolMap = function (el, d, t) {
+    var pts = d.points || [];
+    var max = Math.max.apply(null, pts.map(function (p) { return p.value; }));
+    return geo(t, [{
+      type: 'scatter', coordinateSystem: 'geo',
+      data: pts.map(function (p) { return { name: p.name, value: p.coord.concat(p.value) }; }),
+      symbolSize: function (v) { return 6 + Math.sqrt(v[2] / max) * 20; },
+      itemStyle: { color: rgba(accent(t), 0.55), borderColor: accent(t), borderWidth: 0.8 },
+      label: { show: true, position: 'right', distance: 4, color: muted(t), fontSize: 9, fontFamily: FONT, formatter: function (p) { return p.name; } }
+    }]);
+  };
+  B.heatMapGeo = function (el, d, t) {
+    var pts = [];
+    var hubs = [[121.47, 31.23], [-74.01, 40.71], [-0.13, 51.51], [139.69, 35.69], [103.82, 1.35], [55.27, 25.20], [151.21, -33.87], [-46.63, -23.55]];
+    hubs.forEach(function (h, i) {
+      for (var k = 0; k < 20; k++) pts.push([h[0] + Math.sin(k * 7 + i) * 5, h[1] + Math.cos(k * 5 + i) * 4, 40 + Math.abs(Math.sin(k + i)) * 60]);
+    });
+    var opt = geo(t, [{ type: 'heatmap', coordinateSystem: 'geo', data: pts, pointSize: 7, blurSize: 10, minOpacity: 0.12, maxOpacity: 0.75 }]);
+    opt.visualMap = { min: 0, max: 100, show: false, inRange: { color: ['rgba(166,124,61,0.05)', 'rgba(166,124,61,0.4)', 'rgba(120,82,35,0.85)'] } };
+    return opt;
+  };
+  B.trajectory = function (el, d, t) {
+    var path = d.path || [];
+    return geo(t, [
+      { type: 'lines', coordinateSystem: 'geo', polyline: true, data: [{ coords: path }], silent: true,
+        lineStyle: { color: rgba(accent(t), 0.8), width: 1.6, curveness: 0 } },
+      { type: 'scatter', coordinateSystem: 'geo', data: path.map(function (p, i) { return { name: 'P' + (i + 1), value: p }; }),
+        symbolSize: 5, itemStyle: { color: ink(t) } },
+      { type: 'lines', coordinateSystem: 'geo', polyline: true, data: [{ coords: path }], silent: true, zlevel: 3,
+        lineStyle: { color: '#fff', width: 0, curveness: 0 },
+        effect: { show: true, period: 6, trailLength: 0.18, symbol: 'circle', symbolSize: 3, color: accent(t) } }
+    ]);
+  };
+  B.migration = function (el, d, t) {
+    var flows = d.flows || [];
+    return geo(t, [{
+      type: 'lines', coordinateSystem: 'geo', zlevel: 2,
+      data: flows.map(function (f) { return { coords: [f.from, f.to], value: f.value }; }),
+      lineStyle: { color: rgba(accent(t), 0.55), width: 1.1, curveness: 0.28 },
+      effect: { show: true, period: 5, trailLength: 0.15, symbol: 'circle', symbolSize: 3 }
+    }]);
+  };
+  B.flowMap = function (el, d, t) {
+    var flows = d.flows || [];
+    return geo(t, [
+      { type: 'lines', coordinateSystem: 'geo', data: flows.map(function (f) { return { coords: [f.from, f.to], value: f.value }; }),
+        lineStyle: { color: rgba(accent(t), 0.5), width: 1.4, curveness: 0.3 },
+        effect: { show: true, period: 5, trailLength: 0.2, symbol: 'circle', symbolSize: 3 } },
+      { type: 'effectScatter', coordinateSystem: 'geo', data: (d.hubs || []).map(function (h) { return { name: h.name, value: h.coord }; }),
+        symbolSize: 7, rippleEffect: { brushType: 'stroke', scale: 2.6, period: 4 }, itemStyle: { color: ink(t) } }
+    ]);
+  };
+  B.hexMap = function (el, d, t) {
+    var pts = d.points || [];
+    var max = Math.max.apply(null, pts.map(function (p) { return p.value; }));
+    return geo(t, [{
+      type: 'scatter', coordinateSystem: 'geo',
+      data: pts.map(function (p) { return { name: p.name, value: p.coord.concat(p.value) }; }),
+      symbol: 'hexagon', symbolSize: function (v) { return 12 + (v[2] / max) * 22; },
+      itemStyle: { color: rgba(accent(t), 0.5), borderColor: accent(t), borderWidth: 0.8 },
+      label: { show: true, position: 'bottom', distance: 2, color: muted(t), fontSize: 8.5, fontFamily: FONT, formatter: function (p) { return p.name; } }
+    }]);
+  };
+
+  /* ================= 8. 层级与流程 ================= */
+  B.tree = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t),
       series: [{
-        type: 'map', map: 'world', roam: true, zoom: 1.2, nameProperty: 'name',
-        itemStyle: { areaColor: rgba(theme.text, 0.06), borderColor: rgba(theme.text, 0.2), borderWidth: 0.6 },
-        emphasis: { itemStyle: { areaColor: rgba(theme.accent, 0.35) }, label: { show: true, color: theme.text, fontSize: 10 } },
-        label: { show: false }, data: vals
+        type: 'tree', data: [d.tree], layout: 'orthogonal', orient: 'LR',
+        left: 52, right: 92, top: 12, bottom: 12,
+        symbol: 'circle', symbolSize: 6,
+        lineStyle: { color: rgba(ink(t), 0.18), width: 1.1, curveness: 0.5 },
+        label: { position: 'left', verticalAlign: 'middle', align: 'right', color: ink(t), fontSize: 10, fontFamily: FONT },
+        leaves: { label: { position: 'right', align: 'left' } },
+        itemStyle: { color: accent(t), borderColor: '#FFF', borderWidth: 1 },
+        expandAndCollapse: false, initialTreeDepth: -1
+      }]
+    });
+  };
+  B.orgChart = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t),
+      series: [{
+        type: 'tree', data: [d.tree], layout: 'orthogonal', orient: 'TB',
+        top: 22, bottom: 26, left: 16, right: 16,
+        symbol: 'roundRect', symbolSize: [46, 17],
+        lineStyle: { color: rgba(ink(t), 0.2), width: 1, curveness: 0 },
+        label: { position: 'inside', color: ink(t), fontSize: 8, fontFamily: FONT },
+        itemStyle: { color: '#FFF', borderColor: rgba(ink(t), 0.25), borderWidth: 1 },
+        emphasis: { itemStyle: { color: rgba(accent(t), 0.12), borderColor: accent(t) } },
+        expandAndCollapse: false, initialTreeDepth: -1
+      }]
+    });
+  };
+  B.icicle = function (el, d, t) {
+    /* 层级占比横向条：每层一行，长度=占比 */
+    var rows = [];
+    (function walk(node, depth, start, total) {
+      var val = node.value || (node.children || []).reduce(function (a, c) { return a + (c.value || 0); }, 0);
+      rows.push({ name: node.name, depth: depth, start: start, value: val, total: total });
+      var acc = start;
+      (node.children || []).forEach(function (c) { walk(c, depth + 1, acc, total); acc += (c.value || 0); });
+    })(d.tree, 0, 0, 100);
+    var maxDepth = Math.max.apply(null, rows.map(function (r) { return r.depth; }));
+    var series = [];
+    for (var dep = 0; dep <= maxDepth; dep++) {
+      var items = rows.filter(function (r) { return r.depth === dep && r.value > 0; });
+      series.push({
+        type: 'bar', stack: 'ic', barWidth: '46%', silent: false,
+        data: items.map(function (it) { return { name: it.name, value: [it.start, it.start + it.value] }; }),
+        itemStyle: { color: rgba(accent(t), 0.9 - dep * 0.22), borderColor: '#FFF', borderWidth: 1.5 },
+        label: { show: true, position: 'inside', color: dep === 0 ? '#FFF' : ink(t), fontSize: 9, fontFamily: FONT,
+          formatter: function (p) { var w = p.value[1] - p.value[0]; return (w >= 14 || dep === 0) ? p.name : ''; } },
+        labelLayout: { hideOverlap: true }
+      });
+    }
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item' }),
+      grid: { left: 10, right: 10, top: 10, bottom: 10 },
+      xAxis: yAxis(t, { type: 'value', max: 100, show: false, splitLine: { show: false } }),
+      yAxis: xAxis(t, { type: 'category', data: ['层级'], show: false }),
+      series: series
+    });
+  };
+  B.flowchart = function (el, d, t) {
+    var steps = d.steps || [], n = steps.length;
+    var W = (el && el.clientWidth) || 640;
+    var gap = (W - 40) / Math.max(1, n);
+    var nodes = steps.map(function (s, i) {
+      var isD = s.type === 'decision';
+      return {
+        name: s.name, x: 20 + gap * i + gap / 2, y: 1,
+        symbol: isD ? 'diamond' : (s.type === 'start' || s.type === 'end' ? 'roundRect' : 'rect'),
+        symbolSize: isD ? [Math.min(64, gap * 0.6), 34] : [Math.min(gap * 0.74, 92), 30],
+        itemStyle: { color: isD ? rgba(accent(t), 0.14) : '#FFF',
+          borderColor: isD ? accent(t) : rgba(ink(t), 0.28), borderWidth: 1 },
+        label: { color: ink(t), fontSize: 8, fontFamily: FONT, width: isD ? 40 : 76, overflow: 'break', lineHeight: 9 }
+      };
+    });
+    var links = [];
+    for (var i = 0; i < n - 1; i++) links.push({ source: steps[i].name, target: steps[i + 1].name });
+    return base(t, {
+      tooltip: { show: false },
+      series: [{
+        type: 'graph', layout: 'none', data: nodes, links: links, roam: false,
+        lineStyle: { color: rgba(ink(t), 0.3), width: 1, curveness: 0 },
+        edgeSymbol: ['none', 'arrow'], edgeSymbolSize: 6,
+        label: { show: true, position: 'inside', color: ink(t), fontSize: 9, fontFamily: FONT }
+      }]
+    });
+  };
+  B.swimlane = function (el, d, t) {
+    var lanes = d.lanes || [], tasks = d.tasks || [];
+    var maxT = Math.max.apply(null, tasks.map(function (x) { return x.start + x.span; }));
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) { return p.name; } }),
+      grid: grid({ left: 6, right: 16, top: 12, bottom: 16 }),
+      xAxis: yAxis(t, { type: 'value', min: 0, max: maxT, splitLine: { show: true, lineStyle: { color: rule(t) } },
+        axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, formatter: function (v) { return 'T' + v; } } }),
+      yAxis: xAxis(t, { data: lanes, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
+      series: [{
+        type: 'custom',
+        renderItem: function (params, api) {
+          var lane = api.value(0), start = api.value(1), span = api.value(2);
+          var p0 = api.coord([start, lane]), p1 = api.coord([start + span, lane]);
+          var h = api.size([0, 1])[1] * 0.52;
+          var c = seriesColor(t, lane);
+          return {
+            type: 'group', children: [
+              { type: 'rect', shape: { x: p0[0] + 1.5, y: p0[1] - h / 2, width: Math.max(8, p1[0] - p0[0] - 3), height: h, r: 2 },
+                style: { fill: rgba(c, 0.85) } },
+              { type: 'text', style: { x: p0[0] + 7, y: p0[1], text: (params.data && params.data.name) || tasks[params.dataIndex].name, fill: '#fff', font: '9px ' + FONT, textVerticalAlign: 'middle' } }
+            ]
+          };
+        },
+        encode: { x: [1, 2], y: 0 },
+        data: tasks.map(function (x) { return { name: x.name, value: [x.lane, x.start, x.span] }; })
       }]
     });
   };
 
+  /* ================= 9. 特殊 ================= */
+  B.control = function (el, d, t) {
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      grid: grid({ left: 8, right: 52, top: 16, bottom: 12 }),
+      xAxis: timeAxis(t, d.labels),
+      yAxis: yAxis(t, { scale: true }),
+      series: [
+        { type: 'line', data: d.values, showSymbol: false, lineStyle: { color: ink(t), width: 1.6 }, z: 3 },
+        { type: 'line', data: d.values.map(function () { return d.ucl; }), showSymbol: false, silent: true,
+          lineStyle: { color: rgba('#B5484B', 0.75), type: 'dashed', width: 1 },
+          endLabel: { show: true, formatter: 'UCL', color: '#B5484B', fontSize: 8.5, fontFamily: FONT, distance: 4 } },
+        { type: 'line', data: d.values.map(function () { return d.lcl; }), showSymbol: false, silent: true,
+          lineStyle: { color: rgba('#B5484B', 0.75), type: 'dashed', width: 1 },
+          endLabel: { show: true, formatter: 'LCL', color: '#B5484B', fontSize: 8.5, fontFamily: FONT, distance: 4 } },
+        { type: 'line', data: d.values.map(function () { return d.mean; }), showSymbol: false, silent: true,
+          lineStyle: { color: rgba(ink(t), 0.35), width: 1 },
+          endLabel: { show: true, formatter: 'CL', color: muted(t), fontSize: 8.5, fontFamily: FONT, distance: 4 } },
+        { type: 'scatter', symbolSize: 6, z: 5, itemStyle: { color: '#B5484B' },
+          data: d.values.map(function (v, i) { return (v > d.ucl || v < d.lcl) ? [i, v] : null; }).filter(function (x) { return x; }) }
+      ]
+    });
+  };
+
+  B.parallel = function (el, d, t) {
+    var dims = d.dims || [];
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item' }),
+      legend: legend(t, { data: (d.rows || []).map(function (r) { return r.name; }) }),
+      parallelAxis: dims.map(function (n, i) {
+        return { dim: i, name: n, nameTextStyle: { color: muted(t), fontSize: 9, fontFamily: FONT, padding: [0, 0, 4, 0] },
+          axisLine: { lineStyle: { color: rgba(ink(t), 0.18) } }, axisLabel: { show: i === 0 || i === dims.length - 1, color: muted(t), fontSize: 8.5, fontFamily: FONT }, axisTick: { show: false } };
+      }),
+      parallel: { left: 34, right: 30, top: 44, bottom: 16 },
+      series: (d.rows || []).map(function (r, i) {
+        return { name: r.name, type: 'parallel', data: [r.values], smooth: 0.2,
+          lineStyle: { width: 1.8, color: seriesColor(t, i), opacity: 0.8 } };
+      })
+    });
+  };
+
+  B.streamgraph = function (el, d, t) {
+    var data = [];
+    d.topics.forEach(function (tp) {
+      tp.values.forEach(function (v, i) {
+        var lb = String(d.labels[i]);
+        var dt = lb.indexOf('-') > 0 ? lb + '-01' : lb + '-01-01';
+        data.push([dt, v, tp.name]);
+      });
+    });
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis' }),
+      legend: legend(t, { data: d.topics.map(function (x) { return x.name; }) }),
+      singleAxis: {
+        type: 'time', bottom: 18, top: 36, left: 18, right: 18,
+        axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT, hideOverlap: true },
+        axisLine: { lineStyle: { color: rgba(ink(t), 0.12) } }, axisTick: { show: false },
+        splitLine: { show: false }
+      },
+      series: [{
+        type: 'themeRiver', data: data, emphasis: { focus: 'series' },
+        label: { show: false }, itemStyle: { opacity: 0.82 },
+        color: (t.series || ['#1A1A2E', '#A67C3D', '#6F8FA8', '#7A5C3E'])
+      }]
+    });
+  };
+
+  /* 散点矩阵 / 气泡等沿用旧实现 */
   global.ADV_BUILDERS = B;
 })(window);

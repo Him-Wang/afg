@@ -545,6 +545,7 @@
     state.catInsts = [];
     state.priceEl = null; state.echartsEl = null;
     el('chart-stage').innerHTML = '';
+    var en = el('event-notes'); if (en) { en.innerHTML = ''; en.style.display = 'none'; }
     clearAnalysis();
   }
 
@@ -1765,7 +1766,7 @@
     if (!cat) { renderHome(); return; }
     setHead({ title: catName(cat), subtitle: cat.charts.length + ' ' + tr('种图表 · 点击任意图表查看大图', 'chart types · click any chart for the full view'), unit: '', source: tr('示例数据 · 随机生成 · 仅演示图表形态', 'Sample data · generated · chart form only') });
 
-    var theme = getChartTheme();
+    var theme = getChartTheme(); theme._noZoom = true;
     var wrap = document.createElement('div');
     wrap.className = 'cat-dash';
 
@@ -1776,6 +1777,25 @@
       '<div class="cat-intro-text">' + catDesc(cat) + '</div>' +
       '<div class="cat-intro-meta">' + tr('共', '') + ' ' + cat.charts.length + ' ' + tr('种图表', 'chart types') + '</div>';
     wrap.appendChild(intro);
+    // 配色选择
+    var pal = document.createElement('div');
+    pal.className = 'cat-palette';
+    var plabel = document.createElement('span');
+    plabel.className = 'cat-palette-label';
+    plabel.textContent = tr('配色', 'Palette');
+    pal.appendChild(plabel);
+    (window.ADV_PALETTES || []).forEach(function (pp) {
+      var chip = document.createElement('button');
+      chip.className = 'pal-chip' + ((state.palette || 'consult') === pp.id ? ' on' : '');
+      chip.title = isEn() ? pp.nameEn : pp.name;
+      chip.innerHTML = pp.colors.slice(0, 4).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
+      chip.addEventListener('click', function () {
+        state.palette = pp.id;
+        renderCategoryDash(catId);
+      });
+      pal.appendChild(chip);
+    });
+    wrap.appendChild(pal);
 
     var grid = document.createElement('div');
     grid.className = 'cat-grid';
@@ -1794,7 +1814,7 @@
       var cv = card.querySelector('.cat-chart');
       requestAnimationFrame(function () {
         try {
-          var inst = ChartFactory.render(cv, ch.type, ch.data(), theme);
+          var inst = ChartFactory.render(cv, ch.type, (window.localizeDemo ? localizeDemo(ch.data()) : ch.data()), theme);
           insts.push({ el: cv, inst: inst, chart: ch });
           setTimeout(function () { try { inst.resize(); } catch (e) {} }, 60);
         } catch (e) { cv.innerHTML = '<div class="cat-err">渲染失败</div>'; }
@@ -1824,13 +1844,28 @@
     back.innerHTML = '<span class="cat-back-btn">← ' + tr('返回', 'Back') + ' ' + catName(cat) + '</span>';
     back.addEventListener('click', function () { renderCategoryDash(catId); });
     el('chart-stage').appendChild(back);
+    var pal2 = document.createElement('div');
+    pal2.className = 'cat-palette cat-palette-detail';
+    var pl2 = document.createElement('span');
+    pl2.className = 'cat-palette-label';
+    pl2.textContent = tr('配色', 'Palette');
+    pal2.appendChild(pl2);
+    (window.ADV_PALETTES || []).forEach(function (pp) {
+      var chip = document.createElement('button');
+      chip.className = 'pal-chip' + ((state.palette || 'consult') === pp.id ? ' on' : '');
+      chip.title = isEn() ? pp.nameEn : pp.name;
+      chip.innerHTML = pp.colors.slice(0, 4).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
+      chip.addEventListener('click', function () { state.palette = pp.id; openCatalogChart(catId, chartId); });
+      pal2.appendChild(chip);
+    });
+    el('chart-stage').appendChild(pal2);
 
     var c = document.createElement('div');
     c.className = 'chart-canvas cat-single';
     el('chart-stage').appendChild(c);
-    var theme = getChartTheme();
+    var theme = getChartTheme(); theme._noZoom = true;
     try {
-      var inst = ChartFactory.render(c, ch.type, ch.data(), theme);
+      var inst = ChartFactory.render(c, ch.type, (window.localizeDemo ? localizeDemo(ch.data()) : ch.data()), theme);
       state.echartsEl = c;
       requestAnimationFrame(function () { try { inst.resize(); } catch (e) {} });
     } catch (e) {}

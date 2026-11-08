@@ -4,8 +4,9 @@
 
   /* 确定性伪随机（保证每次进入案例一致） */
   function seedRand(seed) {
-    var s = seed % 2147483647;
+    var s = (seed * 2654435761 + 12345) % 2147483647;   // 先做一次哈希打散
     if (s <= 0) s += 2147483646;
+    for (var w = 0; w < 3; w++) s = s * 16807 % 2147483647;   // 预热
     return function () { s = s * 16807 % 2147483647; return (s - 1) / 2147483646; };
   }
   function rnd(seed, min, max) { return min + seedRand(seed)() * (max - min); }
@@ -19,6 +20,42 @@
     for (var i = 0; i < n; i++) { out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); d.setMonth(d.getMonth() + 1); }
     return out;
   }
+
+
+  /* 演示数据的中英对照（英文模式下整体替换） */
+  var DEMO_EN = {
+    '华东':'East China','华南':'South China','华北':'North China','西南':'Southwest','东北':'Northeast',
+    '研发':'R&D','销售':'Sales','管理':'Admin','生产':'Production','客服':'Support',
+    '客户留存':'Retention','毛利完成率':'Gross margin','营收完成率':'Revenue',
+    '消费':'Consumer','科技':'Tech','医药':'Healthcare','金融':'Financials','制造':'Industrials','能源':'Energy',
+    'A 公司':'Company A','B 公司':'Company B','公司 A':'Company A','公司 B':'Company B',
+    '公司 C':'Company C','公司 D':'Company D',
+    '指标 A':'Series A','指标 B':'Series B','业务 A':'Business A','业务 B':'Business B','业务 C':'Business C',
+    '产品 A':'Product A','产品 B':'Product B','产品 C':'Product C','产品 D':'Product D',
+    '客单价 <50':'AOV <50','50–100':'50–100','100–300':'100–300','>300':'>300',
+    '新客':'New','老客':'Returning','会员':'Members','家电':'Appliances','食品':'Food','服饰':'Apparel',
+    '半导体':'Semiconductors','软件':'Software','硬件':'Hardware','创新药':'Innovative drugs','器械':'Devices',
+    '境内':'Domestic','境外':'Overseas','北美':'N. America','欧洲':'Europe','亚太':'APAC',
+    '期初':'Opening','新增':'Additions','流失':'Churn','提价':'Price hike','成本':'Cost','期末':'Closing',
+    '广告投入':'Ad spend','销售额':'Sales','增速':'Growth','利润率':'Margin','出口':'Exports','投资':'Investment',
+    '功能 A':'Feature A','功能 B':'Feature B','功能 C':'Feature C',
+    '采购':'Procurement','生产':'Production','仓储':'Warehouse','物流':'Logistics','门店':'Store','客户':'Customer',
+    '总流量':'Total traffic','自然搜索':'Organic','付费广告':'Paid ads','社交':'Social','成交':'Converted',
+    '曝光':'Impressions','点击':'Clicks','加购':'Add to cart','下单':'Orders','支付':'Payment',
+    '提交申请':'Submit','材料审核':'Review','是否齐全':'Complete?','补充材料':'Resubmit','通过':'Approve',
+    '提交需求':'Request','需求确认':'Confirm','资信评估':'Credit check','授信审批':'Approval','签约放款':'Disburse',
+    '客户':'Customer','风控':'Risk','财务':'Finance','集团':'Group',
+    '消费事业群':'Consumer BU','科技事业群':'Tech BU','医药事业群':'Healthcare BU',
+    '研发部':'R&D','平台部':'Platform','财务部':'Finance Dept','审计部':'Audit','运营部':'Operations','供应链':'Supply chain',
+    '本月营收':'Revenue MTD','回款率':'Collection rate','毛利率':'Gross margin','现金流':'Cash flow','负债率':'Leverage','估值':'Valuation',
+    '盈利':'Profitability','成长':'Growth','运营':'Operation','偿债':'Solvency',
+    '主题 A':'Topic A','主题 B':'Topic B','主题 C':'Topic C','主题 D':'Topic D',
+    '公司':'Company','算出':'','半导体':'Semiconductors','算力':'Compute','出海':'Going global','降本':'Cost cutting',
+    '库存':'Inventory','分红':'Dividends','并购':'M&A','汇率':'FX','产能':'Capacity','新能源':'New energy',
+    'A 组':'Group A','B 组':'Group B','C 组':'Group C','D 组':'Group D',
+    '其他':'Other','直销':'Direct','经销':'Dealer','电商':'E-commerce','渠道结构':'Channel mix',
+    '2024':'2024','2025':'2025'
+  };
 
   var CATS = [];
   CATS.push({
@@ -254,6 +291,19 @@
     ]
   });
 
+  function localizeDemo(obj) {
+    var en = false;
+    try { en = window.I18N && window.I18N.getLang() === 'en'; } catch (e) {}
+    if (!en) return obj;
+    function walk(v) {
+      if (typeof v === 'string') return DEMO_EN[v] !== undefined ? DEMO_EN[v] : v;
+      if (Array.isArray(v)) return v.map(walk);
+      if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = walk(v[k]); return o; }
+      return v;
+    }
+    return walk(obj);
+  }
+  global.localizeDemo = localizeDemo;
   global.CHART_CATALOG = CATS;
   global.CHART_GEN = { rndArr: rndArr, months: months, seedRand: seedRand };
 })(window);

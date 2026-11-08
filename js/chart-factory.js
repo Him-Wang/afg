@@ -1234,14 +1234,18 @@
   }
 
   function polishOption(option, theme, type) {
+    if (theme && theme._noZoom) { delete option.dataZoom; }
+
     var cartesian = ['line', 'area', 'bar', 'stacked', 'stackedBar', 'stackedLine', 'step', 'dual', 'dualLine', 'bump', 'season'];
     if (cartesian.indexOf(type) < 0) return option;
     // 1) 价格轴放右侧（TradingView / Bloomberg 惯例）
     var yAxes = option.yAxis || [];
+    if (!Array.isArray(yAxes)) { yAxes = [yAxes]; option.yAxis = yAxes; }
     yAxes.forEach(function (y, yi) {
       if (!y) return;
       // 单轴 → 右侧；双轴 → 左(主)+右(次)，避免重叠
-      y.position = (yAxes.length > 1 && yi === 0) ? 'left' : 'right';
+      if (theme && theme._noZoom) { y.position = 'left'; }   // 分类看板：期刊风格左轴
+      else y.position = (yAxes.length > 1 && yi === 0) ? 'left' : 'right';
       if (yAxes.length > 1 && yi > 1) y.offset = (yi - 1) * 46;
       if (y.type === 'value' && !(y.axisLabel && y.axisLabel.formatter)) {
         y.axisLabel = Object.assign({}, y.axisLabel, { formatter: axisNum, margin: 8 });
@@ -1375,6 +1379,7 @@
     }
     if (watermarkOn) addWatermark(option, theme, type);
     option = polishOption(option, theme, type);
+    if (theme && theme._noZoom) { delete option.dataZoom; }
     localizeOption(option);
     // 大数据量不播放入场动画（专业终端习惯，且避免导出时截到半张图）
     var maxPoints = 0;
