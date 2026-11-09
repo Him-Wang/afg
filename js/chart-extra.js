@@ -693,7 +693,7 @@
       } }),
       series: [{
         type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false },
-        width: '98%', height: '90%', top: 20, left: '1%',
+        left: 12, right: 12, top: 24, bottom: 12,
         levels: [
           { itemStyle: { borderWidth: 0, gapWidth: 4, borderColor: '#fff' },
             upperLabel: { show: true, height: 17, color: muted(t), fontSize: 9.5, fontFamily: FONT, fontWeight: 700 } },
