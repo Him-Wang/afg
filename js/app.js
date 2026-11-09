@@ -758,6 +758,15 @@
      统一数据标注层：最新值 / 最高 / 最低 全部由这一层绘制
      —— 同一套字体、同一套配色逻辑、统一避让与越界收敛
      =================================================================== */
+  function labelNum(v) {
+    var n = Number(v);
+    if (!isFinite(n)) return String(v);
+    var a = Math.abs(n);
+    if (a >= 1000) return n % 1 === 0 ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    if (a >= 10) return n.toFixed(1);
+    return n.toFixed(2);
+  }
+
   function renderValueLabels(inst) {
     if (!inst || !inst.getDom) return;
     var container = inst.getDom();
@@ -797,10 +806,10 @@
         try { var r = inst.convertToPixel({ seriesIndex: si }, [p.i, p.v]); return r ? [r[0], r[1]] : null; }
         catch (e) { return null; }
       }
-      var pLast = px(lastP); if (pLast) items.push({ px: pLast[0], py: pLast[1], text: fmtNum(lastP.v), color: c, kind: 'latest', pri: 1 });
+      var pLast = px(lastP); if (pLast) items.push({ px: pLast[0], py: pLast[1], text: labelNum(lastP.v), color: c, kind: 'latest', pri: 1 });
       if (vals.length > 3) {
-        var pHi = px(hiP); if (pHi && hiP.i !== lastP.i) items.push({ px: pHi[0], py: pHi[1], text: fmtNum(hiP.v), color: '#B5484B', kind: 'max', pri: 2 });
-        var pLo = px(loP); if (pLo && loP.i !== lastP.i && loP.i !== hiP.i) items.push({ px: pLo[0], py: pLo[1], text: fmtNum(loP.v), color: '#1E7A46', kind: 'min', pri: 3 });
+        var pHi = px(hiP); if (pHi && hiP.i !== lastP.i) if (labelNum(hiP.v) !== labelNum(lastP.v)) items.push({ px: pHi[0], py: pHi[1], text: labelNum(hiP.v), color: '#B5484B', kind: 'max', pri: 2 });
+        var pLo = px(loP); if (pLo && loP.i !== lastP.i && loP.i !== hiP.i) if (labelNum(loP.v) !== labelNum(lastP.v) && labelNum(loP.v) !== labelNum(hiP.v)) items.push({ px: pLo[0], py: pLo[1], text: labelNum(loP.v), color: '#1E7A46', kind: 'min', pri: 3 });
       }
     });
     if (!items.length) return;
@@ -4062,7 +4071,21 @@
       m.classList.toggle('open');
       placeMenu(m, this);
     });
-    if (el('lb-all')) el('lb-all').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('all'); });
+    if (el('lb-all')) el('lb-all').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var okTypes = { line: 1, area: 1, bar: 1, step: 1, stacked: 1, stackedBar: 1, stackedLine: 1, dual: 1, dualLine: 1, season: 1, groupedBar: 1, dumbbell: 1, bullet: 1, percentBar: 1, histogram: 1, boxplot: 1, violin: 1, ecdf: 1, scatter: 1, corrMatrix: 1, matrixHeat: 1, heatmap: 1, control: 1, streamgraph: 0 };
+      var t = (state.lastChart && state.lastChart.type) || '';
+      if (state.echoCharts) {}
+      var inst0 = state.echartsEl ? echarts.getInstanceByDom(state.echartsEl) : null;
+      var st0 = inst0 ? inst0.getOption() : null;
+      var sType = st0 && st0.series && st0.series[0] ? st0.series[0].type : '';
+      if (sType && ['pie', 'funnel', 'sankey', 'graph', 'sunburst', 'treemap', 'themeRiver', 'map', 'lines', 'effectScatter', 'parallel', 'radar', 'tree', 'custom'].indexOf(sType) >= 0) {
+        toast(tr('该图表类型不支持逐点数值标注', 'This chart type does not support per-point labels'));
+        var m0 = el('tb-label-menu'); if (m0) m0.classList.remove('open');
+        return;
+      }
+      setLabelMode('all');
+    });
     if (el('lb-off')) el('lb-off').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('off'); });
 
     // 单图配色

@@ -955,15 +955,14 @@
         minSize: '18%', maxSize: '94%', sort: 'descending', gap: 2,
         itemStyle: { borderColor: '#FFF', borderWidth: 2 },
         label: { show: true, position: 'inside', color: '#fff', fontSize: 10.5, fontFamily: FONT,
-          formatter: function (p) { return p.name + '  ' + (p.value / first * 100).toFixed(0) + '%'; } },
-        markLine: { silent: true, symbol: 'none',
-          data: steps.slice(1).map(function (st, i) {
-            var prev = steps[i].value;
-            var rate = prev ? (st.value / prev * 100) : 0;
-            return { yAxis: i + 0.5, lineStyle: { color: 'transparent' },
-              label: { show: true, position: 'end', color: accentOf(t), font: '700 8.5px ' + FONT,
-                formatter: '↓ ' + rate.toFixed(0) + '%' } };
-          }) },
+          formatter: function (p) {
+            var i = p.dataIndex;
+            var prev = i > 0 ? steps[i - 1].value : p.value;
+            var stepRate = prev ? (p.value / prev * 100) : 100;
+            return p.name + '  ' + (p.value / first * 100).toFixed(0) + '%'
+              + (i > 0 ? '  ↓' + stepRate.toFixed(0) + '%' : '');
+          } },
+
         data: steps.map(function (s, i) { return { name: s.name, value: s.value, itemStyle: { color: rgba(seriesColor(t, i), 0.9) } }; })
       }]
     });
