@@ -854,3 +854,16 @@ body.is-home .chart-head { display: none; }
 .season-val { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--accent); }
 .season-box { height: 210px; }
 @media (max-width: 1100px) { .season-grid { grid-template-columns: 1fr; } }
+
+/* 趋同/分化分析面板 */
+.cohesion-panel { margin: 8px 22px 4px; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--panel); }
+.coh-head { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 12px; }
+.coh-sub { margin-left: 8px; font-size: 10.5px; letter-spacing: 0; text-transform: none; color: var(--muted); font-weight: 400; }
+.coh-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.coh-cell { border-left: 2px solid var(--border); padding-left: 10px; }
+.coh-k { font-size: 10.5px; color: var(--muted); }
+.coh-v { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--text); margin: 3px 0 2px; }
+.coh-v.pos { color: var(--up); }
+.coh-v.neg { color: var(--down); }
+.coh-d { font-size: 10.5px; color: var(--muted); }
+@media (max-width: 900px) { .coh-grid { grid-template-columns: repeat(2, 1fr); } .cohesion-panel { margin: 8px 12px 4px; } }

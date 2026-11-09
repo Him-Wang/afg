@@ -184,7 +184,16 @@
   /* 时间区间裁剪：近1年/近5年/近10年/全部 */
   function applyTimeRange(labels, series) {
     if (!state.timeRange || state.timeRange === 'all' || !labels || !labels.length) return { labels: labels, series: series };
-    var years = { '1y': 1, '5y': 5, '10y': 10 }[state.timeRange];
+    if (state.timeRange === 'ytd') {
+      var lastL = String(labels[labels.length - 1]);
+      var ym0 = lastL.match(/^(\d{4})/);
+      if (!ym0) return { labels: labels, series: series };
+      var yr = ym0[1], st0 = -1;
+      for (var k = 0; k < labels.length; k++) { if (String(labels[k]).indexOf(yr + '-') === 0) { st0 = k; break; } }
+      if (st0 <= 0) return { labels: labels, series: series };
+      return { labels: labels.slice(st0), series: series.map(function (x) { return { name: x.name, values: x.values.slice(st0) }; }) };
+    }
+    var years = { '1y': 1, '3y': 3, '5y': 5, '10y': 10 }[state.timeRange];
     if (!years) return { labels: labels, series: series };
     var lastLabel = String(labels[labels.length - 1]);
     var lastY = parseInt(lastLabel.match(/\d{4}/), 10);
@@ -430,6 +439,125 @@
       return ChartFactory.render(c, 'dualLine', dup, theme);
     }
     return ChartFactory.render(c, type, data, theme);
+  }
+
+
+  /* ---------- 多指标：趋同 / 分化分析与区间概率 ---------- */
+  function returnsOf(values) {
+    var out = [];
+    for (var i = 1; i < values.length; i++) {
+      var a = values[i - 1], b = values[i];
+      out.push((a !== null && a !== undefined && !isNaN(a) && a !== 0 && b !== null && !isNaN(b)) ? (b - a) / Math.abs(a) : null);
+    }
+    return out;
+  }
+  function corrOf(x, y) {
+    var pairs = [];
+    for (var i = 0; i < x.length; i++) if (x[i] !== null && y[i] !== null) pairs.push([x[i], y[i]]);
+    var n = pairs.length;
+    if (n < 8) return null;
+    var sx = 0, sy = 0;
+    pairs.forEach(function (p) { sx += p[0]; sy += p[1]; });
+    var mx = sx / n, my = sy / n, num = 0, dx = 0, dy = 0;
+    pairs.forEach(function (p) {
+      var a = p[0] - mx, b = p[1] - my;
+      num += a * b; dx += a * a; dy += b * b;
+    });
+    if (dx === 0 || dy === 0) return null;
+    return num / Math.sqrt(dx * dy);
+  }
+  function analyzeCohesion(labels, series) {
+    if (!series || series.length < 2) return null;
+    var base = series[0].values;
+    var out = { pairs: [], overall: null };
+    for (var i = 1; i < series.length; i++) {
+      var r1 = returnsOf(base), r2 = returnsOf(series[i].values);
+      var r = corrOf(r1, r2);
+      out.pairs.push({ name: series[i].name, r: r });
+    }
+    out.overall = out.pairs[0] ? out.pairs[0].r : null;
+    /* 滚动相关：窗口 = 60 期或 1/8 长度 */
+    var win = Math.max(20, Math.min(120, Math.floor(labels.length / 8)));
+    var rA = returnsOf(base), rB = returnsOf(series[1].values);
+    var roll = [];
+    for (var t = win; t <= rA.length; t++) {
+      roll.push({ i: t, c: corrOf(rA.slice(t - win, t), rB.slice(t - win, t)) });
+    }
+    var conv = 0, div = 0, valid = 0;
+    roll.forEach(function (o) {
+      if (o.c === null) return;
+      valid++;
+      if (o.c >= 0.3) conv++;
+      else if (o.c <= -0.1) div++;
+    });
+    out.roll = roll;
+    out.convRatio = valid ? conv / valid : 0;
+    out.divRatio = valid ? div / valid : 0;
+    out.win = win;
+    /* 找最长的连续分化段 */
+    var best = null, cur = null;
+    roll.forEach(function (o) {
+      var isDiv = (o.c !== null && o.c <= -0.1);
+      if (isDiv) {
+        if (!cur) cur = { from: o.i - win, to: o.i, len: 1 };
+        else { cur.to = o.i; cur.len++; }
+      } else if (cur) {
+        if (!best || cur.len > best.len) best = cur;
+        cur = null;
+      }
+    });
+    if (cur && (!best || cur.len > best.len)) best = cur;
+    out.longestDiv = best;
+    return out;
+  }
+
+  function renderCohesionPanel(labels, series, inst, theme) {
+    var an = analyzeCohesion(labels, series);
+    if (!an) return null;
+    var wrap = document.createElement('div');
+    wrap.className = 'cohesion-panel';
+    var r = an.overall;
+    var rTxt = (r === null || isNaN(r)) ? '—' : r.toFixed(2);
+    var verdict = r === null ? '' : (r >= 0.5 ? tr('高度趋同', 'strongly convergent')
+      : r >= 0.15 ? tr('弱趋同', 'mildly convergent')
+      : r > -0.15 ? tr('基本无关', 'uncorrelated')
+      : tr('走势分化', 'divergent'));
+    wrap.innerHTML =
+      '<div class="coh-head">' + tr('趋同 / 分化分析', 'Convergence & divergence') +
+        '<span class="coh-sub">' + tr('滚动窗口 ', 'rolling window ') + an.win + tr(' 期 · 相关系数', ' periods · correlation') + '</span></div>' +
+      '<div class="coh-grid">' +
+        '<div class="coh-cell"><div class="coh-k">' + tr('区间相关系数', 'Correlation') + '</div>' +
+          '<div class="coh-v ' + (r >= 0.15 ? 'pos' : (r <= -0.15 ? 'neg' : '')) + '">' + rTxt + '</div>' +
+          '<div class="coh-d">' + verdict + '</div></div>' +
+        '<div class="coh-cell"><div class="coh-k">' + tr('趋同期占比', 'Convergent share') + '</div>' +
+          '<div class="coh-v">' + (an.convRatio * 100).toFixed(0) + '%</div>' +
+          '<div class="coh-d">' + tr('滚动相关 ≥ 0.3', 'rolling r ≥ 0.3') + '</div></div>' +
+        '<div class="coh-cell"><div class="coh-k">' + tr('分化期占比', 'Divergent share') + '</div>' +
+          '<div class="coh-v neg">' + (an.divRatio * 100).toFixed(0) + '%</div>' +
+          '<div class="coh-d">' + tr('滚动相关 ≤ -0.1', 'rolling r ≤ -0.1') + '</div></div>' +
+        '<div class="coh-cell"><div class="coh-k">' + tr('最长分化区间', 'Longest divergence') + '</div>' +
+          '<div class="coh-v">' + (an.longestDiv ? an.longestDiv.len + tr(' 期', ' periods') : '—') + '</div>' +
+          '<div class="coh-d">' + (an.longestDiv ? (labels[Math.max(0, an.longestDiv.from)] || '') + ' → ' + (labels[Math.min(labels.length - 1, an.longestDiv.to)] || '') : '') + '</div></div>' +
+      '</div>';
+    el('chart-stage').appendChild(wrap);
+
+    /* 在图上标注最长分化区间 */
+    if (inst && an.longestDiv && an.longestDiv.len >= 2) {
+      try {
+        var fromLb = labels[Math.max(0, an.longestDiv.from)];
+        var toLb = labels[Math.min(labels.length - 1, an.longestDiv.to)];
+        inst.setOption({
+          series: [{ markArea: {
+            silent: true,
+            itemStyle: { color: 'rgba(181,72,75,0.06)' },
+            label: { show: true, position: 'insideTop', distance: 5, color: '#B5484B',
+              font: '700 9px Inter,sans-serif', formatter: tr('分化区间', 'divergence') },
+            data: [[{ xAxis: fromLb }, { xAxis: toLb }]]
+          } }]
+        });
+      } catch (e) {}
+    }
+    return wrap;
   }
 
   /* ---------- 数据管理（保存/导出/URL 载入） ---------- */
@@ -1686,9 +1814,22 @@
         attachExtremeLabels(ci);
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
+        if (merged.series.length >= 2) {
+          try { renderCohesionPanel(merged.labels, merged.series, ci, theme); } catch (e) {}
+        }
         renderFinanceMetricsTable(merged.labels, merged.series, item.type === 'fund', item.unit === '%', ci);
         setHead({ title: item.title + (state.overlaySeries.length ? ' · 对比' : ''), subtitle: '', unit: item.unit || '', source: '公开数据' });
         el('hint').textContent = DT(state.overlaySeries.length ? '多指标对比' : '收益率/波动率走势');
+      } else if (state.overlaySeries && state.overlaySeries.length) {
+        // 已叠加对比指标：改为折线（自动双轴）+ 趋同分析
+        var ciOv = renderAutoDual(c, 'line', { labels: merged.labels, series: merged.series }, theme);
+        attachExtremeLabels(ciOv);
+        state.echartsEl = c;
+        state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
+        try { renderCohesionPanel(merged.labels, merged.series, ciOv, theme); } catch (e) {}
+        renderFinanceMetricsTable(merged.labels, merged.series, true, false, ciOv);
+        setHead({ title: item.title + ' · 对比', subtitle: '', unit: item.unit || '净值', source: '公开数据' });
+        el('hint').textContent = tr('多指标对比', 'Multi-indicator comparison');
       } else {
         // 业绩评估：净值 + 回撤 + 指标
         var nav = merged.labels.map(function (d, i) { return { date: d, value: merged.series[0].values[i] }; }).filter(function (p) { return p.value !== null && p.value !== undefined && !isNaN(p.value); });
@@ -3341,6 +3482,26 @@
       if (_i) { var _o = _i.getOption(); multi = (_o.series || []).length > 1; }
     }
     document.querySelectorAll('.tb-time-only').forEach(function (n) { n.style.display = isTimeSeries ? '' : 'none'; });
+    /* 金融视图额外提供 今年以来 / 近3年 */
+    (function () {
+      var selR = el('toolbar-range');
+      if (!selR) return;
+      var finView = !!state.finItem || state.mode === 'finance';
+      ['ytd', '3y'].forEach(function (v) {
+        var opt = selR.querySelector('option[value="' + v + '"]');
+        if (finView && !opt) {
+          var o = document.createElement('option');
+          o.value = v;
+          o.textContent = v === 'ytd' ? tr('今年以来', 'YTD') : tr('近3年', 'Last 3Y');
+          o.setAttribute('data-i18n-opt', v === 'ytd' ? '今年以来' : '近3年');
+          o.setAttribute('data-adv-fin', '1');
+          selR.insertBefore(o, selR.querySelector('option[value="5y"]'));
+        } else if (!finView && opt && opt.getAttribute('data-adv-fin')) {
+          opt.remove();
+        }
+      });
+      if (!finView && (selR.value === 'ytd' || selR.value === '3y')) { selR.value = 'all'; state.timeRange = 'all'; }
+    })();
     if (el('btn-events')) el('btn-events').style.display = isTimeSeries ? '' : 'none';
     var sel = el('toolbar-chart-type');
     if (!sel) return;
