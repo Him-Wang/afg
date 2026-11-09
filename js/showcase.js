@@ -37,6 +37,31 @@
     return { svg: svg, w: d.w, h: d.h };
   }
 
+
+  /* ---------- 悬停提示（D3 图专用） ---------- */
+  function makeTip(el, theme) {
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    var tip = document.createElement('div');
+    tip.className = 'd3-tip';
+    tip.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;opacity:0;transition:opacity .12s ease;' +
+      'background:#fff;border:1px solid rgba(26,26,46,.12);border-radius:8px;padding:7px 10px;' +
+      'font:11.5px/1.5 ' + FONT + ';color:' + ink(theme) + ';box-shadow:0 8px 24px rgba(20,20,35,.12);z-index:30;white-space:nowrap;';
+    el.appendChild(tip);
+    return {
+      show: function (html, x, y) {
+        tip.innerHTML = html;
+        tip.style.opacity = 1;
+        var w = tip.offsetWidth, h = tip.offsetHeight;
+        var lx = x + 14, ly = y - h - 10;
+        if (lx + w > el.clientWidth - 6) lx = x - w - 14;
+        if (ly < 4) ly = y + 14;
+        tip.style.left = Math.max(4, lx) + 'px';
+        tip.style.top = Math.max(4, ly) + 'px';
+      },
+      hide: function () { tip.style.opacity = 0; }
+    };
+  }
+
   /* ============ 1. 力导向关系网络 ============ */
   S.scForce = function (el, data, theme) {
     if (!global.d3) return;
@@ -69,6 +94,21 @@
       .attr('fill', muted(theme));
 
     var sc = Math.max(1, Math.min(r.w, r.h) / 280);   // 大画布自动放大斥力与连线
+    var tip = makeTip(el, theme);
+    nodeSel
+      .on('mouseenter', function (ev, n) {
+        var related = links.filter(function (l) { return l.source.id === n.id || l.target.id === n.id; }).length;
+        tip.show('<b>' + n.name + '</b><br/>权重 ' + n.value + ' · 关联 ' + related + ' 条', ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+        d3.select(this).select('circle').transition().duration(120).attr('r', 5 + Math.sqrt(n.value) * 1.9 + 4);
+      })
+      .on('mousemove', function (ev, n) {
+        tip.show('<b>' + n.name + '</b><br/>权重 ' + n.value, ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mouseleave', function (ev, n) {
+        tip.hide();
+        d3.select(this).select('circle').transition().duration(120).attr('r', 5 + Math.sqrt(n.value) * 1.9);
+      });
+
     var sim = d3.forceSimulation(nodes)
       .force('link', d3.forceLink(links).id(function (n) { return n.id; }).distance(function (l) { return (60 + Math.sqrt(l.value) * 8) * sc; }).strength(0.35))
       .force('charge', d3.forceManyBody().strength(function (n) { return (-60 - n.value * 3) * sc * sc; }))
@@ -117,16 +157,29 @@
         .attr('id', 'chordGrad' + i)
         .attr('gradientUnits', 'userSpaceOnUse')
         .attr('x1', -outer).attr('y1', -outer).attr('x2', outer).attr('y2', outer);
-      grd.append('stop').attr('offset', '0%').attr('stop-color', rgba(pal(theme, d.index), 0.55));
-      grd.append('stop').attr('offset', '100%').attr('stop-color', rgba(accent(theme), 0.25));
+      grd.append('stop').attr('offset', '0%').attr('stop-color', rgba(pal(theme, d.index), 0.72));
+      grd.append('stop').attr('offset', '100%').attr('stop-color', rgba(accent(theme), 0.38));
     });
 
+    var tipC = makeTip(el, theme);
     g.append('g').selectAll('path').data(chord).join('path')
       .attr('d', ribbon)
       .attr('fill', function (d) { return 'url(#chordGrad' + d.source.index + ')'; })
       .attr('stroke', rgba(ink(theme), 0.12))
       .attr('stroke-width', 0.5)
-      .style('mix-blend-mode', 'multiply');
+      .attr('opacity', 0.85)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (ev, d) {
+        d3.select(this).transition().duration(100).attr('opacity', 1).attr('stroke', rgba(ink(theme), 0.4));
+        tipC.show('<b>' + names[d.source.index] + ' → ' + names[d.target.index] + '</b><br/>规模 ' + d.source.value.toFixed(1), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mousemove', function (ev, d) {
+        tipC.show('<b>' + names[d.source.index] + ' → ' + names[d.target.index] + '</b><br/>规模 ' + d.source.value.toFixed(1), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).transition().duration(120).attr('opacity', 0.85).attr('stroke', rgba(ink(theme), 0.12));
+        tipC.hide();
+      });
 
     var group = g.append('g').selectAll('g').data(chord.groups).join('g');
     group.append('path')
@@ -166,6 +219,25 @@
 
     var node = g.append('g').selectAll('g').data(root.descendants()).join('g')
       .attr('transform', function (d) { return 'rotate(' + (d.x * 180 / Math.PI - 90) + ') translate(' + d.y + ',0)'; });
+
+    var tipT = makeTip(el, theme);
+    node.style('cursor', 'pointer')
+      .on('mouseenter', function (ev, d) {
+        d3.select(this).select('circle').transition().duration(100)
+          .attr('r', (d.depth === 0 ? 7 : (d.children ? 4.5 : 3)) + 3);
+        var path = d.ancestors().reverse().map(function (a) { return a.data.name; }).join(' › ');
+        var kids = d.children ? d.children.length : 0;
+        tipT.show('<b>' + d.data.name + '</b><br/>' + path + (kids ? '<br/>下级 ' + kids + ' 项' : ''), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mousemove', function (ev, d) {
+        var path = d.ancestors().reverse().map(function (a) { return a.data.name; }).join(' › ');
+        tipT.show('<b>' + d.data.name + '</b><br/>' + path, ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mouseleave', function (ev, d) {
+        d3.select(this).select('circle').transition().duration(100)
+          .attr('r', d.depth === 0 ? 7 : (d.children ? 4.5 : 3));
+        tipT.hide();
+      });
 
     node.append('circle')
       .attr('r', function (d) { return d.depth === 0 ? 7 : (d.children ? 4.5 : 3); })
@@ -218,11 +290,24 @@
       return [R * Math.cos(a), R * Math.sin(a)];
     });
 
+    var tipH = makeTip(el, theme);
     r.svg.append('g').selectAll('path').data(arr).join('path')
       .attr('d', hexPath(hexPts))
       .attr('transform', function (b) { return 'translate(' + b.cx + ',' + b.cy + ')'; })
       .attr('fill', function (b) { return color(b.n); })
-      .attr('stroke', '#fff').attr('stroke-width', 1.2);
+      .attr('stroke', '#fff').attr('stroke-width', 1.2)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (ev, b) {
+        d3.select(this).attr('stroke', ink(theme)).attr('stroke-width', 1.8);
+        tipH.show('<b>' + b.n + ' 个样本</b><br/>' + Math.round(x.invert(b.cx)) + ' · ' + Math.round(y.invert(b.cy)), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mousemove', function (ev, b) {
+        tipH.show('<b>' + b.n + ' 个样本</b>', ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('stroke', '#fff').attr('stroke-width', 1.2);
+        tipH.hide();
+      });
 
     /* 轴 */
     var gx = r.svg.append('g').attr('transform', 'translate(0,' + (r.h - 26) + ')');
@@ -271,6 +356,25 @@
       .attr('text-anchor', 'end').attr('font-family', FONT).attr('font-size', 11).attr('font-weight', 700)
       .attr('fill', ink(theme)).text(Number(last.v.toFixed(2)));
 
+    /* 悬停：十字线 + 最近点数值 */
+    var tipL = makeTip(el, theme);
+    var vline = r.svg.append('line').attr('y1', 14).attr('y2', r.h - 30)
+      .attr('stroke', rgba(ink(theme), 0.25)).attr('stroke-dasharray', '3 3').attr('opacity', 0);
+    var vdot = r.svg.append('circle').attr('r', 4).attr('fill', accent(theme)).attr('opacity', 0);
+    var overlay = r.svg.append('rect')
+      .attr('x', 26).attr('y', 14).attr('width', Math.max(1, r.w - 42)).attr('height', r.h - 44)
+      .attr('fill', 'transparent').style('cursor', 'crosshair');
+    overlay.on('mousemove', function (ev) {
+      var mx = d3.pointer(ev, r.svg.node())[0];
+      var i = Math.max(0, Math.min(vals.length - 1, Math.round(x.invert(mx))));
+      var d = vals[i];
+      vline.attr('x1', x(i)).attr('x2', x(i)).attr('opacity', 1);
+      vdot.attr('cx', x(i)).attr('cy', y(d.v)).attr('opacity', 1);
+      tipL.show('<b>' + (data.labels[i] || '') + '</b><br/>' + Number(d.v.toFixed(2)), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+    }).on('mouseleave', function () {
+      vline.attr('opacity', 0); vdot.attr('opacity', 0); tipL.hide();
+    });
+
     var gx = r.svg.append('g').attr('transform', 'translate(0,' + (r.h - 30) + ')')
       .call(d3.axisBottom(x).ticks(6).tickFormat(function (i) { return data.labels[Math.round(i)] || ''; }).tickSize(0));
     gx.select('.domain').attr('stroke', rgba(ink(theme), 0.15));
@@ -297,7 +401,19 @@
     var y = d3.scaleLinear().domain([0, maxV * 1.1]).range([r.h - 34, 16]);
 
     var g = r.svg.append('g');
+    var tipW = makeTip(el, theme);
     g.selectAll('rect').data(cum).join('rect')
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (ev, d) {
+        var i = cum.indexOf(d);
+        d3.select(this).attr('opacity', 1);
+        tipW.show('<b>' + labels[i] + '</b><br/>' + (vals[i] >= 0 ? '+' : '') + vals[i], ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mousemove', function (ev, d) {
+        var i = cum.indexOf(d);
+        tipW.show('<b>' + labels[i] + '</b><br/>' + (vals[i] >= 0 ? '+' : '') + vals[i], ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
+      })
+      .on('mouseleave', function () { d3.select(this).attr('opacity', 0.9); tipW.hide(); })
       .attr('x', function (d, i) { return x(labels[i]); })
       .attr('width', x.bandwidth())
       .attr('y', function (d) { return y(Math.max(d.y0, d.y1)); })

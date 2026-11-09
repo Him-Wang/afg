@@ -836,3 +836,12 @@ body.is-home .chart-head { display: none; }
 /* 拆分仪表盘：卡片高度收紧 */
 .split-panel { min-height: 0; }
 .split-panel .dash-panel-body { flex: none; height: 240px; min-height: 240px; }
+
+/* 卡片悬停增强 */
+.cat-card { transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
+.cat-card:hover { box-shadow: 0 10px 28px rgba(5,28,44,.10); }
+.cat-card:hover .cat-card-foot { opacity: 1; transform: translateX(3px); }
+.cat-card-foot { transition: opacity .16s ease, transform .16s ease; }
+
+/* D3 悬停提示层 */
+.d3-tip { pointer-events: none; }
