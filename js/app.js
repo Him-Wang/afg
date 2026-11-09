@@ -517,44 +517,73 @@
     var wrap = document.createElement('div');
     wrap.className = 'cohesion-panel';
     var r = an.overall;
-    var rTxt = (r === null || isNaN(r)) ? '—' : r.toFixed(2);
-    var verdict = r === null ? '' : (r >= 0.5 ? tr('高度趋同', 'strongly convergent')
-      : r >= 0.15 ? tr('弱趋同', 'mildly convergent')
-      : r > -0.15 ? tr('基本无关', 'uncorrelated')
-      : tr('走势分化', 'divergent'));
+    var verdict = r === null ? '—'
+      : r >= 0.5 ? tr('高度正相关 · 走势高度趋同', 'Strongly positive · highly convergent')
+      : r >= 0.15 ? tr('弱正相关 · 大体同向', 'Mildly positive · mostly same direction')
+      : r > -0.15 ? tr('基本无关 · 走势分化', 'Uncorrelated · divergent')
+      : tr('负相关 · 走势背离', 'Negative · move in opposite directions');
+    var cls = r === null ? '' : (r >= 0.15 ? 'pos' : (r <= -0.15 ? 'neg' : ''));
+
+    /* 生成连续时段带：正相关 / 分化 */
+    var segs = [];
+    var win = an.win;
+    an.roll.forEach(function (o) {
+      if (o.c === null) return;
+      var kind = o.c >= 0.3 ? 'conv' : (o.c <= 0 ? 'div' : null);
+      if (!kind) return;
+      var from = o.i - win, to = o.i;
+      var lastSeg = segs[segs.length - 1];
+      if (lastSeg && lastSeg.kind === kind && from <= lastSeg.to + 1) lastSeg.to = to;
+      else segs.push({ kind: kind, from: from, to: to });
+    });
+    /* 图例 + 时段表 */
+    var convTot = 0, divTot = 0;
+    segs.forEach(function (sg) { if (sg.kind === 'conv') convTot += (sg.to - sg.from); else divTot += (sg.to - sg.from); });
+    var list = segs.slice().sort(function (a, b) { return (b.to - b.from) - (a.to - a.from); }).slice(0, 5);
+
     wrap.innerHTML =
-      '<div class="coh-head">' + tr('趋同 / 分化分析', 'Convergence & divergence') +
-        '<span class="coh-sub">' + tr('滚动窗口 ', 'rolling window ') + an.win + tr(' 期 · 相关系数', ' periods · correlation') + '</span></div>' +
+      '<div class="coh-head">' + tr('趋同 / 分化时段', 'Convergence & divergence periods') +
+        '<span class="coh-sub">' + tr('滚动窗口 ', 'window ') + win + tr(' 期 · 基于收益率相关系数', ' periods · correlation of returns') + '</span></div>' +
+      '<div class="coh-legend">' +
+        '<span class="coh-dot conv"></span>' + tr('正相关（r ≥ 0.3）走势趋同', 'Convergent (r ≥ 0.3)') +
+        '<span class="coh-dot div"></span>' + tr('分化（r ≤ 0）背离或无关', 'Divergent (r ≤ 0)') +
+      '</div>' +
       '<div class="coh-grid">' +
         '<div class="coh-cell"><div class="coh-k">' + tr('区间相关系数', 'Correlation') + '</div>' +
-          '<div class="coh-v ' + (r >= 0.15 ? 'pos' : (r <= -0.15 ? 'neg' : '')) + '">' + rTxt + '</div>' +
+          '<div class="coh-v ' + cls + '">' + (r === null ? '—' : r.toFixed(2)) + '</div>' +
           '<div class="coh-d">' + verdict + '</div></div>' +
-        '<div class="coh-cell"><div class="coh-k">' + tr('趋同期占比', 'Convergent share') + '</div>' +
-          '<div class="coh-v">' + (an.convRatio * 100).toFixed(0) + '%</div>' +
+        '<div class="coh-cell"><div class="coh-k">' + tr('趋同时段占比', 'Convergent share') + '</div>' +
+          '<div class="coh-v pos">' + (an.convRatio * 100).toFixed(0) + '%</div>' +
           '<div class="coh-d">' + tr('滚动相关 ≥ 0.3', 'rolling r ≥ 0.3') + '</div></div>' +
-        '<div class="coh-cell"><div class="coh-k">' + tr('分化期占比', 'Divergent share') + '</div>' +
+        '<div class="coh-cell"><div class="coh-k">' + tr('分化时段占比', 'Divergent share') + '</div>' +
           '<div class="coh-v neg">' + (an.divRatio * 100).toFixed(0) + '%</div>' +
-          '<div class="coh-d">' + tr('滚动相关 ≤ -0.1', 'rolling r ≤ -0.1') + '</div></div>' +
-        '<div class="coh-cell"><div class="coh-k">' + tr('最长分化区间', 'Longest divergence') + '</div>' +
-          '<div class="coh-v">' + (an.longestDiv ? an.longestDiv.len + tr(' 期', ' periods') : '—') + '</div>' +
-          '<div class="coh-d">' + (an.longestDiv ? (labels[Math.max(0, an.longestDiv.from)] || '') + ' → ' + (labels[Math.min(labels.length - 1, an.longestDiv.to)] || '') : '') + '</div></div>' +
+          '<div class="coh-d">' + tr('滚动相关 ≤ 0', 'rolling r ≤ 0') + '</div></div>' +
+        '<div class="coh-cell"><div class="coh-k">' + tr('主要时段', 'Key periods') + '</div>' +
+          '<div class="coh-list">' + (list.length ? list.map(function (sg) {
+            return '<span class="coh-tag ' + sg.kind + '">' +
+              (sg.kind === 'conv' ? tr('趋同', 'conv') : tr('分化', 'div')) + ' ' +
+              String(labels[Math.max(0, sg.from)] || '').slice(0, 7) + '→' + String(labels[Math.min(labels.length - 1, sg.to)] || '').slice(0, 7) +
+              '</span>';
+          }).join('') : '<span class="coh-d">—</span>') + '</div></div>' +
       '</div>';
     el('chart-stage').appendChild(wrap);
 
-    /* 在图上标注最长分化区间 */
-    if (inst && an.longestDiv && an.longestDiv.len >= 2) {
+    /* 图上标注：把连续时段画成底色带 */
+    if (inst && segs.length) {
       try {
-        var fromLb = labels[Math.max(0, an.longestDiv.from)];
-        var toLb = labels[Math.min(labels.length - 1, an.longestDiv.to)];
-        inst.setOption({
-          series: [{ markArea: {
-            silent: true,
-            itemStyle: { color: 'rgba(181,72,75,0.06)' },
-            label: { show: true, position: 'insideTop', distance: 5, color: '#B5484B',
-              font: '700 9px Inter,sans-serif', formatter: tr('分化区间', 'divergence') },
-            data: [[{ xAxis: fromLb }, { xAxis: toLb }]]
-          } }]
+        var areas = segs.filter(function (sg) { return (sg.to - sg.from) >= Math.max(4, win / 2); }).slice(0, 8).map(function (sg) {
+          return [
+            { xAxis: labels[Math.max(0, sg.from)], itemStyle: { color: sg.kind === 'conv' ? 'rgba(46,107,82,0.09)' : 'rgba(181,72,75,0.08)' } },
+            { xAxis: labels[Math.min(labels.length - 1, sg.to)] }
+          ];
         });
+        if (areas.length) {
+          inst.setOption({ series: [{ markArea: {
+            silent: true,
+            label: { show: false },
+            data: areas
+          } }] });
+        }
       } catch (e) {}
     }
     return wrap;
@@ -1965,7 +1994,7 @@
         attachExtremeLabels(ci);
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
-        if (merged.series.length >= 2) {
+        if (merged.series.length === 2) {
           try { renderCohesionPanel(merged.labels, merged.series, ci, theme); } catch (e) {}
         }
         renderFinanceMetricsTable(merged.labels, merged.series, item.type === 'fund', item.unit === '%', ci);
@@ -1977,7 +2006,7 @@
         attachExtremeLabels(ciOv);
         state.echartsEl = c;
         state.lastChart = { type: 'line', title: item.title, data: { labels: merged.labels, series: merged.series } };
-        try { renderCohesionPanel(merged.labels, merged.series, ciOv, theme); } catch (e) {}
+        if (merged.series.length === 2) { try { renderCohesionPanel(merged.labels, merged.series, ciOv, theme); } catch (e) {} }
         renderFinanceMetricsTable(merged.labels, merged.series, true, false, ciOv);
         setHead({ title: item.title + ' · 对比', subtitle: '', unit: item.unit || '净值', source: '公开数据' });
         el('hint').textContent = tr('多指标对比', 'Multi-indicator comparison');

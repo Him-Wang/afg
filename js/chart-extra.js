@@ -164,10 +164,9 @@
         var isLast = (i === n - 1);
         var multi = !!(window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0];
         multi = !!(multi && multi.multiHue);
-        var c1, c2;
+        var c1, c2, flat = false;
         if (multi) {
-          c1 = seriesColor(t, i);
-          c2 = rgba(c1, 0.55);
+          c1 = seriesColor(t, i); c2 = c1; flat = true;      // 多色系：柱状图纯色不渐变
         } else {
           c1 = ramp[Math.min(i, ramp.length - 1)];
           c2 = isLast ? acc : ramp[Math.min(i + 1, ramp.length - 1)];
@@ -175,7 +174,7 @@
         return {
           name: s.name, type: 'bar', data: s.values,
           barGap: '14%', barWidth: n > 4 ? (W < 480 ? 3.5 : 7) : 11,
-          itemStyle: { color: vGrad(c1, c2), borderRadius: [1.5, 1.5, 0, 0] },
+          itemStyle: { color: flat ? c1 : vGrad(c1, c2), borderRadius: [1.5, 1.5, 0, 0] },
           z: isLast ? 4 : 3,
           markLine: isLast ? {
             silent: true, symbol: 'none',
@@ -248,7 +247,7 @@
       yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: W < 480 ? 9.5 : 10.5, fontFamily: FONT, width: labelW - 12, overflow: 'truncate' } }),
       series: [
         { type: 'bar', barWidth: W < 480 ? 10 : 13, barCategoryGap: '58%', data: rv.map(function (r) { return r.value; }),
-          itemStyle: { color: vGrad(seriesColor(t, 0), rgba(seriesColor(t, 0), 0.6)), borderRadius: [0, 2, 2, 0] }, z: 3,
+          itemStyle: { color: seriesColor(t, 0), borderRadius: [0, 2, 2, 0] }, z: 3,
           label: { show: true, position: 'insideLeft', distance: 7, color: '#FFFFFF', fontSize: W < 480 ? 8.5 : 9.5, fontWeight: 700, fontFamily: FONT,
             formatter: function (p) { return num(p.value); } } },
         { type: 'scatter', silent: true, z: 5,
@@ -313,6 +312,63 @@
         { type: 'text', left: narrow ? 56 : 74, top: 6, style: { text: '● ' + d.toLabel, fill: ink(t), font: '700 9.5px ' + FONT } },
         { type: 'text', left: narrow ? 100 : 132, top: 6, style: { text: '○ ' + d.fromLabel, fill: muted(t), font: '600 9.5px ' + FONT } }
       ]
+    });
+  };
+
+  B.radar = function (el, d, t) {
+    var W = (el && el.clientWidth) || 600, H = (el && el.clientHeight) || 300;
+    var narrow = W < 480;
+    var n = d.indicators.length;
+    var vals = d.series[d.series.length - 1].values;
+    var prev = d.series.length > 1 ? d.series[d.series.length - 2].values : null;
+    var maxI = -1, maxD = 0;
+    if (prev) {
+      for (var i = 0; i < n; i++) {
+        var dv = Math.abs(vals[i] - prev[i]);
+        if (dv > maxD) { maxD = dv; maxI = i; }
+      }
+    }
+    var badge = null;
+    if (maxI >= 0 && maxD > 0) {
+      var dvv = vals[maxI] - prev[maxI];
+      badge = '波动最大 · ' + d.indicators[maxI].name + '  ' + (dvv >= 0 ? '+' : '') + dvv.toFixed(1);
+    }
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item' }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
+      title: badge ? {
+        text: badge, left: 12, bottom: 8, z: 30,
+        textStyle: { color: '#B5484B', fontSize: narrow ? 9 : 11, fontWeight: 700, fontFamily: FONT,
+          backgroundColor: 'rgba(181,72,75,0.08)', padding: [4, 8], borderRadius: 4 }
+      } : undefined,
+      radar: {
+        center: ['50%', '52%'], radius: narrow ? '54%' : '68%',
+        indicator: d.indicators.map(function (x, i) {
+          var vs = d.series.map(function (ser) { return ser.values[i]; }).filter(function (v) { return isFinite(v); });
+          if (!vs.length) return { name: x.name, min: 0, max: 100 };
+          var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+          var sp = (mx - mn) || Math.abs(mx) * 0.1 || 1;
+          return { name: x.name, min: Math.floor((mn - sp * 0.6) * 10) / 10, max: Math.ceil((mx + sp * 0.6) * 10) / 10 };
+        }),
+        axisName: { color: muted(t), fontSize: narrow ? 8 : 9.5, fontFamily: FONT },
+        axisLine: { lineStyle: { color: rule(t) } },
+        splitLine: { lineStyle: { color: rule(t) } },
+        splitArea: { show: false }
+      },
+      series: [{
+        type: 'radar', symbolSize: 3,
+        data: d.series.map(function (s, si) {
+          var isLast = si === d.series.length - 1;
+          var c = seriesColor(t, si);
+          return {
+            name: s.name, value: s.values,
+            lineStyle: { color: c, width: isLast ? 2.2 : 1.2, type: isLast ? 'solid' : 'dashed', opacity: isLast ? 1 : 0.65 },
+            itemStyle: { color: c, opacity: isLast ? 1 : 0.5 },
+            areaStyle: { color: rgba(c, isLast ? 0.13 : 0.04) },
+            symbolSize: isLast ? 4 : 2
+          };
+        })
+      }]
     });
   };
 

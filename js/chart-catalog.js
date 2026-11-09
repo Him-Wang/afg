@@ -82,16 +82,22 @@
           return { rows: names.map(function (n, i) { return { name: n, from: from[i], to: to[i] }; }),
             fromLabel: '2021', toLabel: '2025', pct: false };
         } },
-      { id: 'bullet', name: 'KPI 达成度', type: 'bullet', desc: '8 项 KPI 实际值对照目标与分级区间',
-        data: function () { return { rows: [
-          { name: '营收完成率', value: 86, target: 100, ranges: [60, 80, 100] },
-          { name: '毛利完成率', value: 72, target: 85, ranges: [50, 70, 90] },
-          { name: '客户留存', value: 91, target: 90, ranges: [70, 85, 95] },
-          { name: '回款周期', value: 78, target: 90, ranges: [55, 75, 95] },
-          { name: '产能利用', value: 94, target: 92, ranges: [65, 85, 98] },
-          { name: '研发投入', value: 63, target: 70, ranges: [40, 60, 80] },
-          { name: '人均产出', value: 82, target: 88, ranges: [55, 75, 95] },
-          { name: '库存周转', value: 69, target: 80, ranges: [45, 70, 90] }] }; } }
+      { id: 'pmiRadar', name: '制造业 PMI 雷达 · 13 项', type: 'radar', desc: '13 项景气指标近 3 个月对比，点出波动最大的指标',
+        data: function () {
+          var names = ['制造业 PMI', '服务业 PMI', '工业增加值', '固定资产投资', '社会消费品零售',
+            '出口', '进口', 'PPI', 'CPI', 'M1', 'M2', '新增贷款', '贷款余额'];
+          var aug = [49.1, 50.2, 52.0, 41.5, 51.8, 56.2, 52.4, 43.0, 50.8, 53.2, 55.6, 54.1, 54.8];
+          var sep = [49.8, 50.0, 53.0, 39.8, 52.6, 51.4, 54.8, 41.6, 51.2, 55.0, 56.4, 52.8, 54.6];
+          var oct = [48.4, 50.4, 54.2, 38.0, 53.4, 58.6, 50.2, 42.2, 51.0, 57.8, 57.0, 56.2, 54.4];
+          return {
+            indicators: names.map(function (x) { return { name: x }; }),
+            series: [
+              { name: '2026-08', values: aug },
+              { name: '2026-09', values: sep },
+              { name: '2026-10', values: oct }
+            ]
+          };
+        } }
     ]
   });
 
@@ -361,7 +367,7 @@
     }
     if (sc) { sc.charts.forEach(function (ch) { SHOW[ch.id] = ch; }); }
     var keep = {
-      compare: ['groupedBar', 'dumbbell', 'bullet'],
+      compare: ['groupedBar', 'dumbbell', 'pmiRadar'],
       trend: ['season', 'stacked', 'waterfall', 'dual'],
       composition: ['donut', 'percentBar', 'sunburst'],
       distribution: ['histogram', 'boxplot', 'violin'],
