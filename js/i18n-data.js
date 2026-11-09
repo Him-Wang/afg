@@ -9,7 +9,7 @@
     '央行基准利率': 'Policy Rates', '通胀 CPI': 'CPI', '增长 GDP': 'GDP', 'PPI': 'PPI', '景气 PMI': 'PMI',
     '就业': 'Employment', '货币供应': 'Money Supply', '股票': 'Equities', '债券': 'Bonds', '商品': 'Commodities',
     '外汇': 'FX', 'VIX': 'VIX',
-    '中国宏观': 'China Macro', '国际宏观': 'Global Macro', '金融数据': 'Markets', '宏观数据': 'Macro', '行业数据': 'Industry', '公司财务': 'Company', '金融资产': 'Assets', '机器学习': 'Machine Learning',
+    '中国宏观': 'China Macro', '国际宏观': 'Global Macro', '金融资产': 'Assets', '宏观数据': 'Macro', '行业数据': 'Industry', '公司财务': 'Company', '金融资产': 'Assets', '机器学习': 'Machine Learning',
 
     /* --- 中国宏观指标 --- */
     'GDP 当季同比': 'GDP YoY (quarterly)',

@@ -169,23 +169,20 @@
 
       { id: 'percentBar', name: '百分比堆叠条形图', type: 'percentBar', desc: '只比结构不比总量，跨组比较最公平',
         data: function () { return { labels: ['客单价 <50', '50–100', '100–300', '>300'], series: [
-          { name: '新客', values: [58, 42, 25, 12] }, { name: '老客', values: [32, 46, 55, 61] }, { name: '会员', values: [10, 12, 20, 27] }] }; } },
-      { id: 'treemap', name: '矩形树图', type: 'treemap', desc: '面积即占比，同时展示两层层级结构',
-        data: function () { return { data: [
-          { name: '消费', value: 38, children: [{ name: '家电', value: 15 }, { name: '食品', value: 13 }, { name: '服饰', value: 10 }] },
-          { name: '科技', value: 30, children: [{ name: '半导体', value: 14 }, { name: '软件', value: 9 }, { name: '硬件', value: 7 }] },
-          { name: '医药', value: 18, children: [{ name: '创新药', value: 10 }, { name: '器械', value: 8 }] },
-          { name: '其他', value: 14 }] }; } },
-      { id: 'sunburst', name: '旭日图', type: 'sunburst', desc: '多层占比的径向展开，适合三级以上结构',
-        data: function () { return { data: [
-          { name: '境内', children: [{ name: '华东', value: 32 }, { name: '华南', value: 25 }, { name: '华北', value: 15 }] },
-          { name: '境外', children: [{ name: '北美', value: 14 }, { name: '欧洲', value: 9 }, { name: '亚太', value: 5 }] }] }; } }
+          { name: '新客', values: [1240, 890, 520, 210] }, { name: '老客', values: [680, 970, 1150, 1080] },
+          { name: '会员', values: [210, 250, 410, 480] }] }; } },
+      { id: 'treemap', name: '矩形树图', type: 'treemap', desc: '板块面积即规模：二级结构 + 占比一眼可读',
+        data: function () { return {
+          data: [
+            { name: '境内', children: [{ name: '华东', value: 32 }, { name: '华南', value: 25 }, { name: '华北', value: 15 }] },
+            { name: '境外', children: [{ name: '北美', value: 14 }, { name: '欧洲', value: 9 }, { name: '亚太', value: 5 }] }
+          ] }; } }
     ]
   });
 
   CATS.push({
-    id: 'distribution', name: '分布', icon: '▥',
-    desc: '数据集中在哪、离散程度、偏态、异常值、双峰/多峰。',
+    id: 'distribution', name: '分布与离散', icon: '▤',
+    desc: '数据怎么分布、集中在哪、尾部和离群点有多长、组间差异多大。',
     charts: [
       { id: 'histogram', name: '直方图', type: 'histogram', desc: '看数据分布形状、集中区间与长尾',
         data: function () { return { values: rndArr(41, 160, 20, 100) }; } },
@@ -369,7 +366,7 @@
     var keep = {
       compare: ['groupedBar', 'dumbbell', 'pmiRadar'],
       trend: ['season', 'stacked', 'waterfall', 'dual'],
-      composition: ['donut', 'percentBar', 'sunburst'],
+      composition: ['donut', 'percentBar', 'treemap'],
       distribution: ['histogram', 'boxplot', 'violin'],
       relation: ['scatter', 'corrMatrix'],
       flow: ['funnel', 'sankey'],

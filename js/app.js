@@ -1649,7 +1649,7 @@
 
   var DATA_SRC = { china: 'js/china-macro.js', intl: 'js/intl-macro.js', finance: 'js/finance-data.js', akshare: 'js/akshare-data.js' };
   var DATA_GLOBAL = { china: 'CHINA_MACRO', intl: 'INTL_MACRO', finance: 'FINANCE_DATA', akshare: 'AKSHARE_DATA' };
-  var DATA_LABEL = { china: '中国宏观数据', intl: '国际宏观数据', finance: '金融数据', akshare: '行情数据' };
+  var DATA_LABEL = { china: '中国宏观数据', intl: '国际宏观数据', finance: '金融资产', akshare: '行情数据' };
   var _dataLoading = {};
 
   function dataReady(k) { return !!window[DATA_GLOBAL[k]]; }
@@ -2033,7 +2033,7 @@
     el('hint').textContent = '';
     var F = window.FINANCE_DATA || { sections: [] };
     setHead({
-      title: '金融数据一览',
+      title: '金融资产一览',
       subtitle: (F.updated ? DT('数据更新到') + ' ' + F.updated : DT('暂无数据')) + ' · ' + tr('股票/商品/外汇用业绩模版，债券/VIX 用收益率折线','equities / commodities / FX use performance template; bonds / VIX use yield lines'),
       unit: '', source: tr('Wind / 交易所 · 手工整理','Wind / exchanges · compiled')
     });
@@ -2239,7 +2239,7 @@
     exploreSel.length = 0;
     box.innerHTML = '';
     var sources = (source === 'all') ? ['china', 'intl', 'finance'] : [source];
-    var labelMap = { china: DT('中国宏观'), intl: DT('国际宏观'), finance: DT('金融数据') };
+    var labelMap = { china: DT('中国宏观'), intl: DT('国际宏观'), finance: DT('金融资产') };
     sources.forEach(function (src) {
       var D = exploreData(src) || { sections: [] };
       // 该数据源有指标才加分组标题
@@ -2633,7 +2633,7 @@
     });
 
     // 3. 金融数据（3 个数据集）
-    var finSub = expando(ICONS.perf, tr('金融数据', 'Financial Data'), 'cases');
+    var finSub = expando(ICONS.perf, tr('金融资产', 'Financial Assets'), 'cases');
     [['china-macro', T('nav.china'), ICONS.macro, renderChinaMacro],
      ['intl-macro',  T('nav.intl'),  ICONS.globe, renderIntlMacro],
      ['finance',     T('nav.finance'), ICONS.perf, renderFinance]].forEach(function (c) {

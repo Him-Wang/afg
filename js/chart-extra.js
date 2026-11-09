@@ -568,30 +568,41 @@
   };
 
   B.donut = function (el, d, t) {
-    var data = d.data || [], sum = data.reduce(function (a, b) { return a + b.value; }, 0) || 1;
+    var data = (d.data || []).slice().sort(function (a, b) { return b.value - a.value; });
+    var sum = data.reduce(function (a, b) { return a + b.value; }, 0) || 1;
+    var rp = rampOf(t);
+    var W = (el && el.clientWidth) || 600;
+    var narrow = W < 420;
     return base(t, {
-      tooltip: tip(t, { formatter: function (p) { return p.name + '<br/>' + p.value + ' (' + (p.value / sum * 100).toFixed(1) + '%)'; } }),
+      tooltip: tip(t, { formatter: function (p) {
+        return '<b>' + p.name + '</b><br/>' + num(p.value) + (d.unit || '') + ' · 占比 ' + (p.value / sum * 100).toFixed(1) + '%';
+      } }),
       graphic: [
-        { type: 'text', left: 'center', top: '44%', z: 10,
-          style: { text: num(sum), fill: ink(t), font: '700 20px ' + FONT, textAlign: 'center' } },
-        { type: 'text', left: 'center', top: '54%', z: 10,
-          style: { text: d.unit || 'total', fill: muted(t), font: '10px ' + FONT, textAlign: 'center' } }
+        { type: 'text', left: 'center', top: narrow ? '36%' : '38%', z: 10,
+          style: { text: (data[0].value / sum * 100).toFixed(1) + '%', fill: ink(t), font: '800 ' + (narrow ? 17 : 23) + 'px ' + FONT, textAlign: 'center' } },
+        { type: 'text', left: 'center', top: narrow ? '48%' : '51%', z: 10,
+          style: { text: '最大 · ' + data[0].name, fill: muted(t), font: '10px ' + FONT, textAlign: 'center' } },
+        { type: 'text', left: 'center', top: narrow ? '56%' : '59%', z: 10,
+          style: { text: (d.centerLabel || '构成') + ' · ' + data.length + ' 项',
+            fill: rgba(ink(t), 0.42), font: '9px ' + FONT, textAlign: 'center' } }
       ],
       series: [{
-        type: 'pie', radius: ['56%', '76%'], center: ['50%', '50%'],
-        itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
-        label: { color: ink(t), fontSize: 10.5, fontFamily: FONT,
-          formatter: function (p) { return p.name + ' ' + (p.value / sum * 100).toFixed(1) + '%'; } },
-        labelLine: { length: 6, length2: 8, lineStyle: { color: rgba(ink(t), 0.25) } },
-        data: (function () {
-          var mx = 0;
-          data.forEach(function (x, i) { if (x.value > data[mx].value) mx = i; });
-          return data.map(function (x, i) {
-            return { name: x.name, value: x.value,
-              itemStyle: { color: seriesColor(t, i), borderWidth: i === mx ? 0 : 2 },
-              label: { fontWeight: i === mx ? 800 : 400, color: i === mx ? ink(t) : muted(t) } };
-          });
-        })()
+        type: 'pie', radius: narrow ? ['48%', '70%'] : ['52%', '78%'], center: ['50%', '50%'],
+        itemStyle: { borderColor: '#FFFFFF', borderWidth: 2.5, borderRadius: 3 },
+        label: { color: ink(t), fontFamily: FONT, lineHeight: 14,
+          formatter: function (p) {
+            return '{n|' + p.name + '}  {v|' + (p.value / sum * 100).toFixed(1) + '%}';
+          },
+          rich: { n: { fontSize: 10.5, color: ink(t), fontWeight: 700, fontFamily: FONT },
+                  v: { fontSize: 9.5, color: muted(t), fontFamily: FONT } } },
+        labelLine: { length: 8, length2: 12, lineStyle: { color: rgba(ink(t), 0.22) } },
+        emphasis: { scale: true, scaleSize: 6, itemStyle: { shadowBlur: 12, shadowColor: 'rgba(5,28,44,.18)' } },
+        data: data.map(function (x, i) {
+          var c = rp[Math.min(i, rp.length - 1)] || seriesColor(t, i);
+          return { name: x.name, value: x.value,
+            itemStyle: { color: c, borderWidth: i === 0 ? 0 : 2 },
+            label: { fontWeight: i === 0 ? 800 : 400 } };
+        })
       }]
     });
   };
@@ -613,36 +624,84 @@
   };
 
   B.percentBar = function (el, d, t) {
-    var totals = d.labels.map(function (_, i) { return d.series.reduce(function (s, se) { return s + se.values[i]; }, 0) || 1; });
+    var rp = rampOf(t);
+    var totals = d.labels.map(function (_, i) { return d.series.reduce(function (a, se) { return a + se.values[i]; }, 0) || 1; });
+    var lastIdx = d.labels.length - 1;
+    function pct(arr, i) { return Math.round(arr[i] / totals[i] * 1000) / 10; }
     return base(t, {
-      tooltip: tip(t, { trigger: 'axis', valueFormatter: function (v) { return v + '%'; } }),
-      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
-      grid: grid({ top: 32 }),
-      xAxis: yAxis(t, { type: 'value', max: 100, axisLabel: { color: muted(t), fontSize: 10, fontFamily: FONT, formatter: '{value}%' } }),
-      yAxis: xAxis(t, { data: d.labels, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
-      series: d.series.map(function (s, i) {
-        return { name: s.name, type: 'bar', stack: 'p', barWidth: 18,
-          data: s.values.map(function (v, j) { return Math.round(v / totals[j] * 1000) / 10; }),
-          itemStyle: { color: seriesColor(t, i) },
-          label: { show: true, color: '#fff', fontSize: 9.5, fontFamily: FONT, formatter: function (p) { return p.value >= 10 ? Math.round(p.value) + '%' : ''; } } };
-      })
+      tooltip: tip(t, { trigger: 'axis', formatter: function (ps) {
+        var i = ps[0].dataIndex;
+        var lines = ps.map(function (p) { return p.marker + p.seriesName + ' ' + p.value + '%'; });
+        return '<b>' + d.labels[i] + '</b>（合计 ' + num(totals[i]) + '）<br/>' + lines.join('<br/>');
+      } }),
+      legend: legend(t, { data: d.series.map(function (x) { return x.name; }) }),
+      grid: grid({ top: 34, left: 8, right: 64, bottom: 6 }),
+      xAxis: yAxis(t, { type: 'value', max: 100,
+        axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, formatter: '{value}%' } }),
+      yAxis: xAxis(t, { data: d.labels,
+        axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT, fontWeight: 600 } }),
+      series: d.series.map(function (sr, i) {
+        var c = rp[Math.min(i + 1, rp.length - 1)] || seriesColor(t, i);
+        return { name: sr.name, type: 'bar', stack: 'p', barWidth: 20,
+          itemStyle: { color: c, borderColor: '#fff', borderWidth: 1 },
+          data: sr.values.map(function (v, j) {
+            var p = pct(sr.values, j);
+            return { value: p,
+              label: { show: p >= 8, color: '#fff', fontSize: 9.5, fontFamily: FONT, fontWeight: 700,
+                formatter: Math.round(p) + '%' } };
+          }) };
+      }).concat([{
+        /* 右侧合计 + 首末期结构变化 */
+        name: '__total', type: 'bar', stack: 'p', silent: true, barWidth: 20,
+        data: totals.map(function (tt) { return 0; }),
+        label: { show: true, position: 'right', distance: 8, color: muted(t), fontSize: 9.5, fontFamily: FONT,
+          formatter: function (p) { return num(totals[p.dataIndex]); } }
+      }])
     });
   };
 
   B.treemap = function (el, d, t) {
+    var rp = rampOf(t);
+    var root = d.data || [];
+    var total = 0;
+    root.forEach(function (g) { (g.children || []).forEach(function (c) { total += c.value; }); });
+    total = total || 1;
+    var groups = root.map(function (g, gi) {
+      var base = rp[Math.min(gi * 2, rp.length - 1)] || seriesColor(t, gi);
+      return {
+        name: g.name,
+        itemStyle: { color: base, borderColor: '#fff', borderWidth: 2, gapWidth: 2 },
+        upperLabel: { show: true, height: 17, color: muted(t), fontSize: 9.5, fontFamily: FONT, fontWeight: 700,
+          formatter: function (p) { return p.name; } },
+        children: (g.children || []).map(function (c, ci) {
+          var share = c.value / total * 100;
+          return {
+            name: c.name, value: c.value,
+            itemStyle: { color: rgba(base, 1 - ci * 0.16), borderColor: '#fff', borderWidth: 1.5 },
+            label: { show: share >= 7, color: '#fff', fontFamily: FONT,
+              formatter: '{a|' + c.name + '}\n{b|' + share.toFixed(1) + '%}',
+              rich: { a: { fontSize: 9.5, fontWeight: 700, color: '#fff', fontFamily: FONT },
+                      b: { fontSize: 8.5, color: 'rgba(255,255,255,.85)', fontFamily: FONT } } }
+          };
+        })
+      };
+    });
     return base(t, {
-      tooltip: tip(t, { formatter: function (p) { return p.name + ' · ' + num(p.value); } }),
+      tooltip: tip(t, { formatter: function (p) {
+        return '<b>' + p.name + '</b><br/>' + num(p.value) + ' · 占比 ' + (p.value / total * 100).toFixed(1) + '%';
+      } }),
       series: [{
-        type: 'treemap', data: d.data, roam: false, nodeClick: false, breadcrumb: { show: false },
-        left: 0, right: 0, top: 0, bottom: 0,
-        width: '100%', height: '100%',
-        itemStyle: { borderColor: '#FFFFFF', borderWidth: 2, gapWidth: 2 },
+        type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false },
+        width: '99%', height: '94%', top: '3%', left: '0.5%',
         levels: [
-          { itemStyle: { borderWidth: 0, gapWidth: 3 } },
-          { colorSaturation: [0.35, 0.6], itemStyle: { borderWidth: 1, gapWidth: 1, borderColorSaturation: 0.6 } }
+          { itemStyle: { borderWidth: 0, gapWidth: 4, borderColor: '#fff' },
+            upperLabel: { show: true, height: 17, color: muted(t), fontSize: 9.5, fontFamily: FONT, fontWeight: 700 } },
+          { itemStyle: { borderWidth: 1.5, gapWidth: 1.5 }, colorSaturation: [0.3, 0.42] }
         ],
-        label: { color: '#FFFFFF', fontSize: 10.5, fontFamily: FONT, overflow: 'truncate' },
-        color: (t.series || ['#1A1A2E', '#A67C3D', '#6F8FA8', '#7A5C3E', '#8A8A99', '#3E5A4E'])
+        upperLabel: { show: true, height: 16, color: muted(t), fontFamily: FONT, fontSize: 9.5, fontWeight: 700 },
+        label: { show: true },
+        emphasis: { itemStyle: { shadowBlur: 14, shadowColor: 'rgba(5,28,44,.22)' } },
+        data: groups
       }]
     });
   };

@@ -13,7 +13,7 @@
       'nav.home': '使用说明',
       'nav.china': '中国宏观数据',
       'nav.intl': '国际宏观数据',
-      'nav.finance': '金融数据',
+      'nav.finance': '金融资产',
       'nav.explore': '数据探索',
       'nav.examples': '图表分类',
 
