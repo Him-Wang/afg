@@ -962,7 +962,7 @@
           try { px = inst.convertToPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [i, v]); } catch (e) {}
         }
         if (!px) return;
-        picks.push({ px: px[0], py: px[1], val: v, color: (tc.series && tc.series[si % tc.series.length]) || tc.accent, si: si });
+        picks.push({ px: px[0], py: px[1], val: v, color: (tc.series && tc.series[si % tc.series.length]) || tc.accent, si: si, sname: ser.name || '' });
       });
     });
     if (!picks.length) return;
@@ -972,13 +972,17 @@
     overlay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:19;';
     container.appendChild(overlay);
 
-    /* 去重：同一位置只保留一个 */
+    /* 去重：同一系列同一 x 只留一个；不同系列保留（按系列纵向错开） */
     picks.sort(function (a, b) { return a.px - b.px; });
-    var lastX = -999, placed = [];
+    var placed = [], seenKey = {}, lastXBySeries = {};
     picks.forEach(function (p) {
+      var key = p.si + ':' + Math.round(p.px);
+      if (seenKey[key]) return;
       var minGap = placed.length > 60 ? 8 : (placed.length > 30 ? 14 : 22);
-      if (Math.abs(p.px - lastX) < minGap) return;
-      lastX = p.px;
+      var lx0 = lastXBySeries[p.si];
+      if (lx0 !== undefined && Math.abs(p.px - lx0) < minGap) return;
+      seenKey[key] = 1;
+      lastXBySeries[p.si] = p.px;
       placed.push(p);
     });
 
@@ -987,9 +991,10 @@
     placed.forEach(function (p) {
       var el2 = document.createElement('div');
       el2.className = 'all-val';
+      el2.dataset.series = p.sname || '';
       var txt = Math.abs(p.val) >= 1000 ? Number(p.val.toFixed(0)).toLocaleString('en-US') : (Math.round(p.val * 100) / 100);
       el2.textContent = txt;
-      var lx = p.px, ly = p.py - 12 - p.si * 13;
+      var lx = p.px, ly = p.py - 12 - p.si * 15;
       var many = placed.length > 40;
       el2.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;transform:translateX(-50%);' +
         'color:' + p.color + ';font:700 ' + (many ? 8.5 : 10.5) + 'px Inter,"PingFang SC",sans-serif;white-space:nowrap;' +
@@ -1395,7 +1400,7 @@
   function dimLabelsTo(inst, name) {
     var container = inst && inst.getDom && inst.getDom();
     if (!container) return;
-    Array.prototype.forEach.call(container.querySelectorAll('.ext-label, .last-tag'), function (el) {
+    Array.prototype.forEach.call(container.querySelectorAll('.ext-label, .last-tag, .all-val'), function (el) {
       var sname = el.dataset && el.dataset.series;
       var on = (!name || !sname || sname === name);
       el.style.opacity = on ? '1' : '0.18';
@@ -3078,6 +3083,23 @@
     });
     return found;
   }
+
+  /* 债券收益率序列判定：收益率上行 = 债券价格下跌，统计需反向换算 */
+  function isYieldSeries(name) {
+    return /收益率|国债|利率|yield|rate/i.test(String(name || ''));
+  }
+  function bondPriceProxy(values) {
+    var first = null;
+    for (var i = 0; i < values.length; i++) {
+      var v = values[i];
+      if (v !== null && v !== undefined && isFinite(v) && v > 0) { first = v; break; }
+    }
+    if (!first) return values.slice();
+    return values.map(function (v) {
+      if (v === null || v === undefined || !isFinite(v) || v <= 0) return null;
+      return 100 * first / v;     // 收益率下行 → 价格上行
+    });
+  }
   function renderFinanceMetricsTable(labels, series, isFund, levelMode, inst) {
     if (!series || !series.length) return null;
     var wrap = document.createElement('div');
@@ -3103,12 +3125,19 @@
       } else {
         var bench = isFund ? financeBenchmark() : null;
         var benchVals = bench ? alignSeriesToBase(labels2, bench.labels, bench.series[0].values) : null;
-        metrics = series2.map(function (x) { return ML.perfMetrics(x.values, benchVals, labels2); });
+        var yieldFlags = series2.map(function (x) { return isYieldSeries(x.name); });
+        metrics = series2.map(function (x, xi) {
+          var vals = yieldFlags[xi] ? bondPriceProxy(x.values) : x.values;
+          return ML.perfMetrics(vals, benchVals, labels2);
+        });
         rows = [['annReturn', DT('年化回报')], ['annVol', DT('年化波动（标准差）')], ['maxDD', DT('最大回撤')], ['sharp', DT('夏普比率')]];
         if (isFund) rows = rows.concat([['sortino', tr('索提诺比率','Sortino')], ['m2', 'M²'], ['alpha', tr('詹森 alpha','Jensen alpha')], ['beta', 'Beta']]);
         rows = rows.concat([['calmar', DT('卡玛比率')], ['var95', 'VaR 95%'], ['totalReturn', DT('累计收益')]]);
         pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
         head = tr('业绩指标','Performance') + (isFund ? tr('（基金 · 基准：沪深300 · 无风险利率 2%）',' (fund · benchmark: CSI 300 · risk-free 2%)') : tr('（无风险利率 2%）',' (risk-free 2%)'));
+        if (series2.some(function (x) { return isYieldSeries(x.name); })) {
+          head += tr(' · 债券列已按价格反向换算（收益率上行 → 价格下跌）', ' · bond columns inverted (yield up → price down)');
+        }
       }
       var html = '<div class="an-head">' + head +
         '<span class="an-sub">' + (labels2.length && labels2.length < labels.length
