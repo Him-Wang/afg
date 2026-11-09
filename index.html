@@ -236,6 +236,16 @@
         </div>
         <div class="field-row" id="analysis-goal" style="display:none"></div>
         <div class="field-row"><label>Y / 数值列</label><span class="hint" id="y-hint">点击选择一列或多列</span></div>
+        <div class="radar-picker" id="radar-picker" style="display:none">
+          <div class="rp-head">雷达图对比设置<span class="rp-sub" id="rp-sub"></span></div>
+          <div class="rp-presets" id="rp-presets">
+            <button class="rp-preset" data-n="3">最近 3 期</button>
+            <button class="rp-preset" data-n="6">最近 6 期</button>
+            <button class="rp-preset" data-n="12">最近 12 期</button>
+            <button class="rp-preset" data-n="all">全部</button>
+          </div>
+          <div class="rp-chips" id="rp-chips"></div>
+        </div>
         <div class="column-picker" id="y-cols"></div>
         <div class="field-row">
           <label>数据行范围</label>

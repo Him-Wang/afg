@@ -158,6 +158,7 @@
     table: null, det: null,
     dataset: null, datasets: null, dashboardDatasets: null,
     mapping: { timeCol: '', yCols: [], chartType: 'line' },
+    radarPick: null,   // 雷达图参与对比的期数（行标签或月份列）
     uploadedTable: null, overlaySeries: [], _indicatorOptions: null, macroItem: null, finItem: null, intlItem: null, chartConfig: null, exploreConfig: null, lastChart: null, timeRange: 'all', alignToMain: true, macroTypeOverride: null, analysisGoal: 'trend'
   };
 
@@ -1275,6 +1276,85 @@
     });
   }
 
+
+  /* ---------- 雷达图：悬停高亮（按指标轴 + 按月份曲线） ---------- */
+  function attachRadarHover(inst, radarData) {
+    if (!inst || inst._radarBound || !radarData || !radarData.indicators) return;
+    inst._radarBound = true;
+    var zr = inst.getZr();
+    var dom = inst.getDom();
+    if (getComputedStyle(dom).position === 'static') dom.style.position = 'relative';
+    var n = radarData.indicators.length;
+    var seriesNames = radarData.series.map(function (x) { return x.name; });
+    var tip = document.createElement('div');
+    tip.className = 'radar-tip';
+    tip.style.cssText = 'position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;background:#fff;' +
+      'border:1px solid rgba(26,26,46,.12);border-radius:8px;padding:8px 10px;font:11.5px/1.6 Inter,"PingFang SC",sans-serif;' +
+      'color:#051C2C;box-shadow:0 8px 24px rgba(20,20,35,.14);z-index:30;white-space:nowrap;';
+    dom.appendChild(tip);
+    var mark = null;
+
+    function geom() {
+      var opt = inst.getOption();
+      var rd = opt.radar && opt.radar[0];
+      if (!rd) return null;
+      var W = inst.getWidth(), H = inst.getHeight();
+      function pct(v, base) { return typeof v === 'string' && v.indexOf('%') >= 0 ? parseFloat(v) / 100 * base : (typeof v === 'number' ? v : null); }
+      var cx = pct(rd.center[0], W), cy = pct(rd.center[1], H);
+      var rv = rd.radius, R;
+      if (typeof rv === 'string' && rv.indexOf('%') >= 0) R = parseFloat(rv) / 100 * Math.min(W, H) / 2;
+      else if (Array.isArray(rv)) R = pct(rv[1], Math.min(W, H) / 2);
+      else R = pct(rv, Math.min(W, H) / 2) || Math.min(W, H) * 0.3;
+      return { cx: cx, cy: cy, R: R };
+    }
+
+    zr.on('mousemove', function (e) {
+      var g = geom();
+      if (!g) return;
+      var dx = e.offsetX - g.cx, dy = e.offsetY - g.cy;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < g.R * 0.12 || dist > g.R * 1.35) { hide(); return; }
+      var ang = Math.atan2(dy, dx) + Math.PI / 2;
+      if (ang < 0) ang += Math.PI * 2;
+      var step = Math.PI * 2 / n;
+      var idx = Math.round(ang / step) % n;
+      show(idx, e.offsetX, e.offsetY);
+    });
+    zr.on('globalout', hide);
+
+    function show(idx, mx, my) {
+      var g = geom();
+      if (!g) return;
+      var ang = -Math.PI / 2 + idx * (Math.PI * 2 / n);
+      var x2 = g.cx + Math.cos(ang) * g.R * 1.02, y2 = g.cy + Math.sin(ang) * g.R * 1.02;
+      if (!mark) {
+        mark = new echarts.graphic.Line({ silent: true,
+          shape: { x1: g.cx, y1: g.cy, x2: x2, y2: y2 },
+          style: { stroke: '#B5484B', lineWidth: 1.4, lineDash: [3, 3] }, z: 30 });
+        zr.add(mark);
+      }
+      mark.setShape({ x1: g.cx, y1: g.cy, x2: x2, y2: y2 });
+      var name = radarData.indicators[idx].name;
+      var rows = radarData.series.map(function (sr, si) {
+        return '<span style="display:inline-block;width:7px;height:7px;border-radius:2px;background:' +
+          ((Themes.active().chart.series || [])[si % 3] || '#051C2C') + ';margin-right:5px"></span>' +
+          sr.name + ' <b style="float:right;margin-left:14px">' + (sr.values[idx] == null ? '—' : Number(sr.values[idx]).toFixed(1)) + '</b>';
+      }).join('<br/>');
+      tip.innerHTML = '<div style="font-weight:800;margin-bottom:4px;color:#B5484B">' + name + '</div>' + rows;
+      tip.style.opacity = 1;
+      var w = tip.offsetWidth, h = tip.offsetHeight;
+      var lx = mx + 16, ly = my - h / 2;
+      if (lx + w > inst.getWidth() - 6) lx = mx - w - 16;
+      if (ly < 4) ly = 4;
+      tip.style.left = Math.max(4, lx) + 'px';
+      tip.style.top = ly + 'px';
+    }
+    function hide() {
+      if (mark) { zr.remove(mark); mark = null; }
+      tip.style.opacity = 0;
+    }
+  }
+
   /* 图例点击：聚焦某条指标，其余变暗（不隐藏），再次点击恢复 */
   function applySeriesFocus(inst, focusName) {
     var opt = inst.getOption();
@@ -1804,7 +1884,10 @@
   /* 社融单项：季节性折线大图 */
   function openSheirongSeasonItem(item, sr) {
     clearStage();
-    state.mode = 'macro';
+    state.mode = 'season';          // 细分图表：显示功能栏
+    state.seasonItem = item;
+    state.seasonCurrent = sr;
+    state.seasonPanels = [];
     state.viewKey = 'macro-seirong-item:' + sr.name;
     state.macroItem = item;
     highlightNav(null);
@@ -1827,6 +1910,7 @@
       maxYears: 4
     }, theme);
     state.echartsEl = c;
+    state.seasonPanels = [{ inst: inst, box: c, sr: sr }];
     attachExtremeLabels(inst);
     try { inst.resize(); } catch (e) {}
     syncToolbar();
@@ -1835,8 +1919,9 @@
   /* 社融结构三项：三张季节性折线（近 4 年，1-12 月对比） */
   function renderSheirongSeason(item) {
     clearStage();
-    state.mode = 'season';
+    state.mode = 'macro';           // 三面板总览：不显示功能栏
     state.seasonItem = item;
+    state.seasonCurrent = null;
     state.seasonPanels = [];
     state.viewKey = 'macro-seirong-season';
     state.macroItem = item;
@@ -2486,7 +2571,9 @@
     el('chart-stage').appendChild(c);
     var theme = getChartTheme(); theme._noZoom = true;
     try {
-      var inst = ChartFactory.render(c, ch.type, (window.localizeDemo ? localizeDemo(ch.data()) : ch.data()), theme);
+      var _cdata = (window.localizeDemo ? localizeDemo(ch.data()) : ch.data());
+      var inst = ChartFactory.render(c, ch.type, _cdata, theme);
+      if (ch.type === 'radar') attachRadarHover(inst, _cdata);
       state.echartsEl = c;
       requestAnimationFrame(function () { try { inst.resize(); } catch (e) {} });
     } catch (e) {}
@@ -3330,12 +3417,19 @@
   }
 
   function rerender() {
+    if (state.mode === 'season' && state.seasonItem && state.seasonCurrent) {
+      openSheirongSeasonItem(state.seasonItem, state.seasonCurrent); return;
+    }
     if (state.macroItem) { openMacroItem(state.macroItem, true); return; }
     if (state.finItem) { openFinItem(state.finItem, true); return; }
     if (state.intlItem) { openIntlItem(state.intlItem, true); return; }
     if (state.exploreConfig) { renderExploreFromConfig(); return; }
     if (state.chartConfig) { applyChartConfig(state.chartConfig); return; }
-    if (state.mode === 'season' && state.seasonItem) { renderSheirongSeason(state.seasonItem); return; }
+    if (state.mode === 'season' && state.seasonItem) {
+      if (state.seasonCurrent) { openSheirongSeasonItem(state.seasonItem, state.seasonCurrent); }
+      else { renderSheirongSeason(state.seasonItem); }
+      return;
+    }
     if (state.mode === 'dashboard') renderDashboard(state.dashboardDatasets, false);
     else if (state.mode === 'dataset') renderDatasetSingle(state.dataset);
     else if (state.mode === 'imported') renderUserChart(false);
@@ -3775,6 +3869,56 @@
     updatePreview();
   }
 
+
+  /* ---------- 雷达图：期数（月份）多选 ---------- */
+  function radarCandidates() {
+    if (!state.table || !state.det) return [];
+    var wide = state.det.orientation === 'wide';
+    if (state.transposed) wide = !wide;
+    if (wide) return state.det.numericCols.slice();
+    return state.table.rows.map(function (r) { return String(r[state.det.timeCol]); });
+  }
+  function renderRadarPicker() {
+    var box = el('radar-picker');
+    if (!box) return;
+    var isRadar = state.mapping.chartType === 'radar';
+    box.style.display = isRadar ? '' : 'none';
+    if (!isRadar) return;
+    var cands = radarCandidates();
+    if (!cands.length) { box.style.display = 'none'; return; }
+    if (!state.radarPick || !state.radarPick.length) {
+      state.radarPick = cands.slice(-3);          // 默认最近 3 期
+    }
+    state.radarPick = state.radarPick.filter(function (c) { return cands.indexOf(c) >= 0; });
+    if (!state.radarPick.length) state.radarPick = cands.slice(-3);
+    var wide = state.det.orientation === 'wide';
+    if (state.transposed) wide = !wide;
+    el('rp-sub').textContent = '（每条曲线 = 一个' + (wide ? '月份' : '时期') + '，选 2–4 条最清晰 · 当前 ' + state.radarPick.length + ' 条）';
+    var chips = el('rp-chips');
+    chips.innerHTML = '';
+    cands.forEach(function (c) {
+      var d = document.createElement('div');
+      d.className = 'rp-chip' + (state.radarPick.indexOf(c) >= 0 ? ' on' : '');
+      d.textContent = c;
+      d.addEventListener('click', function () {
+        var i = state.radarPick.indexOf(c);
+        if (i >= 0) state.radarPick.splice(i, 1);
+        else state.radarPick.push(c);
+        if (!state.radarPick.length) state.radarPick = [c];
+        renderRadarPicker(); updatePreview();
+      });
+      chips.appendChild(d);
+    });
+    Array.prototype.forEach.call(el('rp-presets').children, function (btn) {
+      btn.classList.remove('active');
+      btn.onclick = function () {
+        var n = btn.getAttribute('data-n');
+        state.radarPick = (n === 'all') ? cands.slice() : cands.slice(-parseInt(n, 10));
+        renderRadarPicker(); updatePreview();
+      };
+    });
+  }
+
   function renderYChips() {
     var box = el('y-cols');
     box.innerHTML = '';
@@ -3931,7 +4075,13 @@
       } else if (type === 'radar') {
         var wide = state.det && state.det.orientation === 'wide';
         if (state.transposed) wide = !wide;
-        data = buildRadarData(rows, state.mapping.timeCol, yCols, wide);
+        var pick = state.radarPick || [];
+        var rowsR = rows, yColsR = yCols;
+        if (pick.length) {
+          if (wide) yColsR = yCols.filter(function (c) { return pick.indexOf(c) >= 0; });
+          else rowsR = rows.filter(function (r) { return pick.indexOf(String(r[state.mapping.timeCol])) >= 0; });
+        }
+        data = buildRadarData(rowsR, state.mapping.timeCol, yColsR.length ? yColsR : yCols, wide);
       } else {
         if (state.transposed) {
           data = { labels: yCols, series: rows.map(function (r) {
@@ -3952,6 +4102,7 @@
       clearStage();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
       var uinst = ChartFactory.render(c, type, data, theme);
+      if (type === 'radar') attachRadarHover(uinst, data);
       attachAnnotationHandler(uinst);
       attachExtremeLabels(uinst);
       state.echartsEl = c;
@@ -4328,7 +4479,7 @@
     });
 
     el('x-col').addEventListener('change', function () { state.mapping.timeCol = el('x-col').value; updatePreview(); });
-    el('chart-type').addEventListener('change', function () { state.mapping.chartType = el('chart-type').value; updateChartTypeHint(); });
+    el('chart-type').addEventListener('change', function () { state.mapping.chartType = el('chart-type').value; updateChartTypeHint(); renderRadarPicker(); updatePreview(); });
     el('btn-swapxy').addEventListener('click', function () {
       state.transposed = !state.transposed;
       el('btn-swapxy').classList.toggle('active', state.transposed);

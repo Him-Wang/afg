@@ -879,3 +879,15 @@ body.is-home .chart-head { display: none; }
 .coh-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
 .coh-tag.conv { background: rgba(46,107,82,0.12); color: #2E6B52; }
 .coh-tag.div { background: rgba(181,72,75,0.12); color: #B5484B; }
+
+/* 雷达图对比设置 */
+.radar-picker { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 10px 0 14px; background: var(--panel); }
+.rp-head { font-size: 11.5px; font-weight: 700; letter-spacing: .6px; color: var(--text); margin-bottom: 10px; text-transform: uppercase; }
+.rp-sub { margin-left: 8px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: 11px; }
+.rp-presets { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.rp-preset { border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 6px; padding: 4px 11px; font-size: 11.5px; cursor: pointer; }
+.rp-preset:hover { border-color: var(--accent); color: var(--accent); }
+.rp-preset.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-chip { border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 11.5px; cursor: pointer; color: var(--muted); user-select: none; }
+.rp-chip.on { border-color: var(--accent); color: var(--accent); background: rgba(176,138,79,.10); font-weight: 700; }

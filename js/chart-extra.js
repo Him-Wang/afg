@@ -357,6 +357,8 @@
       },
       series: [{
         type: 'radar', symbolSize: 3,
+        emphasis: { focus: 'series', lineStyle: { width: 3.2 }, areaStyle: { opacity: 0.22 } },
+        blur: { lineStyle: { opacity: 0.12 }, areaStyle: { opacity: 0.02 }, itemStyle: { opacity: 0.15 }, label: { opacity: 0.1 } },
         data: d.series.map(function (s, si) {
           var isLast = si === d.series.length - 1;
           var c = seriesColor(t, si);
