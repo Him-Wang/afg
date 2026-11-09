@@ -215,7 +215,14 @@
     // 单图配色（顶级咨询/金融/期刊风格）
     var pid = state.palette || 'consult';
     var ps = (window.ADV_PALETTES || []).filter(function (p) { return p.id === pid; })[0];
-    if (ps) { c.series = ps.colors.slice(); if (ps.accent) c.accent = ps.accent; if (ps.ink) c.text = ps.ink; }
+    c.paletteId = pid;
+    if (ps) {
+      c.series = ps.colors.slice();
+      if (ps.accent) c.accent = ps.accent;
+      if (ps.ink) c.text = ps.ink;
+      if (ps.up) c.up = ps.up;
+      if (ps.down) c.down = ps.down;
+    }
     return c;
   }
 

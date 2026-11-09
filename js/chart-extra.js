@@ -82,22 +82,22 @@
 
   /* 取当前色板的明度梯度 */
   function rampOf(t) {
-    var pid = (window.state && state.palette) || 'consult';
+    var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.ramp) ? p.ramp : [(t.text || '#051C2C'), '#1B4B72', '#4A7FA8', '#A8C4D8', '#E4EBF1'];
   }
   function upOf(t) {
-    var pid = (window.state && state.palette) || 'consult';
+    var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.up) || '#1E7A46';
   }
   function downOf(t) {
-    var pid = (window.state && state.palette) || 'consult';
+    var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.down) || '#B5484B';
   }
   function accentOf(t) {
-    var pid = (window.state && state.palette) || 'consult';
+    var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.accent) ? p.accent : (t.accent || '#B08A4F');
   }

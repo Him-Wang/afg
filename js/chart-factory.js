@@ -1431,6 +1431,26 @@
     }
     if (watermarkOn) addWatermark(option, theme, type);
     option = polishOption(option, theme, type);
+    /* 悬停聚焦：突出当前系列，其余变暗（ECharts blur 状态） */
+    (function () {
+      var selfFocus = { pie: 1, donut: 1, sunburst: 1, treemap: 1, funnel: 1, map: 1, choropleth: 1, heatMapGeo: 1 };
+      var skip = { tree: 1, orgChart: 1, swimlane: 1, flowchart: 1, parallel: 1, sankey: 1, graph: 1, lines: 1, themeRiver: 1 };
+      if (skip[type]) return;
+      var focusMode = selfFocus[type] ? 'self' : 'series';
+      var blur = {
+        itemStyle: { opacity: 0.10 },
+        lineStyle: { opacity: 0.08, width: 1 },
+        areaStyle: { opacity: 0.04 },
+        label: { opacity: 0.08 },
+        labelLine: { opacity: 0.06 },
+        symbolSize: 2
+      };
+      (option.series || []).forEach(function (sr) {
+        if (!sr) return;
+        sr.emphasis = Object.assign({}, sr.emphasis, { focus: focusMode, blurScope: 'coordinateSystem' });
+        sr.blur = Object.assign({}, sr.blur, blur);
+      });
+    })();
     maybeDualAxis(option, theme, type);
     if (theme && theme._noZoom) { delete option.dataZoom; }
     localizeOption(option);

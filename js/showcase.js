@@ -100,6 +100,12 @@
         var related = links.filter(function (l) { return l.source.id === n.id || l.target.id === n.id; }).length;
         tip.show('<b>' + n.name + '</b><br/>权重 ' + n.value + ' · 关联 ' + related + ' 条', ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
         d3.select(this).select('circle').transition().duration(120).attr('r', 5 + Math.sqrt(n.value) * 1.9 + 4);
+        nodeSel.transition().duration(120).style('opacity', function (o) {
+          return (o.id === n.id || links.some(function (l) { return (l.source.id === n.id && l.target.id === o.id) || (l.target.id === n.id && l.source.id === o.id); })) ? 1 : 0.18;
+        });
+        linkSel.transition().duration(120).style('opacity', function (l) {
+          return (l.source.id === n.id || l.target.id === n.id) ? 1 : 0.08;
+        });
       })
       .on('mousemove', function (ev, n) {
         tip.show('<b>' + n.name + '</b><br/>权重 ' + n.value, ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
@@ -107,6 +113,8 @@
       .on('mouseleave', function (ev, n) {
         tip.hide();
         d3.select(this).select('circle').transition().duration(120).attr('r', 5 + Math.sqrt(n.value) * 1.9);
+        nodeSel.transition().duration(150).style('opacity', 1);
+        linkSel.transition().duration(150).style('opacity', 1);
       });
 
     var sim = d3.forceSimulation(nodes)
@@ -170,14 +178,16 @@
       .attr('opacity', 0.85)
       .style('cursor', 'pointer')
       .on('mouseenter', function (ev, d) {
-        d3.select(this).transition().duration(100).attr('opacity', 1).attr('stroke', rgba(ink(theme), 0.4));
+        g.selectAll('path').transition().duration(120).attr('opacity', 0.12);
+        d3.select(this).transition().duration(120).attr('opacity', 1).attr('stroke', rgba(ink(theme), 0.45));
         tipC.show('<b>' + names[d.source.index] + ' → ' + names[d.target.index] + '</b><br/>规模 ' + d.source.value.toFixed(1), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
       })
       .on('mousemove', function (ev, d) {
         tipC.show('<b>' + names[d.source.index] + ' → ' + names[d.target.index] + '</b><br/>规模 ' + d.source.value.toFixed(1), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
       })
       .on('mouseleave', function () {
-        d3.select(this).transition().duration(120).attr('opacity', 0.85).attr('stroke', rgba(ink(theme), 0.12));
+        g.selectAll('path').transition().duration(150).attr('opacity', 0.85);
+        d3.select(this).transition().duration(150).attr('stroke', rgba(ink(theme), 0.12));
         tipC.hide();
       });
 
@@ -227,6 +237,7 @@
           .attr('r', (d.depth === 0 ? 7 : (d.children ? 4.5 : 3)) + 3);
         var path = d.ancestors().reverse().map(function (a) { return a.data.name; }).join(' › ');
         var kids = d.children ? d.children.length : 0;
+        node.style('opacity', function (o) { return (o === d || o.parent === d || d.parent === o || d.ancestors().indexOf(o) >= 0) ? 1 : 0.2; });
         tipT.show('<b>' + d.data.name + '</b><br/>' + path + (kids ? '<br/>下级 ' + kids + ' 项' : ''), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
       })
       .on('mousemove', function (ev, d) {
@@ -236,6 +247,7 @@
       .on('mouseleave', function (ev, d) {
         d3.select(this).select('circle').transition().duration(100)
           .attr('r', d.depth === 0 ? 7 : (d.children ? 4.5 : 3));
+        node.style('opacity', 1);
         tipT.hide();
       });
 
