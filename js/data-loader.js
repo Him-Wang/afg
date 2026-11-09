@@ -856,8 +856,22 @@
       ohlc = { time: timeCol, open: 'open', high: 'high', low: 'low', close: 'close',
                volume: has(['volume', 'vol']) ? (columns[lower.indexOf('volume') >= 0 ? lower.indexOf('volume') : lower.indexOf('vol')]) : null };
     }
+    /* 方向判断：表头是时间（如「1月/2月/2025-01」）且首列不是时间 → 时间在列方向（wide） */
+    function isTimeHeader(c) {
+      var t = String(c).trim();
+      if (isDateLike(t)) return true;
+      if (/^\d{1,2}\s*月$/.test(t)) return true;
+      if (/^\d{4}\s*年?$/.test(t)) return true;
+      if (/^\d{4}[-/]\d{1,2}$/.test(t)) return true;
+      return false;
+    }
+    var headerTimes = columns.filter(function (c) { return c !== '__row__' && isTimeHeader(c); }).length;
+    var firstColTime = sample.some(function (r) { return isDateLike(r[timeCol]); });
+    /* 首列是时间 → 时间在行方向（long）；首列非时间且表头是时间 → 时间在列方向（wide） */
+    var wide = !firstColTime && (headerTimes >= 2 || numericCols.length > table.rows.length);
     return { timeCol: timeCol, numericCols: numericCols, ohlc: ohlc, isTimeSeries: isTimeSeries,
-             orientation: (numericCols.length > table.rows.length) ? 'wide' : 'long' };
+             headerTimeCount: headerTimes,
+             orientation: wide ? 'wide' : 'long' };
   }
 
   /* ---------- 宏观数据变换：变频 / 同比 / 环比 / 累计 / 自定义公式 ---------- */

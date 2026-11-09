@@ -831,6 +831,7 @@
       var hiP = vals.reduce(function (a, b) { return b.v > a.v ? b : a; });
       var loP = vals.reduce(function (a, b) { return b.v < a.v ? b : a; });
       var c = (tc.series && tc.series[si % tc.series.length]) || tc.accent;
+      var nSer = (opt.series || []).filter(function (x) { return x && x.type === 'line' || x.type === 'bar'; }).length || 1;
       function px(p) {
         try { var r = inst.convertToPixel({ seriesIndex: si }, [p.i, p.v]); return r ? [r[0], r[1]] : null; }
         catch (e) { return null; }
@@ -859,8 +860,10 @@
       el2.className = 'last-tag';
       el2.dataset.kind = it.kind;
       el2.textContent = it.text;
+      var nS = (opt.series || []).filter(function (x) { return x && (x.type === 'line' || x.type === 'bar'); }).length || 1;
+      var fs = nS <= 2 ? 11.5 : (nS <= 4 ? 10 : (nS <= 6 ? 9 : 8));
       el2.style.cssText = 'position:absolute;pointer-events:none;background:transparent;color:' + it.color +
-        ';font:800 11.5px Inter,"PingFang SC",sans-serif;letter-spacing:.2px;padding:0 2px;white-space:nowrap;' +
+        ';font:800 ' + fs + 'px Inter,"PingFang SC",sans-serif;letter-spacing:.2px;padding:0 2px;white-space:nowrap;' +
         'text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 8px #fff,0 0 10px #fff;';
       overlay.appendChild(el2);
       var lw = el2.offsetWidth || 44, lh = el2.offsetHeight || 14;
@@ -917,12 +920,17 @@
       if (!n) return;
       var s0 = Math.floor(n * st / 100), e0 = Math.ceil(n * en / 100);
       var idxs = [];
-      if (visible <= 40 && !highFreq) {
-        for (var i = s0; i < e0; i++) idxs.push(i);
-      } else if (visible <= 400 && !highFreq) {
-        var step = Math.max(1, Math.ceil(visible / 30));
+      if (visible <= 200) {
+        for (var i = s0; i < e0; i++) idxs.push(i);          // 全部标注：逐点显示
+      } else if (visible <= 600) {
+        var step = Math.max(1, Math.ceil(visible / 120));
         for (var j = s0; j < e0; j += step) idxs.push(j);
       } else {
+        if (!window.__allLabelToast) {
+          window.__allLabelToast = 1;
+          toast('当前区间 ' + visible + ' 个数据点，已按间隔抽样；缩小「区间」即可显示全部数值');
+          setTimeout(function () { window.__allLabelToast = 0; }, 4000);
+        }
         /* 日频 / 超密：每段只取高点与低点 */
         var buckets = Math.max(6, Math.min(20, Math.round(W / 60)));
         var span = Math.max(1, Math.floor((e0 - s0) / buckets));
@@ -965,7 +973,8 @@
     picks.sort(function (a, b) { return a.px - b.px; });
     var lastX = -999, placed = [];
     picks.forEach(function (p) {
-      if (Math.abs(p.px - lastX) < Math.max(26, W / 34)) return;
+      var minGap = placed.length > 60 ? 8 : (placed.length > 30 ? 14 : 22);
+      if (Math.abs(p.px - lastX) < minGap) return;
       lastX = p.px;
       placed.push(p);
     });
@@ -978,8 +987,9 @@
       var txt = Math.abs(p.val) >= 1000 ? Number(p.val.toFixed(0)).toLocaleString('en-US') : (Math.round(p.val * 100) / 100);
       el2.textContent = txt;
       var lx = p.px, ly = p.py - 12 - p.si * 13;
+      var many = placed.length > 40;
       el2.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;transform:translateX(-50%);' +
-        'color:' + p.color + ';font:700 10.5px Inter,"PingFang SC",sans-serif;white-space:nowrap;' +
+        'color:' + p.color + ';font:700 ' + (many ? 8.5 : 10.5) + 'px Inter,"PingFang SC",sans-serif;white-space:nowrap;' +
         'text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 6px #fff;';
       overlay.appendChild(el2);
       var lw = el2.offsetWidth || 30, lh = el2.offsetHeight || 12;
@@ -3928,8 +3938,9 @@
         }
       }
       data.annotations = echartsAnnotations(state.viewKey);
+      var _skipPerf = (type === 'radar' || type === 'rank' || type === 'pie' || type === 'donut');
       data.seriesColors = state.seriesColors;
-      renderAnalysis(labels, yCols.map(function (col) { return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) }; }));
+      if (!_skipPerf) renderAnalysis(labels, yCols.map(function (col) { return { name: col, values: rows.map(function (r) { return vnum(r[col]); }) }; }));
       clearStage();
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
       var uinst = ChartFactory.render(c, type, data, theme);
@@ -3938,7 +3949,7 @@
       state.echartsEl = c;
       setHead({ title: '用户数据 · ' + (TYPE_LABELS[type] || type), subtitle: '', unit: '', source: '' });
       // 价格型多指标：图表下方加对比指标表（随缩放区间更新）
-      if (state.isPriceData && yCols.length >= 2) {
+      if (state.isPriceData && yCols.length >= 2 && !_skipPerf) {
         var navsAll = yCols.map(function (col) {
           var nav = [];
           rows.forEach(function (r) { var v = DataLoader.toNum(r[col]); if (!isNaN(v) && v > 0) nav.push({ date: String(r[state.mapping.timeCol]), value: v }); });
