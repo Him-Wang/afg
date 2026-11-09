@@ -836,10 +836,11 @@
         try { var r = inst.convertToPixel({ seriesIndex: si }, [p.i, p.v]); return r ? [r[0], r[1]] : null; }
         catch (e) { return null; }
       }
-      var pLast = px(lastP); if (pLast) items.push({ px: pLast[0], py: pLast[1], text: labelNum(lastP.v), color: c, kind: 'latest', pri: 1 });
-      if (vals.length > 3) {
-        var pHi = px(hiP); if (pHi && hiP.i !== lastP.i) if (labelNum(hiP.v) !== labelNum(lastP.v)) items.push({ px: pHi[0], py: pHi[1], text: labelNum(hiP.v), color: '#B5484B', kind: 'max', pri: 2 });
-        var pLo = px(loP); if (pLo && loP.i !== lastP.i && loP.i !== hiP.i) if (labelNum(loP.v) !== labelNum(lastP.v) && labelNum(loP.v) !== labelNum(hiP.v)) items.push({ px: pLo[0], py: pLo[1], text: labelNum(loP.v), color: '#1E7A46', kind: 'min', pri: 3 });
+      var sname = ser.name || '';
+      var pLast = px(lastP); if (pLast) items.push({ px: pLast[0], py: pLast[1], text: labelNum(lastP.v), color: c, kind: 'latest', pri: 1, seriesName: sname });
+      if (state.labelMode === 'extreme' && vals.length > 3) {
+        var pHi = px(hiP); if (pHi && hiP.i !== lastP.i) if (labelNum(hiP.v) !== labelNum(lastP.v)) items.push({ px: pHi[0], py: pHi[1], text: labelNum(hiP.v), color: '#B5484B', kind: 'max', pri: 2, seriesName: sname });
+        var pLo = px(loP); if (pLo && loP.i !== lastP.i && loP.i !== hiP.i) if (labelNum(loP.v) !== labelNum(lastP.v) && labelNum(loP.v) !== labelNum(hiP.v)) items.push({ px: pLo[0], py: pLo[1], text: labelNum(loP.v), color: '#1E7A46', kind: 'min', pri: 3, seriesName: sname });
       }
     });
     if (!items.length) return;
@@ -859,6 +860,7 @@
       var el2 = document.createElement('div');
       el2.className = 'last-tag';
       el2.dataset.kind = it.kind;
+      el2.dataset.series = it.seriesName || '';
       el2.textContent = it.text;
       var nS = (opt.series || []).filter(function (x) { return x && (x.type === 'line' || x.type === 'bar'); }).length || 1;
       var fs = nS <= 2 ? 11.5 : (nS <= 4 ? 10 : (nS <= 6 ? 9 : 8));
@@ -1833,7 +1835,9 @@
   /* 社融结构三项：三张季节性折线（近 4 年，1-12 月对比） */
   function renderSheirongSeason(item) {
     clearStage();
-    state.mode = 'macro';
+    state.mode = 'season';
+    state.seasonItem = item;
+    state.seasonPanels = [];
     state.viewKey = 'macro-seirong-season';
     state.macroItem = item;
     highlightNav(null);
@@ -1863,11 +1867,14 @@
       box.className = 'season-box';
       panel.appendChild(box);
       grid.appendChild(panel);
-      ChartFactory.render(box, 'season', {
+      var sInst = ChartFactory.render(box, 'season', {
         labels: item.labels,
         series: [{ name: sr.name, values: sr.values }],
         maxYears: 4
       }, theme);
+      state.seasonPanels.push({ inst: sInst, box: box, sr: sr });
+      if (state.seasonPanels.length === 1) state.echartsEl = box;
+      try { applyExtremeLabels(sInst); applyLastValueTag(sInst); } catch (e) {}
     });
     syncToolbar();
   }
@@ -3328,6 +3335,7 @@
     if (state.intlItem) { openIntlItem(state.intlItem, true); return; }
     if (state.exploreConfig) { renderExploreFromConfig(); return; }
     if (state.chartConfig) { applyChartConfig(state.chartConfig); return; }
+    if (state.mode === 'season' && state.seasonItem) { renderSheirongSeason(state.seasonItem); return; }
     if (state.mode === 'dashboard') renderDashboard(state.dashboardDatasets, false);
     else if (state.mode === 'dataset') renderDatasetSingle(state.dataset);
     else if (state.mode === 'imported') renderUserChart(false);
@@ -4100,6 +4108,12 @@
       var m = el('tb-label-menu'); if (m) m.classList.remove('open');
     }
     function rerenderLabels() {
+      if (state.mode === 'season' && state.seasonPanels && state.seasonPanels.length) {
+        state.seasonPanels.forEach(function (pp) {
+          try { applyExtremeLabels(pp.inst); applyLastValueTag(pp.inst); } catch (e) {}
+        });
+        return;
+      }
       if (!state.echartsEl) return;
       var inst = echarts.getInstanceByDom(state.echartsEl);
       if (inst) { applyExtremeLabels(inst); applyLastValueTag(inst); }
@@ -4125,6 +4139,19 @@
         return;
       }
       setLabelMode('all');
+    });
+    if (el('lb-extreme')) el('lb-extreme').addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!window.echarts) return;
+      var inst0 = state.echartsEl ? echarts.getInstanceByDom(state.echartsEl) : null;
+      var st0 = inst0 ? inst0.getOption() : null;
+      var sType = st0 && st0.series && st0.series[0] ? st0.series[0].type : '';
+      if (sType && ['pie', 'funnel', 'sankey', 'graph', 'sunburst', 'treemap', 'themeRiver', 'map', 'lines', 'effectScatter', 'parallel', 'radar', 'tree', 'custom'].indexOf(sType) >= 0) {
+        toast(tr('该图表类型不支持极值标注', 'This chart type does not support extreme labels'));
+        var m1 = el('tb-label-menu'); if (m1) m1.classList.remove('open');
+        return;
+      }
+      setLabelMode('extreme');
     });
     if (el('lb-off')) el('lb-off').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('off'); });
 
