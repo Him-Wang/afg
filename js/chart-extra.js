@@ -133,12 +133,12 @@
     if (opts.max !== false) out.push({ coord: [hi.i, hi.v], symbol: 'circle', symbolSize: 4.5,
       itemStyle: { color: downOf(t) },
       label: { show: true, position: 'top', distance: 6, color: downOf(t),
-        font: '800 10px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+        font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
         formatter: function () { return num(hi.v); } } });
     if (opts.min !== false) out.push({ coord: [lo.i, lo.v], symbol: 'circle', symbolSize: 4.5,
       itemStyle: { color: upOf(t) },
       label: { show: true, position: 'bottom', distance: 6, color: upOf(t),
-        font: '800 10px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+        font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
         formatter: function () { return num(lo.v); } } });
     return out;
   }
@@ -359,12 +359,12 @@
             marks.push({ kind: 'max', name: '峰值', coord: [hi.k, hi.v],
               itemStyle: { color: '#B5484B' }, symbol: 'circle', symbolSize: 4.5,
               label: { show: true, position: 'top', distance: 7, color: '#B5484B',
-                font: '800 10.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+                font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
                 formatter: function () { return num(hi.v); } } });
             marks.push({ kind: 'min', name: '谷值', coord: [lo.k, lo.v],
               itemStyle: { color: '#1E7A46' }, symbol: 'circle', symbolSize: 4.5,
               label: { show: true, position: 'bottom', distance: 7, color: '#1E7A46',
-                font: '800 10.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+                font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
                 formatter: function () { return num(lo.v); } } });
             marks.push({ kind: 'mean', name: '均值', coord: [0, mean],
               symbol: 'none',

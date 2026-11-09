@@ -99,22 +99,17 @@
     id: 'trend', name: '趋势与时间', icon: '↗',
     desc: '数据随时间怎么变、变化的节奏、拐点、周期、累计过程。',
     charts: [
-      { id: 'line', name: '多指标趋势', type: 'line', desc: '5 年 60 个月，三条曲线对比走势与拐点',
+      { id: 'season', name: '季节性折线', type: 'season', desc: '近 4 年同月对比：看季节性规律与同比变化',
         data: function () {
           var labels = months(60);
-          var mk = function (seed, start, drift, amp) {
-            var out = [], v = start;
-            for (var i = 0; i < 60; i++) {
-              v += drift + Math.sin(i / 5 + seed) * amp + (rnd(seed * 100 + i, -1, 1) * amp * 0.6);
-              out.push(Math.round(v * 10) / 10);
-            }
-            return out;
-          };
-          return { labels: labels, series: [
-            { name: '沪深300', values: mk(1, 3800, 2.2, 45) },
-            { name: '中证500', values: mk(2, 5600, 3.1, 70) },
-            { name: '创业板指', values: mk(3, 2400, 1.1, 55) }
-          ] };
+          var out = [], base = 120;
+          for (var i = 0; i < 60; i++) {
+            var mth = (i % 12) + 1;
+            var season = [0.78, 0.72, 1.06, 1.02, 1.0, 1.08, 1.04, 0.98, 1.12, 1.18, 1.24, 1.32][mth - 1];
+            base += 0.9;
+            out.push(Math.round((base * season + rnd(i + 3, -5, 5)) * 10) / 10);
+          }
+          return { labels: labels, series: [{ name: '月度营收', values: out }], maxYears: 4 };
         } },
       { id: 'stacked', name: '结构演变', type: 'stacked', desc: '5 年营收结构：四条业务线的此消彼长',
         data: function () {
@@ -367,7 +362,7 @@
     if (sc) { sc.charts.forEach(function (ch) { SHOW[ch.id] = ch; }); }
     var keep = {
       compare: ['groupedBar', 'dumbbell', 'bullet'],
-      trend: ['line', 'stacked', 'waterfall', 'dual'],
+      trend: ['season', 'stacked', 'waterfall', 'dual'],
       composition: ['donut', 'percentBar', 'sunburst'],
       distribution: ['histogram', 'boxplot', 'violin'],
       relation: ['scatter', 'corrMatrix'],

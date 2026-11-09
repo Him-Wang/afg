@@ -712,7 +712,7 @@
       el2.textContent = txt;
       var lx = p.px, ly = p.py - 12 - p.si * 13;
       el2.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;transform:translateX(-50%);' +
-        'color:' + p.color + ';font:600 9.5px Inter,"PingFang SC",sans-serif;white-space:nowrap;' +
+        'color:' + p.color + ';font:700 10.5px Inter,"PingFang SC",sans-serif;white-space:nowrap;' +
         'text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 6px #fff;';
       overlay.appendChild(el2);
       var lw = el2.offsetWidth || 30, lh = el2.offsetHeight || 12;
@@ -962,17 +962,18 @@
       var tag = document.createElement('div');
       tag.className = 'last-tag';
       tag.dataset.series = s.name || '';
-      tag.title = '最新值（可拖动）';
-      tag.style.cssText = 'position:absolute;pointer-events:auto;cursor:default;background:' + color +
-        ';color:' + pickTextColor(color) + ';font:700 10px Inter,sans-serif;padding:3px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:21;';
+      tag.title = '最新值';
+      tag.style.cssText = 'position:absolute;pointer-events:none;cursor:default;background:transparent;color:' + color +
+        ';font:800 11.5px Inter,"PingFang SC",sans-serif;letter-spacing:.2px;padding:0 2px;white-space:nowrap;' +
+        'text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 8px #fff,0 0 10px #fff;z-index:21;';
       tag.textContent = fmtNum(lv);
       container.appendChild(tag);
       var tw = tag.offsetWidth || 54, th = tag.offsetHeight || 18;
       var prt = getPlotRect(inst);
       var bxt = prt ? prt.x : 0, byt = prt ? prt.y : 0;
       var bwt = prt ? prt.w : cw, bht = prt ? prt.h : chh;
-      var tx = p[0] - tw - 8;
-      if (tx < bxt + 3) tx = p[0] + 8;
+      var tx = p[0] + 9;
+      if (tx + tw > bxt + bwt - 3) tx = p[0] - tw - 9;
       if (tx + tw > bxt + bwt - 3) tx = bxt + bwt - tw - 3;
       if (tx < bxt + 3) tx = bxt + 3;
       var ty = p[1] - th / 2;
@@ -1513,8 +1514,49 @@
     syncToolbar();
   }
 
+
+  /* 社融结构三项：三张季节性折线（近 4 年，1-12 月对比） */
+  function renderSheirongSeason(item) {
+    clearStage();
+    state.mode = 'macro';
+    state.viewKey = 'macro-seirong-season';
+    state.macroItem = item;
+    highlightNav(null);
+    el('stat-badge').style.display = 'none';
+    el('btn-events').style.display = 'none';
+    el('btn-table').style.display = 'none';
+    showBack(function () { renderChinaMacro(); });
+    setHead({
+      title: tr('社融结构 · 三项季节性对比', 'Social financing · seasonal comparison'),
+      subtitle: tr('近 4 年 · 每月新增（亿元）· 三项各自对比', 'Last 4 years · monthly new issuance (CNY bn)'),
+      unit: item.unit || '亿元', source: '中国人民银行 · akshare 实时'
+    });
+    var theme = getChartTheme(); theme._noZoom = true;
+    var grid = document.createElement('div');
+    grid.className = 'season-grid';
+    el('chart-stage').appendChild(grid);
+    (item.series || []).forEach(function (sr) {
+      var panel = document.createElement('div');
+      panel.className = 'season-panel';
+      var last = sr.values[sr.values.length - 1];
+      panel.innerHTML = '<div class="season-hd"><span class="season-name">' + DT(sr.name) + '</span>' +
+        '<span class="season-val">' + fmtNum(last) + '</span></div>';
+      var box = document.createElement('div');
+      box.className = 'season-box';
+      panel.appendChild(box);
+      grid.appendChild(panel);
+      ChartFactory.render(box, 'season', {
+        labels: item.labels,
+        series: [{ name: sr.name, values: sr.values }],
+        maxYears: 4
+      }, theme);
+    });
+    syncToolbar();
+  }
+
   function openMacroItem(item, keep) {
     try {
+      if (/社融结构/.test(item.title) && (item.series || []).length >= 2) { renderSheirongSeason(item); return; }
       var vk = 'macro-item:' + item.title;
       if (!keep) { state.overlaySeries = []; state.macroTypeOverride = null; delete state.customTitles[vk]; }
       state.macroItem = item;
