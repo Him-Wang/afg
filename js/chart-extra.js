@@ -86,6 +86,16 @@
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.ramp) ? p.ramp : [(t.text || '#051C2C'), '#1B4B72', '#4A7FA8', '#A8C4D8', '#E4EBF1'];
   }
+  function upOf(t) {
+    var pid = (window.state && state.palette) || 'consult';
+    var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
+    return (p && p.up) || '#1E7A46';
+  }
+  function downOf(t) {
+    var pid = (window.state && state.palette) || 'consult';
+    var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
+    return (p && p.down) || '#B5484B';
+  }
   function accentOf(t) {
     var pid = (window.state && state.palette) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
@@ -93,6 +103,44 @@
   }
   function vGrad(c1, c2) {
     return new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: c1 }, { offset: 1, color: c2 }]);
+  }
+
+
+  /* 机构级标注：均值参考线 */
+  function meanMark(t, values, label) {
+    var vs = (values || []).filter(function (v) { return v !== null && v !== undefined && !isNaN(v); });
+    if (!vs.length) return null;
+    var m = vs.reduce(function (a, b) { return a + b; }, 0) / vs.length;
+    return {
+      silent: true, symbol: 'none',
+      data: [{
+        yAxis: Math.round(m * 100) / 100,
+        lineStyle: { color: rgba(accentOf(t), 0.85), width: 1.1, type: 'dashed' },
+        label: { show: true, position: 'insideStartTop', distance: 3, color: accentOf(t),
+          font: '700 8.5px ' + FONT, formatter: (label || 'avg') + ' ' + Math.round(m) }
+      }]
+    };
+  }
+  /* 机构级标注：最高/最低点数值 */
+  function extremeMarks(t, labels, values, opts) {
+    opts = opts || {};
+    var out = [];
+    var vs = [];
+    (values || []).forEach(function (v, i) { if (v !== null && v !== undefined && !isNaN(v)) vs.push({ v: v, i: i }); });
+    if (vs.length < 4) return out;
+    var hi = vs.reduce(function (a, b) { return b.v > a.v ? b : a; });
+    var lo = vs.reduce(function (a, b) { return b.v < a.v ? b : a; });
+    if (opts.max !== false) out.push({ coord: [hi.i, hi.v], symbol: 'circle', symbolSize: 4.5,
+      itemStyle: { color: downOf(t) },
+      label: { show: true, position: 'top', distance: 6, color: downOf(t),
+        font: '800 10px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+        formatter: function () { return num(hi.v); } } });
+    if (opts.min !== false) out.push({ coord: [lo.i, lo.v], symbol: 'circle', symbolSize: 4.5,
+      itemStyle: { color: upOf(t) },
+      label: { show: true, position: 'bottom', distance: 6, color: upOf(t),
+        font: '800 10px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+        formatter: function () { return num(lo.v); } } });
+    return out;
   }
 
   /* ================= 1. 比较与排序 ================= */
@@ -355,7 +403,9 @@
         return lineSeries(t, s, i, {
           areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: rgba(c, 0.28) }, { offset: 1, color: rgba(c, 0.02) }]) },
-          markPoint: { silent: true, symbol: 'circle', symbolSize: 5, data: [{ coord: [s.values.length - 1, s.values[s.values.length - 1]], itemStyle: { color: c } }] },
+          markPoint: { silent: true, symbol: 'circle', symbolSize: 5,
+            data: [{ coord: [s.values.length - 1, s.values[s.values.length - 1]], itemStyle: { color: c } }].concat(extremeMarks(t, d.labels, s.values)) },
+          markLine: i === 0 ? meanMark(t, s.values) : undefined,
           endLabel: endLabel(t)
         });
       })
@@ -371,9 +421,16 @@
       yAxis: yAxis(t),
       series: d.series.map(function (s, i) {
         var c = seriesColor(t, i);
+        var totals = d.labels.map(function (_, k) { return d.series.reduce(function (a, ss) { return a + (ss.values[k] || 0); }, 0); });
         return lineSeries(t, s, i, {
           stack: 'st', areaStyle: { color: rgba(c, 0.55) }, lineStyle: { color: rgba(c, 0.9), width: 1 },
-          emphasis: { focus: 'series' }
+          emphasis: { focus: 'series' },
+          markPoint: (i === d.series.length - 1) ? {
+            silent: true, symbol: 'circle', symbolSize: 5, itemStyle: { color: ink(t) },
+            data: [{ coord: [totals.length - 1, totals[totals.length - 1]], itemStyle: { color: ink(t) },
+              label: { show: true, position: 'top', distance: 6, color: ink(t), font: '800 10px ' + FONT,
+                textBorderColor: '#fff', textBorderWidth: 3, formatter: 'total ' + num(totals[totals.length - 1]) } }]
+          } : undefined
         });
       })
     });
@@ -470,7 +527,15 @@
         label: { color: ink(t), fontSize: 10.5, fontFamily: FONT,
           formatter: function (p) { return p.name + ' ' + (p.value / sum * 100).toFixed(1) + '%'; } },
         labelLine: { length: 6, length2: 8, lineStyle: { color: rgba(ink(t), 0.25) } },
-        data: data.map(function (x, i) { return { name: x.name, value: x.value, itemStyle: { color: seriesColor(t, i) } }; })
+        data: (function () {
+          var mx = 0;
+          data.forEach(function (x, i) { if (x.value > data[mx].value) mx = i; });
+          return data.map(function (x, i) {
+            return { name: x.name, value: x.value,
+              itemStyle: { color: seriesColor(t, i), borderWidth: i === mx ? 0 : 2 },
+              label: { fontWeight: i === mx ? 800 : 400, color: i === mx ? ink(t) : muted(t) } };
+          });
+        })()
       }]
     });
   };
@@ -581,7 +646,22 @@
         { type: 'bar', data: h.counts, barWidth: '88%', silent: true,
           itemStyle: { color: rgba(accent(t), 0.28), borderColor: rgba(accent(t), 0.5), borderWidth: 0.6 } },
         { type: 'line', data: curve, showSymbol: false, smooth: true, silent: true,
-          lineStyle: { color: ink(t), width: 1.6 } }
+          lineStyle: { color: ink(t), width: 1.6 } },
+        /* 均值 / 中位数 参考线 */
+        (function () {
+          var vs = d.values.filter(function (v) { return v !== null && !isNaN(v); });
+          var mean = vs.reduce(function (a, b) { return a + b; }, 0) / vs.length;
+          var sorted = vs.slice().sort(function (a, b) { return a - b; });
+          var med = sorted[Math.floor(sorted.length / 2)];
+          var toIdx = function (x) { return (x - h.min) / (h.max - h.min) * 14 - 0.5; };
+          return { type: 'line', data: [], silent: true,
+            markLine: { silent: true, symbol: 'none', data: [
+              { xAxis: Math.round(toIdx(mean)), lineStyle: { color: rgba(accentOf(t), 0.9), width: 1.2, type: 'dashed' },
+                label: { show: true, position: 'end', color: accentOf(t), font: '700 8.5px ' + FONT, formatter: 'mean ' + Math.round(mean) } },
+              { xAxis: Math.round(toIdx(med)), lineStyle: { color: rgba(ink(t), 0.5), width: 1.1, type: 'dotted' },
+                label: { show: true, position: 'start', color: muted(t), font: '600 8.5px ' + FONT, formatter: 'median ' + Math.round(med) } }
+            ] } };
+        })()
       ]
     });
   };
@@ -601,7 +681,7 @@
         type: 'boxplot',
         boxWidth: (W < 480 ? ['18%', '34%'] : ['10%', '20%']),
         data: boxes,   /* [min, Q1, median, Q3, max] */
-        itemStyle: { color: rgba(accent(t), 0.14), borderColor: rgba(accent(t), 0.85), borderWidth: 1.1 },
+        itemStyle: { color: rgba(rampOf(t)[2], 0.16), borderColor: rgba(rampOf(t)[1], 0.9), borderWidth: 1.1 },
         emphasis: { itemStyle: { borderColor: accent(t), borderWidth: 1.6 } },
         label: { show: false }
       }]
@@ -647,7 +727,7 @@
             left.push([x2, cy + item.value[k + 1] * half]);
           }
           var poly = right.concat(left);
-          var c = seriesColor(t, params.dataIndex);
+          var c = rampOf(t)[Math.min(params.dataIndex + 1, 3)] || seriesColor(t, params.dataIndex);
           return {
             type: 'group', children: [
               { type: 'polygon', shape: { points: poly }, style: { fill: rgba(c, 0.22), stroke: rgba(c, 0.85), lineWidth: 1.2 } },
@@ -878,6 +958,14 @@
         itemStyle: { borderColor: '#FFF', borderWidth: 2 },
         label: { show: true, position: 'inside', color: '#fff', fontSize: 10.5, fontFamily: FONT,
           formatter: function (p) { return p.name + '  ' + (p.value / first * 100).toFixed(0) + '%'; } },
+        markLine: { silent: true, symbol: 'none',
+          data: steps.slice(1).map(function (st, i) {
+            var prev = steps[i].value;
+            var rate = prev ? (st.value / prev * 100) : 0;
+            return { yAxis: i + 0.5, lineStyle: { color: 'transparent' },
+              label: { show: true, position: 'end', color: accentOf(t), font: '700 8.5px ' + FONT,
+                formatter: '↓ ' + rate.toFixed(0) + '%' } };
+          }) },
         data: steps.map(function (s, i) { return { name: s.name, value: s.value, itemStyle: { color: rgba(seriesColor(t, i), 0.9) } }; })
       }]
     });
