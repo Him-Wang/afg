@@ -271,12 +271,14 @@
             var lo = vs.reduce(function (a, b) { return b.v < a.v ? b : a; });
             var mean = vs.reduce(function (a, b) { return a + b.v; }, 0) / vs.length;
             marks.push({ kind: 'max', name: '峰值', coord: [hi.k, hi.v],
-              itemStyle: { color: seriesColor(t, i) }, symbol: 'circle', symbolSize: 4,
-              label: { show: true, position: 'top', distance: 8, color: ink(t), font: '600 9.5px ' + FONT,
+              itemStyle: { color: '#B5484B' }, symbol: 'circle', symbolSize: 4.5,
+              label: { show: true, position: 'top', distance: 7, color: '#B5484B',
+                font: '800 10.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
                 formatter: function () { return num(hi.v); } } });
             marks.push({ kind: 'min', name: '谷值', coord: [lo.k, lo.v],
-              itemStyle: { color: seriesColor(t, i) }, symbol: 'circle', symbolSize: 4,
-              label: { show: true, position: 'bottom', distance: 8, color: muted(t), font: '600 9.5px ' + FONT,
+              itemStyle: { color: '#1E7A46' }, symbol: 'circle', symbolSize: 4.5,
+              label: { show: true, position: 'bottom', distance: 7, color: '#1E7A46',
+                font: '800 10.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
                 formatter: function () { return num(lo.v); } } });
             marks.push({ kind: 'mean', name: '均值', coord: [0, mean],
               symbol: 'none',

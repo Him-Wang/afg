@@ -811,7 +811,9 @@
       label.dataset.series = m.name || '';
       label.dataset.idx = m.i;
       var txtColor = pickTextColor(m.color);
-      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:auto;cursor:default;background:transparent;color:' + m.color + ';font:700 10.5px Inter,"PingFang SC",sans-serif;padding:0 1px;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 7px #fff;';
+      var isHi = (m.kind === '最高');
+      var lblColor = isHi ? '#B5484B' : '#1E7A46';
+      label.style.cssText = 'position:absolute;left:' + lx + 'px;top:' + ly + 'px;pointer-events:none;cursor:default;background:transparent;color:' + lblColor + ';font:800 11.5px Inter,"PingFang SC",sans-serif;letter-spacing:.2px;padding:0 2px;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 8px #fff,0 0 10px #fff;';
       label.textContent = fmtNum(m.val);
       overlay.appendChild(label);
       // 边界收敛：保证标签完整显示在图表内
@@ -3709,7 +3711,6 @@
       placeMenu(m, this);
     });
     if (el('lb-all')) el('lb-all').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('all'); });
-    if (el('lb-extreme')) el('lb-extreme').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('extreme'); });
     if (el('lb-off')) el('lb-off').addEventListener('click', function (e) { e.stopPropagation(); setLabelMode('off'); });
 
     // 单图配色
