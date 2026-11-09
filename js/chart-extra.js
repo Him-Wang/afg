@@ -79,26 +79,58 @@
     };
   }
 
+
+  /* 取当前色板的明度梯度 */
+  function rampOf(t) {
+    var pid = (window.state && state.palette) || 'consult';
+    var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
+    return (p && p.ramp) ? p.ramp : [(t.text || '#051C2C'), '#1B4B72', '#4A7FA8', '#A8C4D8', '#E4EBF1'];
+  }
+  function accentOf(t) {
+    var pid = (window.state && state.palette) || 'consult';
+    var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
+    return (p && p.accent) ? p.accent : (t.accent || '#B08A4F');
+  }
+  function vGrad(c1, c2) {
+    return new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: c1 }, { offset: 1, color: c2 }]);
+  }
+
   /* ================= 1. 比较与排序 ================= */
   B.groupedBar = function (el, d, t) {
     var n = d.series.length;
     var W = (el && el.clientWidth) || 600;
-    var showVal = d.labels.length * n <= 12 && W >= 460;
+    var ramp = rampOf(t);
+    var acc = accentOf(t);
+    var labels = d.labels;
+    var last = d.series[n - 1].values;
+    var bench = last.reduce(function (a, b) { return a + b; }, 0) / Math.max(1, last.length);
+    var maxV = 0;
+    d.series.forEach(function (s) { s.values.forEach(function (v) { if (v > maxV) maxV = v; }); });
     return base(t, {
-      tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: rgba(ink(t), 0.04) } } }),
-      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
-      grid: grid({ top: 34 }),
-      xAxis: xAxis(t, { data: d.labels }),
-      yAxis: yAxis(t),
+      tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: rgba(ink(t), 0.045) } } }),
+      legend: legend(t, { data: d.series.map(function (s) { return s.name; }), itemGap: W < 480 ? 8 : 14 }),
+      grid: grid({ left: 6, right: 16, top: 34, bottom: 16 }),
+      xAxis: xAxis(t, { data: labels, axisLabel: { color: muted(t), fontSize: W < 480 ? 8 : 9.5, fontFamily: FONT, interval: 0, margin: 10 } }),
+      yAxis: yAxis(t, { name: d.unit || '', nameTextStyle: { color: muted(t), fontSize: 9, align: 'left' } }),
       series: d.series.map(function (s, i) {
+        var isLast = (i === n - 1);
+        var c1 = ramp[Math.min(i, ramp.length - 1)];
+        var c2 = isLast ? acc : ramp[Math.min(i + 1, ramp.length - 1)];
         return {
           name: s.name, type: 'bar', data: s.values,
-          barGap: '28%', barWidth: n > 3 ? 9 : 14,
-          itemStyle: { color: seriesColor(t, i), borderRadius: [2, 2, 0, 0] },
-          label: showVal ? {
-            show: true, position: 'top', distance: 5, color: muted(t), fontSize: 9.5, fontFamily: FONT,
-            formatter: function (p) { return num(p.value); }
-          } : { show: false }
+          barGap: '14%', barWidth: n > 4 ? (W < 480 ? 3.5 : 7) : 11,
+          itemStyle: { color: vGrad(c1, c2), borderRadius: [1.5, 1.5, 0, 0] },
+          z: isLast ? 4 : 3,
+          markLine: isLast ? {
+            silent: true, symbol: 'none',
+            data: [{
+              yAxis: Math.round(bench * 10) / 10,
+              lineStyle: { color: rgba(acc, 0.9), width: 1.2, type: 'dashed' },
+              label: { show: true, position: 'insideStartTop', distance: 3, color: acc,
+                font: '700 9px ' + FONT, formatter: 'avg ' + Math.round(bench) }
+            }]
+          } : undefined,
+          label: { show: false }
         };
       })
     });
@@ -160,8 +192,8 @@
       yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: W < 480 ? 9.5 : 10.5, fontFamily: FONT, width: labelW - 12, overflow: 'truncate' } }),
       series: [
         { type: 'bar', barWidth: W < 480 ? 10 : 13, barCategoryGap: '58%', data: rv.map(function (r) { return r.value; }),
-          itemStyle: { color: accent(t), borderRadius: 2 }, z: 3,
-          label: { show: true, position: 'right', distance: 6, color: ink(t), fontSize: 10, fontWeight: 700, fontFamily: FONT,
+          itemStyle: { color: vGrad(rampOf(t)[0], rampOf(t)[1]), borderRadius: [0, 2, 2, 0] }, z: 3,
+          label: { show: true, position: 'insideLeft', distance: 7, color: '#FFFFFF', fontSize: W < 480 ? 8.5 : 9.5, fontWeight: 700, fontFamily: FONT,
             formatter: function (p) { return num(p.value); } } },
         { type: 'scatter', silent: true, z: 5,
           data: rv.map(function (r) { return [r.target, rv.indexOf(r)]; }),
@@ -170,56 +202,61 @@
     });
   };
 
-  /* 词云：螺旋 + 旋转，视觉更接近出版物 */
-  B.wordcloud = function (el, d, t) {
-    var words = (d.words || []).slice().sort(function (a, b) { return b.weight - a.weight; });
-    var W = (el && el.clientWidth) || 700, H = (el && el.clientHeight) || 190;
-    var maxW = words[0] ? words[0].weight : 100, minW = words[words.length - 1] ? words[words.length - 1].weight : 10;
-    var boxes = [], els = [];
-    var palette = (t && t.series) || ['#1A1A2E', '#A67C3D', '#6F8FA8'];
-    words.forEach(function (w, i) {
-      var ratio = (w.weight - minW) / Math.max(1, maxW - minW);
-      var fs = Math.round((H < 240 ? 10 : 12) + ratio * (H < 240 ? 16 : 24));
-      var rotate = (i > 4 && i % 3 === 0) ? 90 : 0;
-      var tw = w.text.length * fs * (rotate ? 0.62 : 1.02), th = fs * (rotate ? 2.4 : 1.3);
-      var placed = false, a = i * 0.7, r = 0;
-      while (!placed && r < Math.max(W, H)) {
-        var x = W / 2 + r * Math.cos(a) - tw / 2, y = H / 2 + r * Math.sin(a) * 0.55 - th / 2;
-        var ok = x > 2 && y > 2 && x + tw < W - 2 && y + th < H - 2 &&
-          !boxes.some(function (b) { return x < b.x + b.w + 2 && x + tw + 2 > b.x && y < b.y + b.h + 2 && y + th + 2 > b.y; });
-        if (ok) {
-          boxes.push({ x: x, y: y, w: tw, h: th });
-          els.push({ type: 'text', left: Math.round(x), top: Math.round(y), rotation: rotate ? Math.PI / 2 : 0,
-            style: { text: w.text, fill: i === 0 ? ink(t) : (i < 4 ? palette[i % palette.length] : rgba(ink(t), 0.55)),
-              font: (i < 3 ? '700 ' : '500 ') + fs + 'px ' + FONT } });
-          placed = true;
-        } else { a += 0.4; r += 0.5; }
-      }
-    });
-    return base(t, { tooltip: { show: false }, graphic: els });
-  };
-
-  B.radar = function (el, d, t) {
+  /* 哑铃图：两期对比 + 变化幅度（替代棒棒糖） */
+  B.dumbbell = function (el, d, t) {
+    var W = (el && el.clientWidth) || 600;
+    var narrow = W < 480;
+    var up = '#1E7A46', down = '#B5484B';
+    var rows = d.rows.slice().sort(function (a, b) { return (b.to - b.from) - (a.to - a.from); });
+    var names = rows.map(function (r) { return r.name; });
+    var allV = [];
+    rows.forEach(function (r) { allV.push(r.from, r.to); });
+    var lo = Math.min.apply(null, allV), hi = Math.max.apply(null, allV);
+    var pad = (hi - lo) * 0.14 || 1;
+    var series = [
+      { type: 'custom', silent: true, z: 2,
+        renderItem: function (params, api) {
+          var i = params.dataIndex, r = rows[i];
+          var p1 = api.coord([r.from, i]), p2 = api.coord([r.to, i]);
+          var col = r.to >= r.from ? up : down;
+          return { type: 'line', shape: { x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1] },
+            style: { stroke: rgba(col, 0.32), lineWidth: narrow ? 2 : 3, lineCap: 'round' } };
+        },
+        data: rows.map(function (r, i) { return { value: [i, r.from, r.to] }; }) },
+      { type: 'scatter', symbolSize: narrow ? 6 : 8, z: 3,
+        itemStyle: { color: '#FFFFFF', borderColor: rgba(ink(t), 0.35), borderWidth: 1.4 },
+        data: rows.map(function (r, i) { return { value: [r.from, i], name: r.name }; }),
+        tooltip: { formatter: function (p) { var r = rows[p.dataIndex]; return r.name + '<br/>' + d.fromLabel + '：' + num(r.from); } } },
+      { type: 'scatter', symbolSize: narrow ? 7 : 9, z: 4,
+        itemStyle: { color: function (p) { var r = rows[p.dataIndex]; return r.to >= r.from ? up : down; } },
+        data: rows.map(function (r, i) { return { value: [r.to, i], name: r.name }; }),
+        tooltip: { formatter: function (p) { var r = rows[p.dataIndex]; return r.name + '<br/>' + d.toLabel + '：' + num(r.to); } } },
+      { type: 'scatter', symbolSize: 0.1, silent: true, z: 5,
+        data: rows.map(function (r, i) {
+          var dv = r.to - r.from;
+          return {
+            value: [hi + pad * 1.15, i],
+            label: {
+              show: true, position: 'right', distance: 4, align: 'left',
+              color: dv >= 0 ? up : down,
+              font: '700 ' + (narrow ? 9 : 10.5) + 'px ' + FONT,
+              formatter: (dv >= 0 ? '+' : '') + (Math.round(dv * 10) / 10)
+            }
+          };
+        }) }
+    ];
     return base(t, {
       tooltip: tip(t, { trigger: 'item' }),
-      legend: legend(t, { data: d.series.map(function (s) { return s.name; }) }),
-      radar: {
-        center: ['50%', '56%'], radius: '64%',
-        indicator: d.indicators.map(function (n) { return { name: n, max: 100 }; }),
-        axisName: { color: muted(t), fontSize: 10.5, fontFamily: FONT },
-        axisLine: { lineStyle: { color: rule(t) } },
-        splitLine: { lineStyle: { color: rule(t) } },
-        splitArea: { show: false }
-      },
-      series: [{
-        type: 'radar', symbolSize: 3,
-        data: d.series.map(function (s, i) {
-          return { name: s.name, value: s.values,
-            lineStyle: { color: seriesColor(t, i), width: 1.6 },
-            itemStyle: { color: seriesColor(t, i) },
-            areaStyle: { color: rgba(seriesColor(t, i), 0.12) } };
-        })
-      }]
+      grid: { left: narrow ? 54 : 72, right: narrow ? 52 : 64, top: 30, bottom: 18 },
+      xAxis: yAxis(t, { type: 'value', min: lo - pad * 0.6, max: hi + pad * 2.3,
+        splitLine: { show: true, lineStyle: { color: rule(t) } },
+        axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, showMinLabel: false, showMaxLabel: false } }),
+      yAxis: xAxis(t, { data: names, axisLabel: { color: ink(t), fontSize: narrow ? 9 : 10.5, fontFamily: FONT, width: narrow ? 50 : 68, overflow: 'truncate' } }),
+      series: series,
+      graphic: [
+        { type: 'text', left: narrow ? 56 : 74, top: 6, style: { text: '● ' + d.toLabel, fill: ink(t), font: '700 9.5px ' + FONT } },
+        { type: 'text', left: narrow ? 100 : 132, top: 6, style: { text: '○ ' + d.fromLabel, fill: muted(t), font: '600 9.5px ' + FONT } }
+      ]
     });
   };
 
@@ -243,6 +280,7 @@
         } }
     });
   }
+
   function lineSeries(t, s, i, opts) {
     return Object.assign({
       name: s.name, type: 'line', data: s.values, showSymbol: false, smooth: false,

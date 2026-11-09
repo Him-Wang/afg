@@ -62,22 +62,36 @@
     id: 'compare', name: '比较与排序', icon: '⇄',
     desc: '谁高谁低、谁多谁少、排名先后、个体之间或个体与基准之间的差异。',
     charts: [
-      { id: 'groupedBar', name: '分组条形图', type: 'groupedBar', desc: '同一维度下多组数据并排对比，看组间差异',
-        data: function () { return { labels: ['华东', '华南', '华北', '西南', '东北'], series: [
-          { name: '2024', values: [86, 72, 64, 51, 38] }, { name: '2025', values: [94, 79, 61, 58, 33] }] }; } },
-      { id: 'tornado', name: '对比柱状图（旋风图）', type: 'tornado', desc: '左右对称对比两组指标，一眼看出结构差异',
-        data: function () { return { labels: ['研发', '销售', '管理', '生产', '客服'], left: [18, 42, 25, 55, 12], right: [26, 31, 19, 62, 9], leftName: 'A 公司', rightName: 'B 公司' }; } },
-      { id: 'lollipop', name: '棒棒糖图', type: 'lollipop', desc: '排序后的横向对比，比条形图更轻，适合排名展示',
-        data: function () { return { labels: ['消费', '科技', '医药', '金融', '制造', '能源'], values: [92, 78, 65, 54, 41, 23] }; } },
-      { id: 'bullet', name: '子弹图', type: 'bullet', desc: '实际值对照目标与区间，适合 KPI 达成情况',
+      { id: 'groupedBar', name: '多期对比条形图', type: 'groupedBar', unit: '增速 %', desc: '8 个行业 5 年增速对比，含行业基准线',
+        data: function () {
+          var cats = ['消费', '科技', '医药', '金融', '制造', '能源', '地产', '材料'];
+          var years = ['2021', '2022', '2023', '2024', '2025'];
+          var base = [14, 22, 18, 6, 11, 9, -4, 16];
+          var series = years.map(function (y, yi) {
+            return { name: y, values: cats.map(function (_, ci) {
+              return Math.round((base[ci] + (rnd(ci * 17 + yi * 31 + 7, -9, 9)) - yi * 1.6) * 10) / 10;
+            }) };
+          });
+          return { labels: cats, series: series, unit: '' };
+        } },
+      { id: 'dumbbell', name: '哑铃图', type: 'dumbbell', desc: '2021→2025 五年变化：谁在拉开差距、谁在追赶',
+        data: function () {
+          var names = ['新能源', '半导体', '高端制造', '医药', '消费', '金融', '地产', '传统能源'];
+          var from = [28, 35, 42, 48, 55, 38, 62, 44];
+          var to = [76, 68, 64, 58, 51, 41, 33, 39];
+          return { rows: names.map(function (n, i) { return { name: n, from: from[i], to: to[i] }; }),
+            fromLabel: '2021', toLabel: '2025', pct: false };
+        } },
+      { id: 'bullet', name: 'KPI 达成度', type: 'bullet', desc: '8 项 KPI 实际值对照目标与分级区间',
         data: function () { return { rows: [
           { name: '营收完成率', value: 86, target: 100, ranges: [60, 80, 100] },
           { name: '毛利完成率', value: 72, target: 85, ranges: [50, 70, 90] },
-          { name: '客户留存', value: 91, target: 90, ranges: [70, 85, 95] }] }; } },
-
-      { id: 'radar', name: '雷达图', type: 'radar', desc: '多维度能力画像，比较主体在各维度的强项与短板',
-        data: function () { return { indicators: ['盈利', '成长', '运营', '偿债', '现金流', '估值'], series: [
-          { name: '公司 A', values: [85, 72, 66, 78, 81, 58] }, { name: '公司 B', values: [62, 88, 74, 55, 60, 82] }] }; } }
+          { name: '客户留存', value: 91, target: 90, ranges: [70, 85, 95] },
+          { name: '回款周期', value: 78, target: 90, ranges: [55, 75, 95] },
+          { name: '产能利用', value: 94, target: 92, ranges: [65, 85, 98] },
+          { name: '研发投入', value: 63, target: 70, ranges: [40, 60, 80] },
+          { name: '人均产出', value: 82, target: 88, ranges: [55, 75, 95] },
+          { name: '库存周转', value: 69, target: 80, ranges: [45, 70, 90] }] }; } }
     ]
   });
 
@@ -312,7 +326,7 @@
     }
     if (sc) { sc.charts.forEach(function (ch) { SHOW[ch.id] = ch; }); }
     var keep = {
-      compare: ['groupedBar', 'lollipop', 'bullet'],
+      compare: ['groupedBar', 'dumbbell', 'bullet'],
       trend: ['line', 'area', 'waterfall'],
       composition: ['donut', 'percentBar', 'sunburst'],
       distribution: ['histogram', 'boxplot', 'violin'],
