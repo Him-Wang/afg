@@ -470,10 +470,13 @@
   function analyzeCohesion(labels, series) {
     if (!series || series.length < 2) return null;
     var base = series[0].values;
-    var out = { pairs: [], overall: null };
+    /* 一条是债券到期收益率、另一条不是 → 收益率与债券价格反向，相关方向需取反 */
+    var invert = isYieldSeries(series[0].name) !== isYieldSeries(series[1].name);
+    var out = { pairs: [], overall: null, inverted: invert };
     for (var i = 1; i < series.length; i++) {
       var r1 = returnsOf(base), r2 = returnsOf(series[i].values);
       var r = corrOf(r1, r2);
+      if (invert && r !== null) r = -r;
       out.pairs.push({ name: series[i].name, r: r });
     }
     out.overall = out.pairs[0] ? out.pairs[0].r : null;
@@ -482,7 +485,8 @@
     var rA = returnsOf(base), rB = returnsOf(series[1].values);
     var roll = [];
     for (var t = win; t <= rA.length; t++) {
-      roll.push({ i: t, c: corrOf(rA.slice(t - win, t), rB.slice(t - win, t)) });
+      var c0 = corrOf(rA.slice(t - win, t), rB.slice(t - win, t));
+      roll.push({ i: t, c: (invert && c0 !== null) ? -c0 : c0 });
     }
     var conv = 0, div = 0, valid = 0;
     roll.forEach(function (o) {
@@ -544,7 +548,8 @@
 
     wrap.innerHTML =
       '<div class="coh-head">' + tr('趋同 / 分化时段', 'Convergence & divergence periods') +
-        '<span class="coh-sub">' + tr('滚动窗口 ', 'window ') + win + tr(' 期 · 基于收益率相关系数', ' periods · correlation of returns') + '</span></div>' +
+        '<span class="coh-sub">' + tr('滚动窗口 ', 'window ') + win + tr(' 期 · 基于收益率相关系数', ' periods · correlation of returns') +
+        (an.inverted ? tr('　·　已按债券价格方向校正（收益率上行＝债券下跌）', '　·　sign-corrected for bond prices') : '') + '</span></div>' +
       '<div class="coh-legend">' +
         '<span class="coh-dot conv"></span>' + tr('正相关（r ≥ 0.3）走势趋同', 'Convergent (r ≥ 0.3)') +
         '<span class="coh-dot div"></span>' + tr('分化（r ≤ 0）背离或无关', 'Divergent (r ≤ 0)') +
@@ -3126,17 +3131,42 @@
         var bench = isFund ? financeBenchmark() : null;
         var benchVals = bench ? alignSeriesToBase(labels2, bench.labels, bench.series[0].values) : null;
         var yieldFlags = series2.map(function (x) { return isYieldSeries(x.name); });
+        var hasYield = yieldFlags.some(Boolean);
+        var hasOther = yieldFlags.some(function (f) { return !f; });
         metrics = series2.map(function (x, xi) {
-          var vals = yieldFlags[xi] ? bondPriceProxy(x.values) : x.values;
-          return ML.perfMetrics(vals, benchVals, labels2);
+          if (yieldFlags[xi]) {
+            /* 债券到期收益率：只给水平统计，不计算收益指标（无法用 YTM 算年化回报） */
+            var vv = x.values.filter(function (v) { return v !== null && v !== undefined && !isNaN(v); });
+            if (vv.length < 2) return null;
+            var first = vv[0], last = vv[vv.length - 1];
+            return { latest: last, changeBp: (last - first) * 100,
+              bp: (Math.max.apply(null, vv) - Math.min.apply(null, vv)) * 100,
+              max: Math.max.apply(null, vv), min: Math.min.apply(null, vv),
+              _level: true };
+          }
+          var m = ML.perfMetrics(x.values, benchVals, labels2);
+          m.latest = x.values[x.values.length - 1];
+          var vv2 = x.values.filter(function (v) { return v !== null && v !== undefined && !isNaN(v); });
+          m.changeBp = null;
+          m.bp = null;
+          m.max = vv2.length ? Math.max.apply(null, vv2) : null;
+          m.min = vv2.length ? Math.min.apply(null, vv2) : null;
+          return m;
         });
-        rows = [['annReturn', DT('年化回报')], ['annVol', DT('年化波动（标准差）')], ['maxDD', DT('最大回撤')], ['sharp', DT('夏普比率')]];
-        if (isFund) rows = rows.concat([['sortino', tr('索提诺比率','Sortino')], ['m2', 'M²'], ['alpha', tr('詹森 alpha','Jensen alpha')], ['beta', 'Beta']]);
-        rows = rows.concat([['calmar', DT('卡玛比率')], ['var95', 'VaR 95%'], ['totalReturn', DT('累计收益')]]);
+        if (hasYield || hasOther) {
+          rows = [['latest', DT('最新值')], ['changeBp', tr('区间变化 (bp)', 'Change (bp)')], ['bp', tr('区间波幅 (bp)', 'Range (bp)')],
+            ['max', DT('最高')], ['min', DT('最低')],
+            ['annReturn', DT('年化回报')], ['annVol', DT('年化波动（标准差）')], ['maxDD', DT('最大回撤')],
+            ['sharp', DT('夏普比率')], ['totalReturn', DT('累计收益')]];
+        } else {
+          rows = [['annReturn', DT('年化回报')], ['annVol', DT('年化波动（标准差）')], ['maxDD', DT('最大回撤')], ['sharp', DT('夏普比率')]];
+          if (isFund) rows = rows.concat([['sortino', tr('索提诺比率','Sortino')], ['m2', 'M²'], ['alpha', tr('詹森 alpha','Jensen alpha')], ['beta', 'Beta']]);
+          rows = rows.concat([['calmar', DT('卡玛比率')], ['var95', 'VaR 95%'], ['totalReturn', DT('累计收益')]]);
+        }
         pctRows = ['annReturn', 'annVol', 'maxDD', 'totalReturn', 'var95', 'alpha', 'm2'];
         head = tr('业绩指标','Performance') + (isFund ? tr('（基金 · 基准：沪深300 · 无风险利率 2%）',' (fund · benchmark: CSI 300 · risk-free 2%)') : tr('（无风险利率 2%）',' (risk-free 2%)'));
-        if (series2.some(function (x) { return isYieldSeries(x.name); })) {
-          head += tr(' · 债券列已按价格反向换算（收益率上行 → 价格下跌）', ' · bond columns inverted (yield up → price down)');
+        if (hasYield) {
+          head += tr(' · 债券到期收益率列只做水平统计，不计算收益指标', ' · yield columns show level stats only');
         }
       }
       var html = '<div class="an-head">' + head +
@@ -3151,7 +3181,9 @@
           var v = m ? m[r[0]] : null;
           var txt = '—';
           if (v !== null && v !== undefined && !isNaN(v)) {
-            txt = (pctRows.indexOf(r[0]) >= 0) ? (v * 100).toFixed(2) + '%' : v.toFixed(2);
+            if (r[0] === 'changeBp' || r[0] === 'bp') txt = (v >= 0 ? '+' : '') + v.toFixed(1);
+            else if (r[0] === 'latest' || r[0] === 'max' || r[0] === 'min') txt = fmtNum(v);
+            else txt = (pctRows.indexOf(r[0]) >= 0) ? (v * 100).toFixed(2) + '%' : v.toFixed(2);
           }
           html += '<td>' + txt + '</td>';
         });
