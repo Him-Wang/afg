@@ -662,6 +662,7 @@
 
   B.treemap = function (el, d, t) {
     var rp = rampOf(t);
+    var TW = (el && el.clientWidth) || 500, TH = (el && el.clientHeight) || 240;
     var root = d.data || [];
     var total = 0;
     root.forEach(function (g) { (g.children || []).forEach(function (c) { total += c.value; }); });
@@ -692,7 +693,7 @@
       } }),
       series: [{
         type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false },
-        width: '99%', height: '94%', top: '3%', left: '0.5%',
+        width: Math.max(120, TW - 10), height: Math.max(80, TH - 26), top: 22, left: 5,
         levels: [
           { itemStyle: { borderWidth: 0, gapWidth: 4, borderColor: '#fff' },
             upperLabel: { show: true, height: 17, color: muted(t), fontSize: 9.5, fontFamily: FONT, fontWeight: 700 } },
@@ -742,68 +743,106 @@
   }
 
   B.histogram = function (el, d, t) {
-    var h = bins(d.values, 14);
+    var W = (el && el.clientWidth) || 600, H = (el && el.clientHeight) || 240;
+    var h = bins(d.values, W < 460 ? 10 : 16);
     var labels = h.edges.slice(0, -1).map(function (e, i) { return Math.round(e) + '–' + Math.round(h.edges[i + 1]); });
-    var dens = kdePts(d.values, h.min, h.max, 80);
-    /* 把密度曲线映射到「柱高」尺度，叠加在直方图上 */
+    var dens = kdePts(d.values, h.min, h.max, 90);
     var maxC = Math.max.apply(null, h.counts) || 1;
-    var peak = Math.max.apply(null, dens.map(function (p) { return p[1]; })) || 1;
+    var peakD = Math.max.apply(null, dens.map(function (p) { return p[1]; })) || 1;
+    var nb = labels.length;
     var curve = dens.map(function (p) {
-      var idx = (p[0] - h.min) / (h.max - h.min) * 14 - 0.5;
-      return [idx, p[1] / peak * maxC * 0.92];
+      var idx = (p[0] - h.min) / (h.max - h.min) * nb - 0.5;
+      return [idx, p[1] / peakD * maxC * 1.02];
     });
+    var vs = d.values.filter(function (v) { return v !== null && !isNaN(v); }).sort(function (a, b) { return a - b; });
+    var mean = vs.reduce(function (a, b) { return a + b; }, 0) / (vs.length || 1);
+    var q = function (p) { var k = (vs.length - 1) * p; var f = Math.floor(k); var c = Math.ceil(k); return vs[f] + (vs[c] - vs[f]) * (k - f); };
+    var med = q(0.5), p10 = q(0.1), p90 = q(0.9);
+    var toX = function (x) { return (x - h.min) / (h.max - h.min) * nb - 0.5; };
+    var modeI = h.counts.indexOf(maxC);
     return base(t, {
       tooltip: tip(t, { trigger: 'axis' }),
-      grid: grid({ left: 6, right: 16, top: 14, bottom: 16 }),
-      xAxis: xAxis(t, { data: labels, axisLabel: { color: muted(t), fontSize: 8.5, fontFamily: FONT, interval: 2, margin: 8 } }),
-      yAxis: yAxis(t, { max: Math.ceil(maxC * 1.18) }),
+      grid: grid({ left: 8, right: 18, top: 26, bottom: 18 }),
+      xAxis: xAxis(t, { data: labels, axisLabel: { color: muted(t), fontSize: 8.5, fontFamily: FONT, interval: Math.max(1, Math.floor(nb / 5)), margin: 8 } }),
+      yAxis: yAxis(t, { max: Math.ceil(maxC * 1.22), axisLabel: { show: false }, splitLine: { show: false } }),
+      graphic: [{ type: 'text', left: 10, top: 6, z: 10,
+        style: { text: 'P10 ' + Math.round(p10) + '　Median ' + Math.round(med) + '　P90 ' + Math.round(p90) + '　σ ' + Math.round(ML.std(vs)),
+          fill: muted(t), font: '9.5px ' + FONT } }],
       series: [
-        { type: 'bar', data: h.counts, barWidth: '88%', silent: true,
-          itemStyle: { color: rgba(accent(t), 0.28), borderColor: rgba(accent(t), 0.5), borderWidth: 0.6 } },
+        { type: 'bar', data: h.counts, barWidth: '86%', silent: true,
+          itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: rgba(seriesColor(t, 0), 0.72) },
+            { offset: 1, color: rgba(seriesColor(t, 0), 0.18) }]),
+            borderRadius: [2, 2, 0, 0] },
+          markArea: { silent: true, itemStyle: { color: rgba(accentOf(t), 0.07) },
+            data: [[{ xAxis: Math.round(toX(p10)) }, { xAxis: Math.round(toX(p90)) }]] } },
         { type: 'line', data: curve, showSymbol: false, smooth: true, silent: true,
-          lineStyle: { color: ink(t), width: 1.6 } },
-        /* 均值 / 中位数 参考线 */
-        (function () {
-          var vs = d.values.filter(function (v) { return v !== null && !isNaN(v); });
-          var mean = vs.reduce(function (a, b) { return a + b; }, 0) / vs.length;
-          var sorted = vs.slice().sort(function (a, b) { return a - b; });
-          var med = sorted[Math.floor(sorted.length / 2)];
-          var toIdx = function (x) { return (x - h.min) / (h.max - h.min) * 14 - 0.5; };
-          return { type: 'line', data: [], silent: true,
-            markLine: { silent: true, symbol: 'none', data: [
-              { xAxis: Math.round(toIdx(mean)), lineStyle: { color: rgba(accentOf(t), 0.9), width: 1.2, type: 'dashed' },
-                label: { show: true, position: 'end', color: accentOf(t), font: '700 8.5px ' + FONT, formatter: 'mean ' + Math.round(mean) } },
-              { xAxis: Math.round(toIdx(med)), lineStyle: { color: rgba(ink(t), 0.5), width: 1.1, type: 'dotted' },
-                label: { show: true, position: 'start', color: muted(t), font: '600 8.5px ' + FONT, formatter: 'median ' + Math.round(med) } }
-            ] } };
-        })()
+          lineStyle: { color: ink(t), width: 1.8 }, z: 5 },
+        { type: 'line', data: [], silent: true, z: 6,
+          markLine: { silent: true, symbol: ['none', 'none'], data: [
+            { xAxis: Math.max(0, Math.round(toX(mean))), lineStyle: { color: '#B5484B', width: 1.3, type: 'dashed' },
+              label: { show: false } },
+            { xAxis: Math.max(0, Math.round(toX(med))), lineStyle: { color: rgba(ink(t), 0.55), width: 1.1, type: 'dotted' },
+              label: { show: false } }
+          ] } },
+        { type: 'scatter', data: [[modeI, maxC]], symbolSize: 0, silent: true, z: 7,
+          label: { show: true, position: 'top', distance: 14, color: ink(t), font: '800 9.5px ' + FONT,
+            formatter: '峰值 ' + maxC, backgroundColor: 'rgba(255,255,255,.9)', padding: [1, 4], borderRadius: 3 } }
       ]
     });
   };
 
+  /* 分布条带图：P10–P90 长条 + IQR 实心 + 中位刻度 + 均值点（麦肯锡式） */
   B.boxplot = function (el, d, t) {
-    var boxes = d.boxes || [];
-    var W = (el && el.clientWidth) || 600;
-    return base(t, {
-      tooltip: tip(t, { trigger: 'item', formatter: function (p) {
-        var v = p.value;
-        return (p.name || '') + '<br/>max ' + num(v[5]) + ' · Q3 ' + num(v[4]) + ' · median ' + num(v[3]) + ' · Q1 ' + num(v[2]) + ' · min ' + num(v[1]);
-      } }),
-      grid: grid({ left: 6, right: 18, top: 18, bottom: 18 }),
-      xAxis: xAxis(t, { data: d.categories, boundaryGap: true, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
-      yAxis: yAxis(t, { scale: true }),
-      series: [{
-        type: 'boxplot',
-        boxWidth: (W < 480 ? ['18%', '34%'] : ['10%', '20%']),
-        data: boxes,   /* [min, Q1, median, Q3, max] */
-        itemStyle: { color: rgba(rampOf(t)[2], 0.16), borderColor: rgba(rampOf(t)[1], 0.9), borderWidth: 1.1 },
-        emphasis: { itemStyle: { borderColor: accent(t), borderWidth: 1.6 } },
-        label: { show: false }
-      }]
+    var W = (el && el.clientWidth) || 600, H = (el && el.clientHeight) || 240;
+    var cats = d.categories || [];
+    var boxes = d.boxes || [];          // [min, Q1, median, Q3, max]
+    var n = cats.length;
+    var rowH = Math.min(30, Math.max(16, (H - 46) / Math.max(1, n)));
+    var cx = 92;
+    var all = [];
+    boxes.forEach(function (b) { b.forEach(function (v) { if (isFinite(v)) all.push(v); }); });
+    var vmin = Math.min.apply(null, all), vmax = Math.max.apply(null, all);
+    var pad = (vmax - vmin) * 0.08 || 1;
+    vmin -= pad; vmax += pad;
+    function X(v) { return cx + (v - vmin) / (vmax - vmin) * (W - cx - 26); }
+    var els = [];
+    /* 顶部刻度 */
+    for (var gi = 0; gi <= 4; gi++) {
+      var gv = vmin + (vmax - vmin) * gi / 4;
+      var gx = X(gv);
+      els.push({ type: 'line', silent: true, shape: { x1: gx, y1: 26, x2: gx, y2: 26 + n * rowH + 6 },
+        style: { stroke: rule(t), lineWidth: 1 } });
+      els.push({ type: 'text', left: gx - 12, top: 8, z: 10,
+        style: { text: Math.round(gv), fill: muted(t), font: '9px ' + FONT } });
+    }
+    var top = 30;
+    boxes.forEach(function (b, i) {
+      var y = top + i * rowH + rowH / 2;
+      var mn = b[0], q1 = b[1], med = b[2], q3 = b[3], mx = b[4];
+      var c = seriesColor(t, i);
+      /* 分类名 */
+      els.push({ type: 'text', left: 4, top: y - 7, z: 10,
+        style: { text: cats[i], fill: ink(t), font: '700 10px ' + FONT } });
+      /* 全距细线 */
+      els.push({ type: 'line', silent: true, shape: { x1: X(mn), y1: y, x2: X(mx), y2: y },
+        style: { stroke: rgba(c, 0.35), lineWidth: 2 } });
+      /* IQR 实心条 */
+      els.push({ type: 'rect', silent: true, shape: { x: X(q1), y: y - rowH * 0.26, width: Math.max(2, X(q3) - X(q1)), height: rowH * 0.52, r: 2 },
+        style: { fill: rgba(c, 0.55) } });
+      /* 中位刻度 */
+      els.push({ type: 'line', silent: true, shape: { x1: X(med), y1: y - rowH * 0.34, x2: X(med), y2: y + rowH * 0.34 },
+        style: { stroke: '#fff', lineWidth: 2 } });
+      /* 极值端点 */
+      els.push({ type: 'circle', silent: true, shape: { cx: X(mn), cy: y, r: 2 }, style: { fill: rgba(c, 0.8) } });
+      els.push({ type: 'circle', silent: true, shape: { cx: X(mx), cy: y, r: 2 }, style: { fill: rgba(c, 0.8) } });
+      /* 中位数值 */
+      els.push({ type: 'text', left: X(q3) + 7, top: y - 6, z: 11,
+        style: { text: num(med), fill: rgba(ink(t), 0.85), font: '800 9px ' + FONT } });
     });
+    return base(t, { graphic: els, xAxis: { show: false }, yAxis: { show: false }, grid: { left: 0, right: 0, top: 0, bottom: 0 } });
   };
 
-  /* 小提琴图：custom 系列绘制密度多边形 */
   B.violin = function (el, d, t) {
     var groups = d.groups || [], cats = d.categories || [];
     var all = [].concat.apply([], groups);
@@ -905,15 +944,15 @@
     });
     return base(t, {
       tooltip: tip(t, { formatter: function (p) { return labels[p.value[0]] || ''; } }),
-      grid: { left: 8, right: 14, top: 10, bottom: 18 },
+      grid: { left: 46, right: 14, top: 12, bottom: 20 },
       xAxis: yAxis(t, { type: 'value', min: lo, max: hi, splitLine: { show: false },
         axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT } }),
       yAxis: yAxis(t, { type: 'value', min: -0.2, max: groups.length, show: false, splitLine: { show: false } }),
       graphic: labels.map(function (lb, i) {
         var H0 = (el && el.clientHeight) || 190;
-        var top = 10 + (1 - (i + 0.5) / labels.length) * (H0 - 28);
-        return { type: 'text', left: 'right', top: Math.round(top), z: 20,
-          style: { text: lb, fill: muted(t), font: '9.5px ' + FONT, textAlign: 'right' } };
+        var top = 12 + (1 - (i + 0.5) / labels.length) * (H0 - 34);
+        return { type: 'text', left: 4, top: Math.round(top), z: 20,
+          style: { text: lb, fill: muted(t), font: '700 9.5px ' + FONT } };
       }),
       series: [{
         type: 'custom',

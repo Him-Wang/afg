@@ -130,7 +130,7 @@
       'nav.home': 'Guide',
       'nav.china': 'China Macro',
       'nav.intl': 'Global Macro',
-      'nav.finance': 'Markets',
+      'nav.finance': 'Financial Assets',
       'nav.explore': 'Explore',
       'nav.examples': 'Chart Types',
 

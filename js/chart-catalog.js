@@ -186,12 +186,12 @@
     charts: [
       { id: 'histogram', name: '直方图', type: 'histogram', desc: '看数据分布形状、集中区间与长尾',
         data: function () { return { values: rndArr(41, 160, 20, 100) }; } },
-      { id: 'boxplot', name: '箱线图', type: 'boxplot', desc: '五数概括，快速比较组间中位数与离散度',
-        data: function () { return { categories: ['A 组', 'B 组', 'C 组', 'D 组'], boxes: [
+      { id: 'boxplot', name: '分布条带图', type: 'boxplot', desc: 'P10–P90 全距 + IQR 实心 + 中位刻度，组间差异一眼可比',
+        data: function () { return { categories: ['A 组 · 一线', 'B 组 · 新一线', 'C 组 · 二线', 'D 组 · 三线'], boxes: [
           [22, 48, 61, 74, 95], [30, 55, 68, 80, 99], [15, 38, 52, 63, 88], [40, 62, 75, 88, 105]] }; } },
-      { id: 'violin', name: '小提琴图', type: 'violin', desc: '箱线图 + 密度曲线，看清分布的多峰形态',
-        data: function () { return { categories: ['A 组', 'B 组', 'C 组'], groups: [
-          rndArr(51, 80, 20, 96), rndArr(52, 80, 35, 100), rndArr(53, 80, 15, 80)] }; } },
+      { id: 'ridge', name: '山脊图', type: 'ridge', desc: '多组密度曲线错位堆叠，看分布形态与位移',
+        data: function () { return { labels: ['2022', '2023', '2024', '2025', '2026'], groups: [
+          rndArr(61, 80, 22, 66), rndArr(62, 80, 26, 72), rndArr(63, 80, 30, 78), rndArr(64, 80, 34, 84), rndArr(65, 80, 38, 92)] }; } },
 
       { id: 'matrixHeat', name: '二维热力图', type: 'matrixHeat', desc: '两个维度交叉的热力矩阵，找聚集区',
         data: function () { var names = ['0–20', '20–40', '40–60', '60–80', '80–100'];
@@ -367,7 +367,7 @@
       compare: ['groupedBar', 'dumbbell', 'pmiRadar'],
       trend: ['season', 'stacked', 'waterfall', 'dual'],
       composition: ['donut', 'percentBar', 'treemap'],
-      distribution: ['histogram', 'boxplot', 'violin'],
+      distribution: ['histogram', 'boxplot', 'ridge'],
       relation: ['scatter', 'corrMatrix'],
       flow: ['funnel', 'sankey'],
       geo: ['choropleth', 'heatMapGeo'],

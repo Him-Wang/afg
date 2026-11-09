@@ -2632,8 +2632,8 @@
       catSub.appendChild(nav);
     });
 
-    // 3. 金融数据（3 个数据集）
-    var finSub = expando(ICONS.perf, tr('金融资产', 'Financial Assets'), 'cases');
+    // 3. 数据看板（中国宏观 / 国际宏观 / 金融资产）
+    var finSub = expando(ICONS.perf, tr('数据看板', 'Data Boards'), 'cases');
     [['china-macro', T('nav.china'), ICONS.macro, renderChinaMacro],
      ['intl-macro',  T('nav.intl'),  ICONS.globe, renderIntlMacro],
      ['finance',     T('nav.finance'), ICONS.perf, renderFinance]].forEach(function (c) {
