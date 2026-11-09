@@ -373,7 +373,8 @@
                 formatter: function () { return 'avg ' + num(mean); } } });
           }
         }
-        return lineSeries(t, s, i, {
+        var axisHint = (s.yAxis !== undefined) ? { yAxisIndex: s.yAxis } : {};
+        return lineSeries(t, s, i, Object.assign({}, axisHint, {
           markPoint: { silent: true, symbol: 'circle', symbolSize: 5,
             data: [{ coord: [last, s.values[last]], itemStyle: { color: seriesColor(t, i) } }].concat(
               marks.filter(function (m) { return m.kind !== 'mean'; }).map(function (m) {
@@ -385,7 +386,7 @@
               }) }
             : undefined,
           endLabel: endLabel(t)
-        });
+        }));
       })
     });
   };

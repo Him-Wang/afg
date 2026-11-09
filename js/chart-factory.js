@@ -1251,24 +1251,34 @@
     var maxS = Math.max.apply(null, pos);
     var minS = Math.min.apply(null, pos);
     if (!(minS > 0 && maxS / minS > 20)) return;         // 差异 20 倍以上才拆
+    var explicit = ss.some(function (ser) { return ser.yAxisIndex !== undefined || (ser.yAxis !== undefined); });
     var big = scales.indexOf(maxS);
     var yAxes = Array.isArray(option.yAxis) ? option.yAxis : [option.yAxis || {}];
     option.yAxis = yAxes;
     var first = yAxes[0];
     var others = ss.filter(function (_, i) { return i !== big; }).map(function (ser) { return ser.name; }).filter(Boolean);
-    if (others.length) first.name = others.join(' / ');
-    first.nameTextStyle = Object.assign({}, first.nameTextStyle, { color: theme.muted, fontSize: 10 });
-    first.nameLocation = 'end'; first.nameGap = 8;
+    if (others.length) first.name = '';
+
     var right = Object.assign({}, first, {
-      position: 'right', name: ss[big].name || '',
+      position: 'right', name: '',
       splitLine: { show: false },
       axisLabel: Object.assign({}, first.axisLabel),
       nameTextStyle: { color: theme.muted, fontSize: 10 }
     });
     yAxes[1] = right;
-    ss[big].yAxisIndex = 1;
-    /* 第一条也归到左轴 */
-    ss.forEach(function (ser, i) { if (i !== big) ser.yAxisIndex = 0; });
+    if (explicit) {
+      /* 数据已指定左右轴：只补齐右轴，不移动系列 */
+      ss.forEach(function (ser) { if (ser.yAxisIndex === undefined) ser.yAxisIndex = (ser.yAxis === 1) ? 1 : 0; });
+    } else {
+      ss[big].yAxisIndex = 1;
+      ss.forEach(function (ser, i) { if (i !== big) ser.yAxisIndex = 0; });
+    }
+    /* 双轴时右侧留白加大，避免末点数值与轴标签相撞 */
+    if (option.grid && !Array.isArray(option.grid)) {
+      option.grid.right = Math.max(option.grid.right || 0, 62);
+    } else if (Array.isArray(option.grid) && option.grid[0]) {
+      option.grid[0].right = Math.max(option.grid[0].right || 0, 62);
+    }
   }
 
   function polishOption(option, theme, type) {

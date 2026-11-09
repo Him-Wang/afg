@@ -99,19 +99,59 @@
     id: 'trend', name: '趋势与时间', icon: '↗',
     desc: '数据随时间怎么变、变化的节奏、拐点、周期、累计过程。',
     charts: [
-      { id: 'line', name: '折线图', type: 'line', desc: '最通用的时间序列表达，看趋势与拐点',
-        data: function () { return { labels: months(36), series: [
-          { name: '指标 A', values: rndArr(11, 36, 80, 160) }, { name: '指标 B', values: rndArr(12, 36, 60, 120) }] }; } },
-      { id: 'area', name: '面积图', type: 'area', desc: '强调累积量的变化，视觉重量更强',
-        data: function () { return { labels: months(30), series: [{ name: '成交额', values: rndArr(21, 30, 420, 980) }] }; } },
-      { id: 'stacked', name: '堆叠面积图', type: 'stacked', desc: '多项累加看总量与结构同步变化',
-        data: function () { return { labels: months(24), series: [
-          { name: '业务 A', values: rndArr(31, 24, 120, 260) }, { name: '业务 B', values: rndArr(32, 24, 80, 200) }, { name: '业务 C', values: rndArr(33, 24, 40, 150) }] }; } },
-      { id: 'waterfall', name: '瀑布图', type: 'waterfall', desc: '从起点到终点的增减拆解，看清每一笔贡献',
-        data: function () { return { labels: ['期初', '新增', '流失', '提价', '成本', '期末'], values: [500, 120, -80, 60, -45, 555], totalFromZero: false }; } },
-      { id: 'heatmap', name: '热力图', type: 'heatmap', desc: '二维矩阵用颜色编码数值，快速定位高低区',
-        data: function () { return { xLabels: ['Q1', 'Q2', 'Q3', 'Q4'], yLabels: ['产品 A', '产品 B', '产品 C', '产品 D'],
-          values: [[82, 91, 76, 88], [64, 72, 85, 69], [45, 51, 62, 58], [30, 38, 44, 41]] }; } }
+      { id: 'line', name: '多指标趋势', type: 'line', desc: '5 年 60 个月，三条曲线对比走势与拐点',
+        data: function () {
+          var labels = months(60);
+          var mk = function (seed, start, drift, amp) {
+            var out = [], v = start;
+            for (var i = 0; i < 60; i++) {
+              v += drift + Math.sin(i / 5 + seed) * amp + (rnd(seed * 100 + i, -1, 1) * amp * 0.6);
+              out.push(Math.round(v * 10) / 10);
+            }
+            return out;
+          };
+          return { labels: labels, series: [
+            { name: '沪深300', values: mk(1, 3800, 2.2, 45) },
+            { name: '中证500', values: mk(2, 5600, 3.1, 70) },
+            { name: '创业板指', values: mk(3, 2400, 1.1, 55) }
+          ] };
+        } },
+      { id: 'stacked', name: '结构演变', type: 'stacked', desc: '5 年营收结构：四条业务线的此消彼长',
+        data: function () {
+          var labels = months(60);
+          var parts = [
+            { name: '硬件', base: 120, grow: 0.6 },
+            { name: '软件', base: 60, grow: 1.8 },
+            { name: '服务', base: 35, grow: 2.6 },
+            { name: '其他', base: 25, grow: 0.2 }
+          ];
+          return { labels: labels, series: parts.map(function (pt, pi) {
+            return { name: pt.name, values: labels.map(function (_, i) {
+              return Math.round((pt.base + pt.grow * i + rnd(pi * 77 + i, -6, 6)) * 10) / 10;
+            }) };
+          }) };
+        } },
+      { id: 'waterfall', name: '归因瀑布', type: 'waterfall', desc: '从收入到净利：每一笔增减的贡献拆解',
+        data: function () { return {
+          labels: ['营业收入', '营业成本', '销售费用', '管理费用', '研发费用', '其他', '净利润'],
+          values: [1200, -760, -110, -75, -140, -15, 100],
+          bridge: true }; } },
+      { id: 'dual', name: '双轴趋势', type: 'line', desc: '指数点位（左）对比利率水平（右），看背离与联动',
+        data: function () {
+          var labels = months(60);
+          var index = [], rate = [];
+          var iv = 3600, rv = 3.2;
+          for (var i = 0; i < 60; i++) {
+            iv += Math.sin(i / 6) * 60 + rnd(i + 7, -40, 40) + 6;
+            rv += Math.cos(i / 9) * 0.05 + rnd(i + 91, -0.04, 0.04) - 0.012;
+            index.push(Math.round(iv));
+            rate.push(Math.round(rv * 100) / 100);
+          }
+          return { labels: labels, series: [
+            { name: '沪深300', values: index, yAxis: 0 },
+            { name: '10年国债收益率', values: rate, yAxis: 1 }
+          ], dual: true };
+        } }
     ]
   });
 
@@ -327,7 +367,7 @@
     if (sc) { sc.charts.forEach(function (ch) { SHOW[ch.id] = ch; }); }
     var keep = {
       compare: ['groupedBar', 'dumbbell', 'bullet'],
-      trend: ['line', 'area', 'waterfall'],
+      trend: ['line', 'stacked', 'waterfall', 'dual'],
       composition: ['donut', 'percentBar', 'sunburst'],
       distribution: ['histogram', 'boxplot', 'violin'],
       relation: ['scatter', 'corrMatrix'],
@@ -352,7 +392,6 @@
     }
     pushTo('flow', 'scChord');           // 和弦图（渐变丝带）
     pushTo('hierarchy', 'scRadialTree'); // 径向树
-    pushTo('trend', 'scGlowLine');       // 发光趋势线
   })();
 
   function localizeDemo(obj) {
