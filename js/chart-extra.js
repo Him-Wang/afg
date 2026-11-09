@@ -162,8 +162,16 @@
       yAxis: yAxis(t, { name: d.unit || '', nameTextStyle: { color: muted(t), fontSize: 9, align: 'left' } }),
       series: d.series.map(function (s, i) {
         var isLast = (i === n - 1);
-        var c1 = ramp[Math.min(i, ramp.length - 1)];
-        var c2 = isLast ? acc : ramp[Math.min(i + 1, ramp.length - 1)];
+        var multi = !!(window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0];
+        multi = !!(multi && multi.multiHue);
+        var c1, c2;
+        if (multi) {
+          c1 = seriesColor(t, i);
+          c2 = rgba(c1, 0.55);
+        } else {
+          c1 = ramp[Math.min(i, ramp.length - 1)];
+          c2 = isLast ? acc : ramp[Math.min(i + 1, ramp.length - 1)];
+        }
         return {
           name: s.name, type: 'bar', data: s.values,
           barGap: '14%', barWidth: n > 4 ? (W < 480 ? 3.5 : 7) : 11,
@@ -240,7 +248,7 @@
       yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: W < 480 ? 9.5 : 10.5, fontFamily: FONT, width: labelW - 12, overflow: 'truncate' } }),
       series: [
         { type: 'bar', barWidth: W < 480 ? 10 : 13, barCategoryGap: '58%', data: rv.map(function (r) { return r.value; }),
-          itemStyle: { color: vGrad(rampOf(t)[0], rampOf(t)[1]), borderRadius: [0, 2, 2, 0] }, z: 3,
+          itemStyle: { color: vGrad(seriesColor(t, 0), rgba(seriesColor(t, 0), 0.6)), borderRadius: [0, 2, 2, 0] }, z: 3,
           label: { show: true, position: 'insideLeft', distance: 7, color: '#FFFFFF', fontSize: W < 480 ? 8.5 : 9.5, fontWeight: 700, fontFamily: FONT,
             formatter: function (p) { return num(p.value); } } },
         { type: 'scatter', silent: true, z: 5,

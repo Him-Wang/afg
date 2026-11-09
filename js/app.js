@@ -1750,6 +1750,38 @@
   }
 
 
+
+  /* 社融单项：季节性折线大图 */
+  function openSheirongSeasonItem(item, sr) {
+    clearStage();
+    state.mode = 'macro';
+    state.viewKey = 'macro-seirong-item:' + sr.name;
+    state.macroItem = item;
+    highlightNav(null);
+    el('stat-badge').style.display = 'none';
+    el('btn-events').style.display = 'none';
+    el('btn-table').style.display = 'none';
+    showBack(function () { renderSheirongSeason(item); });
+    setHead({
+      title: DT(sr.name) + ' · ' + tr('季节性折线', 'Seasonal line'),
+      subtitle: tr('近 4 年同月对比（1–12 月）· 单位：', 'Last 4 years by month · unit: ') + (item.unit || '亿元'),
+      unit: item.unit || '亿元', source: '中国人民银行 · akshare 实时'
+    });
+    var c = document.createElement('div');
+    c.className = 'chart-canvas';
+    el('chart-stage').appendChild(c);
+    var theme = getChartTheme();
+    var inst = ChartFactory.render(c, 'season', {
+      labels: item.labels,
+      series: [{ name: sr.name, values: sr.values }],
+      maxYears: 4
+    }, theme);
+    state.echartsEl = c;
+    attachExtremeLabels(inst);
+    try { inst.resize(); } catch (e) {}
+    syncToolbar();
+  }
+
   /* 社融结构三项：三张季节性折线（近 4 年，1-12 月对比） */
   function renderSheirongSeason(item) {
     clearStage();
@@ -1773,6 +1805,9 @@
     (item.series || []).forEach(function (sr) {
       var panel = document.createElement('div');
       panel.className = 'season-panel';
+      panel.title = tr('点击查看大图', 'Click for full chart');
+      panel.style.cursor = 'pointer';
+      panel.addEventListener('click', function () { openSheirongSeasonItem(item, sr); });
       var last = sr.values[sr.values.length - 1];
       panel.innerHTML = '<div class="season-hd"><span class="season-name">' + DT(sr.name) + '</span>' +
         '<span class="season-val">' + fmtNum(last) + '</span></div>';
