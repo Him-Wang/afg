@@ -753,6 +753,107 @@
 
 
   /* 全部标注：覆盖层纯数字标签（不依赖 ECharts label，避免高密度时不渲染） */
+
+  /* ===================================================================
+     统一数据标注层：最新值 / 最高 / 最低 全部由这一层绘制
+     —— 同一套字体、同一套配色逻辑、统一避让与越界收敛
+     =================================================================== */
+  function renderValueLabels(inst) {
+    if (!inst || !inst.getDom) return;
+    var container = inst.getDom();
+    if (!container) return;
+    Array.prototype.forEach.call(container.querySelectorAll('.last-tag, .ext-label'), function (n) { n.remove(); });
+    var oldOv = container.querySelector('.ext-overlay');
+    if (oldOv) oldOv.remove();
+
+    var tc = Themes.active().chart;
+    var opt = inst.getOption();
+    var dz = opt.dataZoom && opt.dataZoom[0];
+    var st = dz ? (dz.start || 0) : 0, en = dz ? (dz.end || 100) : 100;
+    var pr = getPlotRect(inst);
+    var bx = pr ? pr.x : 0, by = pr ? pr.y : 0, bw = pr ? pr.w : (container.clientWidth || 800), bh = pr ? pr.h : (container.clientHeight || 300);
+
+    var items = [];
+    (opt.series || []).forEach(function (ser, si) {
+      if (!ser || (ser.type !== 'line' && ser.type !== 'bar' && ser.type !== 'scatter')) return;
+      var data = ser.data || [];
+      var n = data.length;
+      if (!n) return;
+      var s0 = Math.floor(n * st / 100), e0 = Math.ceil(n * en / 100);
+      if (e0 <= s0) e0 = Math.min(n, s0 + 1);
+      var vals = [];
+      for (var k = s0; k < e0; k++) {
+        var raw = data[k];
+        var v = (raw && typeof raw === 'object') ? raw.value : raw;
+        if (v === null || v === undefined || isNaN(v)) continue;
+        vals.push({ i: k, v: v });
+      }
+      if (!vals.length) return;
+      var lastP = vals[vals.length - 1];
+      var hiP = vals.reduce(function (a, b) { return b.v > a.v ? b : a; });
+      var loP = vals.reduce(function (a, b) { return b.v < a.v ? b : a; });
+      var c = (tc.series && tc.series[si % tc.series.length]) || tc.accent;
+      function px(p) {
+        try { var r = inst.convertToPixel({ seriesIndex: si }, [p.i, p.v]); return r ? [r[0], r[1]] : null; }
+        catch (e) { return null; }
+      }
+      var pLast = px(lastP); if (pLast) items.push({ px: pLast[0], py: pLast[1], text: fmtNum(lastP.v), color: c, kind: 'latest', pri: 1 });
+      if (vals.length > 3) {
+        var pHi = px(hiP); if (pHi && hiP.i !== lastP.i) items.push({ px: pHi[0], py: pHi[1], text: fmtNum(hiP.v), color: '#B5484B', kind: 'max', pri: 2 });
+        var pLo = px(loP); if (pLo && loP.i !== lastP.i && loP.i !== hiP.i) items.push({ px: pLo[0], py: pLo[1], text: fmtNum(loP.v), color: '#1E7A46', kind: 'min', pri: 3 });
+      }
+    });
+    if (!items.length) return;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'ext-overlay';
+    overlay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:20;';
+    container.appendChild(overlay);
+
+    /* 依次放置：最新值优先，其次峰谷；冲突则换方向/移位 */
+    items.sort(function (a, b) { return a.pri - b.pri; });
+    var placed = [];
+    function overlaps(x, y, w, h) {
+      return placed.some(function (p) { return x < p.x + p.w + 3 && x + w + 3 > p.x && y < p.y + p.h + 2 && y + h + 2 > p.y; });
+    }
+    items.forEach(function (it) {
+      var el2 = document.createElement('div');
+      el2.className = 'last-tag';
+      el2.dataset.kind = it.kind;
+      el2.textContent = it.text;
+      el2.style.cssText = 'position:absolute;pointer-events:none;background:transparent;color:' + it.color +
+        ';font:800 11.5px Inter,"PingFang SC",sans-serif;letter-spacing:.2px;padding:0 2px;white-space:nowrap;' +
+        'text-shadow:0 0 3px #fff,0 0 5px #fff,0 0 8px #fff,0 0 10px #fff;';
+      overlay.appendChild(el2);
+      var lw = el2.offsetWidth || 44, lh = el2.offsetHeight || 14;
+
+      var cand = [
+        [it.px + 9, it.py - lh / 2],
+        [it.px - lw - 9, it.py - lh / 2],
+        [it.px - lw / 2, it.py - lh - 8],
+        [it.px - lw / 2, it.py + 8],
+        [it.px + 9, it.py - lh - 6],
+        [it.px - lw - 9, it.py + 6]
+      ];
+      var pos = null;
+      for (var ci = 0; ci < cand.length; ci++) {
+        var cx = cand[ci][0], cy = cand[ci][1];
+        if (cx < bx + 2 || cx + lw > bx + bw - 2 || cy < by + 2 || cy + lh > by + bh - 2) continue;
+        if (overlaps(cx, cy, lw, lh)) continue;
+        pos = [cx, cy]; break;
+      }
+      if (!pos) {
+        /* 兜底：贴边收敛 */
+        var fx = Math.min(Math.max(bx + 3, it.px + 9), bx + bw - lw - 3);
+        var fy = Math.min(Math.max(by + 3, it.py - lh / 2), by + bh - lh - 3);
+        pos = [fx, fy];
+      }
+      el2.style.left = Math.round(pos[0]) + 'px';
+      el2.style.top = Math.round(pos[1]) + 'px';
+      placed.push({ x: pos[0], y: pos[1], w: lw, h: lh });
+    });
+  }
+
   function renderAllValueLabels(inst) {
     var container = inst.getDom && inst.getDom();
     if (!container) return;
@@ -1041,6 +1142,12 @@
 
   /* 最新值标签：每个系列各一个，右缘内、不越界、可拖动、自动错开 */
   function applyLastValueTag(inst) {
+    if (state.labelMode === 'all') return;   // 全部标注模式由另一层接管
+    renderValueLabels(inst);
+    return;
+  }
+
+  function _legacyLastTag(inst) {
     var _cont = inst && inst.getDom && inst.getDom();
     if (_cont) { var _old = _cont.querySelectorAll('.last-tag'); for (var _k = 0; _k < _old.length; _k++) _old[_k].remove(); }
     if (state.labelMode && state.labelMode !== 'off') return;   // 已有数据标注，避免重复

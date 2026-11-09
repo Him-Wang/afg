@@ -353,23 +353,11 @@
         if (i === 0) {
           var vs = s.values.map(function (v, k) { return { v: v, k: k }; }).filter(function (o) { return o.v !== null && o.v !== undefined && !isNaN(o.v); });
           if (vs.length > 4) {
-            var hi = vs.reduce(function (a, b) { return b.v > a.v ? b : a; });
-            var lo = vs.reduce(function (a, b) { return b.v < a.v ? b : a; });
             var mean = vs.reduce(function (a, b) { return a + b.v; }, 0) / vs.length;
-            marks.push({ kind: 'max', name: '峰值', coord: [hi.k, hi.v],
-              itemStyle: { color: '#B5484B' }, symbol: 'circle', symbolSize: 4.5,
-              label: { show: true, position: 'top', distance: 7, color: '#B5484B',
-                font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
-                formatter: function () { return num(hi.v); } } });
-            marks.push({ kind: 'min', name: '谷值', coord: [lo.k, lo.v],
-              itemStyle: { color: '#1E7A46' }, symbol: 'circle', symbolSize: 4.5,
-              label: { show: true, position: 'bottom', distance: 7, color: '#1E7A46',
-                font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
-                formatter: function () { return num(lo.v); } } });
             marks.push({ kind: 'mean', name: '均值', coord: [0, mean],
               symbol: 'none',
-              lineStyle: { color: rgba(ink(t), 0.35), width: 1, type: [4, 3] },
-              label: { show: big, position: 'insideEndTop', distance: 4, color: muted(t), font: '9px ' + FONT,
+              lineStyle: { color: rgba(ink(t), 0.35), width: 1, type: 'dashed' },
+              label: { show: big, position: 'insideStartTop', distance: 4, color: muted(t), font: '9px ' + FONT,
                 formatter: function () { return 'avg ' + num(mean); } } });
           }
         }
@@ -385,7 +373,7 @@
                 return { name: m.name, yAxis: m.coord[1], lineStyle: m.lineStyle, label: m.label };
               }) }
             : undefined,
-          endLabel: endLabel(t)
+          endLabel: { show: false }
         }));
       })
     });
@@ -405,9 +393,10 @@
           areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: rgba(c, 0.28) }, { offset: 1, color: rgba(c, 0.02) }]) },
           markPoint: { silent: true, symbol: 'circle', symbolSize: 5,
-            data: [{ coord: [s.values.length - 1, s.values[s.values.length - 1]], itemStyle: { color: c } }].concat(extremeMarks(t, d.labels, s.values)) },
+            data: [{ coord: [s.values.length - 1, s.values[s.values.length - 1]], itemStyle: { color: c },
+              label: { show: false } }] },
           markLine: i === 0 ? meanMark(t, s.values) : undefined,
-          endLabel: endLabel(t)
+          endLabel: { show: false }
         });
       })
     });
