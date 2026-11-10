@@ -216,7 +216,7 @@
     if (!global.d3) return;
     var d3 = global.d3;
     var r = svgRoot(el, theme);
-    var radius = Math.min(r.w * 0.44, r.h * 0.47);
+    var radius = Math.min(r.w * 0.47, r.h * 0.50);
     var g = r.svg.append('g').attr('transform', 'translate(' + (r.w / 2) + ',' + (r.h / 2) + ')');
 
     var root = d3.hierarchy(data.tree);
@@ -235,7 +235,7 @@
     node.style('cursor', 'pointer')
       .on('mouseenter', function (ev, d) {
         d3.select(this).select('circle').transition().duration(100)
-          .attr('r', (d.depth === 0 ? 7 : (d.children ? 4.5 : 3)) + 3);
+          .attr('r', (d.depth === 0 ? 8 : (d.children ? 5.5 : 3.5)) + 3);
         var path = d.ancestors().reverse().map(function (a) { return a.data.name; }).join(' › ');
         var kids = d.children ? d.children.length : 0;
         node.style('opacity', function (o) { return (o === d || o.parent === d || d.parent === o || d.ancestors().indexOf(o) >= 0) ? 1 : 0.2; });
@@ -247,13 +247,13 @@
       })
       .on('mouseleave', function (ev, d) {
         d3.select(this).select('circle').transition().duration(100)
-          .attr('r', d.depth === 0 ? 7 : (d.children ? 4.5 : 3));
+          .attr('r', d.depth === 0 ? 8 : (d.children ? 5.5 : 3.5));
         node.style('opacity', 1);
         tipT.hide();
       });
 
     node.append('circle')
-      .attr('r', function (d) { return d.depth === 0 ? 7 : (d.children ? 4.5 : 3); })
+      .attr('r', function (d) { return d.depth === 0 ? 8 : (d.children ? 5.5 : 3.5); })
       .attr('fill', function (d) { return d.depth === 0 ? ink(theme) : rgba(pal(theme, d.depth - 1), 0.85); })
       .attr('stroke', '#fff').attr('stroke-width', 1.2);
 
