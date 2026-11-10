@@ -5,6 +5,13 @@
   var DICT = {
     zh: {
       'app.import': '＋ 导入数据',
+      'app.importTitle': '导入数据', 'app.importSub': '数据仅在本地浏览器处理，不会上传到任何服务器。',
+      'app.tabFile': '上传文件', 'app.tabPaste': '粘贴数据', 'app.tabSample': '示例数据',
+      'app.dropHint': '点击选择或拖拽文件到此处', 'app.dropSub': '支持 Excel / CSV / JSON，自动识别文件类型',
+      'app.sampleHint': '选择一个内置示例数据集，再在下方映射列后渲染。',
+      'app.parse': '解析（自动识别 CSV / JSON）',
+      'dt.overview': '一览',
+
       'app.menu': '菜单',
       'app.theme': '切换配色',
       'app.lang': '语言',
@@ -122,6 +129,15 @@
     },
     en: {
       'app.import': '＋ Import data',
+      'tb.palette': '🎨 Palette', 'tb.labels': '◉ Labels', 'labels.all': 'All values',
+      'labels.extreme': 'Extremes', 'labels.off': 'Hide labels',
+      'app.importTitle': 'Import data', 'app.importSub': 'Everything runs in your browser — nothing is uploaded to any server.',
+      'app.tabFile': 'Upload file', 'app.tabPaste': 'Paste data', 'app.tabSample': 'Sample data',
+      'app.dropHint': 'Click or drag a file here', 'app.dropSub': 'Supports Excel / CSV / JSON with automatic detection',
+      'app.sampleHint': 'Pick a built-in sample, then map the columns below and render.',
+      'app.parse': 'Parse (auto-detect CSV / JSON)',
+      'dt.overview': 'Overview',
+
       'app.menu': 'Menu',
       'app.theme': 'Theme',
       'app.lang': 'Language',

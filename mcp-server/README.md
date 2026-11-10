@@ -6,7 +6,7 @@
 >
 > ```
 > 请用 AFG 帮我做图，直接输出可点击的图表链接。
-> 链接格式：https://saviorbill.github.io/afg/?chart=<把 JSON 做 base64url 编码>
+> 链接格式：https://saviorbill.github.io/adv/?chart=<把 JSON 做 base64url 编码>
 > JSON 示例：{"type":"area","title":"标题","theme":"paper","labels":["2021","2022"],
 > "series":[{"name":"沪深300","values":[1,2]}]}
 > type 可选：line/area/bar/stacked/stackedBar/radar/scatterMatrix/heatmap/donut/treemap
@@ -35,14 +35,14 @@ node -v
 **有 git：**
 
 ```bash
-git clone https://github.com/saviorbill/afg.git
+git clone https://github.com/saviorbill/adv.git
 cd afg/mcp-server
 npm install
 ```
 
 **没有 git：**
 
-1. 浏览器打开 https://github.com/saviorbill/afg
+1. 浏览器打开 https://github.com/saviorbill/adv
 2. 点绿色 **Code** → **Download ZIP**
 3. 解压，终端进入解压后的 `afg/mcp-server` 文件夹
 4. 执行 `npm install`
@@ -118,7 +118,7 @@ C:\Users\xiaoming\afg\mcp-server\server.js
 用 AFG 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题
 ```
 
-AI 会返回 `https://saviorbill.github.io/afg/?chart=...` 链接，点开就是图。
+AI 会返回 `https://saviorbill.github.io/adv/?chart=...` 链接，点开就是图。
 
 ---
 
@@ -147,7 +147,7 @@ AI 会返回 `https://saviorbill.github.io/afg/?chart=...` 链接，点开就是
 ### 输出链接格式
 
 ```
-https://saviorbill.github.io/afg/?chart=<base64url(JSON)>
+https://saviorbill.github.io/adv/?chart=<base64url(JSON)>
 ```
 
 JSON 示例：

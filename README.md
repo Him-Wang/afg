@@ -4,7 +4,7 @@
 
 **上传数据，直接出图 —— 专业级金融图表，纯前端运行**
 
-[🌐 在线使用](https://saviorbill.github.io/afg/) · [中文](#中文) · [English](#english)
+[🌐 在线使用](https://saviorbill.github.io/adv/) · [中文](#中文) · [English](#english)
 
 </div>
 
@@ -18,7 +18,7 @@ ADV 是一个**纯静态的金融图表工具**：上传 Excel / CSV / JSON，�
 
 适合：研究报告配图、路演材料、财报分析、宏观数据可视化。
 
-**在线地址**：https://saviorbill.github.io/afg/
+**在线地址**：https://saviorbill.github.io/adv/
 
 ---
 
@@ -26,7 +26,7 @@ ADV 是一个**纯静态的金融图表工具**：上传 Excel / CSV / JSON，�
 
 #### ① 最简：直接上传（推荐小白）
 
-1. 打开 https://saviorbill.github.io/afg/
+1. 打开 https://saviorbill.github.io/adv/
 2. 点击「**＋ 上传数据出图**」
 3. 选择 Excel / CSV / JSON 文件 → 图表自动生成
 
@@ -55,7 +55,7 @@ cd mcp-server && npm install
   "mcpServers": {
     "afg-charts": {
       "command": "node",
-      "args": ["/完整路径/afg/mcp-server/server.js"]
+      "args": ["/完整路径/adv/mcp-server/server.js"]
     }
   }
 }
@@ -122,8 +122,8 @@ cd mcp-server && npm install
 ### 本地运行
 
 ```bash
-git clone https://github.com/saviorbill/afg.git
-cd afg
+git clone https://github.com/saviorbill/adv.git
+cd adv
 # 任选一种方式启动静态服务
 python3 -m http.server 8000
 # 或 npx serve .
@@ -155,7 +155,7 @@ ADV is a **fully static financial charting tool**. Upload Excel / CSV / JSON, an
 
 Built for research reports, pitch decks, earnings analysis, and macro data visualization.
 
-**Live demo**: https://saviorbill.github.io/afg/
+**Live demo**: https://saviorbill.github.io/adv/
 
 ---
 
@@ -163,7 +163,7 @@ Built for research reports, pitch decks, earnings analysis, and macro data visua
 
 #### ① Simplest: just upload (recommended)
 
-1. Open https://saviorbill.github.io/afg/
+1. Open https://saviorbill.github.io/adv/
 2. Click **"＋ Upload data"**
 3. Pick your Excel / CSV / JSON → chart appears
 
@@ -192,7 +192,7 @@ Add to your MCP config:
   "mcpServers": {
     "afg-charts": {
       "command": "node",
-      "args": ["/absolute/path/to/afg/mcp-server/server.js"]
+      "args": ["/absolute/path/to/adv/mcp-server/server.js"]
     }
   }
 }
@@ -259,8 +259,8 @@ Use "🐞 Help make it better" on the homepage — report bugs, request features
 ### Run locally
 
 ```bash
-git clone https://github.com/saviorbill/afg.git
-cd afg
+git clone https://github.com/saviorbill/adv.git
+cd adv
 python3 -m http.server 8000     # or: npx serve .
 ```
 

@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
 
-  var REPO = 'https://github.com/saviorbill/afg';
+  var REPO = 'https://github.com/saviorbill/adv';
 
   var ZH = [
     '<div class="guide-sec">',
@@ -56,7 +56,7 @@
     '<pre class="guide-code">你现在有哪些工具？有没有 make_chart？</pre>',
     '<p>如果它列出 <code>make_chart</code> → 配置成功。之后直接用自然语言：</p>',
     '<pre class="guide-code">用 ADV 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题</pre>',
-    '<p>AI 会返回一个 <code>https://saviorbill.github.io/afg/?chart=...</code> 链接，点开就是图。</p>',
+    '<p>AI 会返回一个 <code>https://saviorbill.github.io/adv/?chart=...</code> 链接，点开就是图。</p>',
     '</div>',
 
     '<div class="guide-sec">',

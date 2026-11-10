@@ -1817,14 +1817,14 @@
         '',
         'STEP 1 — If you have terminal / file access:',
         '  a) run `node -v` (if Node.js is missing, tell me the download link and stop)',
-        '  b) git clone https://github.com/saviorbill/afg.git ~/afg',
+        '  b) git clone https://github.com/saviorbill/adv.git ~/afg',
         '  c) cd ~/afg/mcp-server && npm install',
         '  d) add this to YOUR OWN MCP config, then reload:',
         '     {"mcpServers":{"afg-charts":{"command":"node","args":["<the real absolute path of ~/afg/mcp-server/server.js>"]}}}',
         '  e) confirm the `make_chart` tool is available',
         '',
         'STEP 2 — If you cannot install anything (chat-only), use links instead:',
-        '  Build https://saviorbill.github.io/afg/?chart=<base64url of JSON>',
+        '  Build https://saviorbill.github.io/adv/?chart=<base64url of JSON>',
         '  JSON: {"type":"area","title":"...","theme":"paper","labels":["2021","2022"],"series":[{"name":"CSI300","values":[1,2]}]}',
         '  type: line / area / bar / stacked / stackedBar / radar / scatterMatrix / heatmap / donut / treemap',
         '  theme: paper (documents) / midnight-gold (pitch decks) / tradingview-dark / emerald / graphite',
@@ -1835,14 +1835,14 @@
         '',
         '第一步：如果你有终端 / 文件权限',
         '  a) 运行 node -v 检查环境（如果没有 Node.js，把下载地址给我就停下）',
-        '  b) git clone https://github.com/saviorbill/afg.git ~/afg',
+        '  b) git clone https://github.com/saviorbill/adv.git ~/afg',
         '  c) cd ~/afg/mcp-server && npm install',
         '  d) 把下面这段加进你自己的 MCP 配置，然后重载：',
         '     {"mcpServers":{"afg-charts":{"command":"node","args":["<~/afg/mcp-server/server.js 的真实绝对路径>"]}}}',
         '  e) 确认你能看到 make_chart 工具',
         '',
         '第二步：如果你不能安装（比如纯聊天环境），改用链接方式',
-        '  把数据编码成链接：https://saviorbill.github.io/afg/?chart=<base64url(JSON)>',
+        '  把数据编码成链接：https://saviorbill.github.io/adv/?chart=<base64url(JSON)>',
         '  JSON 结构：{"type":"area","title":"标题","theme":"paper","labels":["2021","2022"],"series":[{"name":"沪深300","values":[1,2]}]}',
         '  type 可选：line 折线 / area 面积 / bar 柱状 / stacked 堆叠面积 / stackedBar 堆叠柱状 / radar 雷达 / scatterMatrix 相关系数矩阵 / heatmap 热力矩阵 / donut 环形 / treemap 树图',
         '  theme 可选：paper 象牙白（写文档）/ midnight-gold 黑金（路演）/ tradingview-dark / emerald / graphite',
@@ -1882,7 +1882,7 @@
     el('hint').textContent = '';
     var M = window.CHINA_MACRO || { sections: [] };
     setHead({
-      title: '中国宏观数据一览',
+      title: tr('中国宏观数据', 'China Macro') + ' · ' + tr('一览', 'Overview'),
       subtitle: (M.updated ? DT('数据更新到') + ' ' + M.updated : DT('暂无数据')) + ' · ' + tr('点击任意卡片查看完整图表','click any card for the full chart'),
       unit: '', source: tr('Wind / 国家统计局 · 手工整理','Wind / NBS · compiled')
     });
@@ -2074,7 +2074,7 @@
     el('hint').textContent = '';
     var F = window.FINANCE_DATA || { sections: [] };
     setHead({
-      title: '金融资产一览',
+      title: tr('金融资产', 'Financial Assets') + ' · ' + tr('一览', 'Overview'),
       subtitle: (F.updated ? DT('数据更新到') + ' ' + F.updated : DT('暂无数据')) + ' · ' + tr('股票/商品/外汇用业绩模版，债券/VIX 用收益率折线','equities / commodities / FX use performance template; bonds / VIX use yield lines'),
       unit: '', source: tr('Wind / 交易所 · 手工整理','Wind / exchanges · compiled')
     });
@@ -2431,6 +2431,8 @@
       orgChart: 'Org Chart', icicle: 'Icicle', flowchart: 'Flowchart', swimlane: 'Swimlane',
       bulletSpecial: 'Bullet (KPI)', control: 'Control Chart', parallel: 'Parallel Coordinates',
       streamgraph: 'Streamgraph',
+      dumbbell: 'Dumbbell', pmiRadar: 'PMI Radar (13 items)', season: 'Seasonal Line', dual: 'Dual-axis Trend',
+      corrNetwork: 'Correlation Network + Matrix',
       scForce: 'Force Network', scChord: 'Chord Diagram', scRadialTree: 'Radial Tree',
       scHexbin: 'Hexbin Density', scGlowLine: 'Glow Trend', scWaterfall: 'Animated Waterfall'
     },
@@ -2460,6 +2462,11 @@
       swimlane: 'Cross-team process by owner lane', bulletSpecial: 'KPI against target and thresholds',
       control: 'Process monitoring with control limits', parallel: 'Multi-dimensional sample lines',
       streamgraph: 'Theme evolution over time',
+      dumbbell: 'Two periods joined by a line: who widened the gap',
+      pmiRadar: '13 activity indicators over 3 months with the most volatile item called out',
+      season: 'Same months across 4 years: seasonality and year-over-year change',
+      dual: 'Index level (left) vs interest rate (right): divergence and linkage',
+      corrNetwork: 'Network on the left, matrix on the right: see who moves with whom',
       scForce: 'Force-directed network sized by weight', scChord: 'Ring of bidirectional flows with gradient ribbons',
       scRadialTree: 'Circular hierarchy for multi-level categories', scHexbin: '2D density bins without overplotting',
       scGlowLine: 'Single glowing trend line with end emphasis', scWaterfall: 'Bars grow one by one to tell the story'
@@ -4254,6 +4261,7 @@
         if (state.mode === 'home') renderHome();
         else { try { rerender(); } catch (e) { if (window.I18N) window.I18N.apply(); } }
         if (window.I18N) window.I18N.apply();
+        refreshFooter();
         toast(next === 'en' ? 'Switched to English' : '已切换为中文');
       });
     }
@@ -4295,7 +4303,7 @@
         if (!f.content) { toast('请先填写内容'); return; }
         var body = f.content + '\n\n---\n' + (f.contact ? ('联系方式：' + f.contact + '\n') : '') + '页面：' + f.view + '\n时间：' + new Date().toLocaleString() + '\n语言：' + (window.I18N ? window.I18N.getLang() : 'zh');
         var title = '[' + f.typeLabel + '] ' + f.content.slice(0, 40);
-        var url = 'https://github.com/saviorbill/afg/issues/new?labels=feedback&title=' +
+        var url = 'https://github.com/saviorbill/adv/issues/new?labels=feedback&title=' +
           encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
         // 本地留档（便于同一浏览器复看）
         try {
@@ -5730,6 +5738,14 @@
   }
 
   /* ---------- 启动 ---------- */
+  function refreshFooter() {
+    var fn = el('footer-note');
+    if (!fn) return;
+    fn.textContent = 'Advanced Data Visualization (ADV) · ' +
+      tr('数据仅本地处理', 'All data processed locally') + ' · ' +
+      tr('生成于', 'generated') + ' ' + new Date().toLocaleDateString(isEn() ? 'en-US' : 'zh-CN');
+  }
+
   function init() {
     var q = {};
     try { new URLSearchParams(location.search).forEach(function (v, k) { q[k] = v; }); } catch (e) {}
@@ -5752,7 +5768,7 @@
     buildGoalCards();
     bindEvents();
     if (el('btn-watermark')) el('btn-watermark').classList.add('active');
-    el('footer-note').textContent = 'Advanced Data Visualization (ADV) · ' + tr('数据仅本地处理','processed locally') + ' · ' + tr('生成于','generated') + ' ' + new Date().toLocaleDateString(isEn() ? 'en-US' : 'zh-CN');
+    el('footer-note').textContent = 'Advanced Data Visualization (ADV) · ' + tr('数据仅本地处理','All data processed locally') + ' · ' + tr('生成于','generated') + ' ' + new Date().toLocaleDateString(isEn() ? 'en-US' : 'zh-CN');
     if (q.chart) {
       try {
         var cfg = JSON.parse(b64Decode(q.chart));

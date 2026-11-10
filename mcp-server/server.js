@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 // AFG 部署地址（可用环境变量覆盖）
-const AFG_BASE = (process.env.AFG_BASE_URL || "https://saviorbill.github.io/afg/").replace(/\/?$/, "/");
+const AFG_BASE = (process.env.AFG_BASE_URL || "https://saviorbill.github.io/adv/").replace(/\/?$/, "/");
 
 const server = new McpServer({ name: "afg-charts", version: "1.0.0" });
 

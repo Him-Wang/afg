@@ -177,34 +177,34 @@
     <div class="modal">
       <div class="modal-head">
         <div>
-          <h2>导入数据</h2>
-          <div class="sub">数据仅在本地浏览器处理，不会上传到任何服务器。</div>
+          <h2 data-i18n="app.importTitle">导入数据</h2>
+          <div class="sub" data-i18n="app.importSub">数据仅在本地浏览器处理，不会上传到任何服务器。</div>
         </div>
         <button class="modal-close" id="modal-close">×</button>
       </div>
 
       <div class="tabs" id="tabs">
-        <div class="tab active" data-tab="file">上传文件</div>
-        <div class="tab" data-tab="paste">粘贴数据</div>
-        <div class="tab" data-tab="sample">示例数据</div>
+        <div class="tab active" data-tab="file" data-i18n="app.tabFile">上传文件</div>
+        <div class="tab" data-tab="paste" data-i18n="app.tabPaste">粘贴数据</div>
+        <div class="tab" data-tab="sample" data-i18n="app.tabSample">示例数据</div>
       </div>
 
       <div class="tab-pane active" data-pane="file">
         <div class="file-drop" id="file-drop">
-          <div class="big">点击选择或拖拽文件到此处</div>
-          <div>支持 Excel / CSV / JSON，自动识别文件类型</div>
+          <div class="big" data-i18n="app.dropHint">点击选择或拖拽文件到此处</div>
+          <div data-i18n="app.dropSub">支持 Excel / CSV / JSON，自动识别文件类型</div>
         </div>
         <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.json,.txt" style="display:none" />
       </div>
 
       <div class="tab-pane" data-pane="paste">
         <textarea class="csv-area" id="csv-text" placeholder="粘贴 CSV 或 JSON 数据…&#10;CSV 示例：&#10;日期,GDP,CPI&#10;2024-01,5.2,0.4&#10;&#10;JSON 示例：&#10;[{&quot;日期&quot;:&quot;2024-01&quot;,&quot;GDP&quot;:5.2}]"></textarea>
-        <div class="field-row"><button class="btn primary" id="csv-parse">解析（自动识别 CSV / JSON）</button></div>
+        <div class="field-row"><button class="btn primary" id="csv-parse" data-i18n="app.parse">解析（自动识别 CSV / JSON）</button></div>
       </div>
 
       <div class="tab-pane" data-pane="sample">
         <div class="column-picker" id="sample-list"></div>
-        <div class="hint">选择一个内置示例数据集，再在下方映射列后渲染。</div>
+        <div class="hint" data-i18n="app.sampleHint">选择一个内置示例数据集，再在下方映射列后渲染。</div>
       </div>
 
       <!-- 解析结果 / 列映射 -->
