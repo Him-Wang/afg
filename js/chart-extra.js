@@ -82,21 +82,25 @@
 
   /* 取当前色板的明度梯度 */
   function rampOf(t) {
+    if (t && t.paletteRamp && t.paletteRamp.length) return t.paletteRamp;
     var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.ramp) ? p.ramp : [(t.text || '#051C2C'), '#1B4B72', '#4A7FA8', '#A8C4D8', '#E4EBF1'];
   }
   function upOf(t) {
+    if (t && t.up && t._dark) return t.up;
     var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.up) || '#1E7A46';
   }
   function downOf(t) {
+    if (t && t.down && t._dark) return t.down;
     var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.down) || '#B5484B';
   }
   function accentOf(t) {
+    if (t && t._dark && t.accent) return t.accent;
     var pid = (t && t.paletteId) || 'consult';
     var p = (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0];
     return (p && p.accent) ? p.accent : (t.accent || '#B08A4F');
@@ -133,12 +137,12 @@
     if (opts.max !== false) out.push({ coord: [hi.i, hi.v], symbol: 'circle', symbolSize: 4.5,
       itemStyle: { color: downOf(t) },
       label: { show: true, position: 'top', distance: 6, color: downOf(t),
-        font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+        font: '800 11.5px ' + FONT, textBorderColor: (t && t._dark) ? '#0E0F12' : '#fff', textBorderWidth: 3,
         formatter: function () { return num(hi.v); } } });
     if (opts.min !== false) out.push({ coord: [lo.i, lo.v], symbol: 'circle', symbolSize: 4.5,
       itemStyle: { color: upOf(t) },
       label: { show: true, position: 'bottom', distance: 6, color: upOf(t),
-        font: '800 11.5px ' + FONT, textBorderColor: '#fff', textBorderWidth: 3,
+        font: '800 11.5px ' + FONT, textBorderColor: (t && t._dark) ? '#0E0F12' : '#fff', textBorderWidth: 3,
         formatter: function () { return num(lo.v); } } });
     return out;
   }
@@ -485,7 +489,7 @@
             silent: true, symbol: 'circle', symbolSize: 5, itemStyle: { color: ink(t) },
             data: [{ coord: [totals.length - 1, totals[totals.length - 1]], itemStyle: { color: ink(t) },
               label: { show: true, position: 'top', distance: 6, color: ink(t), font: '800 10px ' + FONT,
-                textBorderColor: '#fff', textBorderWidth: 3, formatter: 'total ' + num(totals[totals.length - 1]) } }]
+                textBorderColor: (t && t._dark) ? '#0E0F12' : '#fff', textBorderWidth: 3, formatter: 'total ' + num(totals[totals.length - 1]) } }]
           } : undefined
         });
       })
@@ -789,7 +793,7 @@
           ] } },
         { type: 'scatter', data: [[modeI, maxC]], symbolSize: 0, silent: true, z: 7,
           label: { show: true, position: 'top', distance: 10, color: ink(t), font: '800 9.5px ' + FONT,
-            formatter: '峰值 ' + maxC, backgroundColor: 'rgba(255,255,255,.9)', padding: [1, 4], borderRadius: 3 } }
+            formatter: '峰值 ' + maxC, backgroundColor: (t && t._dark) ? 'rgba(22,24,30,.92)' : 'rgba(255,255,255,.9)', padding: [1, 4], borderRadius: 3 } }
       ]
     });
   };
@@ -1046,7 +1050,7 @@
           style: { text: 'y = ' + k.toFixed(2) + 'x ' + (b >= 0 ? '+ ' : '− ') + Math.abs(b).toFixed(1) +
             '　R² = ' + r2.toFixed(3) + '　r = ' + r.toFixed(2),
             fill: accentOf(t), font: '800 10px ' + FONT,
-            backgroundColor: 'rgba(255,255,255,.86)', padding: [4, 8], borderRadius: 4 } });
+            backgroundColor: (t && t._dark) ? 'rgba(22,24,30,.9)' : 'rgba(255,255,255,.86)', padding: [4, 8], borderRadius: 4 } });
       }
     }
     return base(t, {
@@ -1083,16 +1087,14 @@
   /* ---------- 配色模板 → 相关性发散色（负=蓝/正=红金） ---------- */
   function divergingOf(t) {
     var ps = (window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0] || {};
-    var neg = (ps.colors && ps.colors[1]) || '#1B4B72';   // 负相关 = 冷色
-    var pos = ps.down || ps.accent || '#B5484B';          // 正相关 = 暖色
-    if (ps.id === 'contrast') { neg = '#0B3C5D'; pos = '#C0392B'; }
-    if (ps.id === 'burgundy') { neg = '#4A6E8A'; pos = '#8C3A2E'; }
-    if (ps.id === 'forest') { neg = '#3E6B7A'; pos = '#8A6A2F'; }
-    var mid = '#F6F1E7';
+    var neg = corrNeg(t);   // 负相关 = 冷色
+    var pos = corrPos(t);   // 正相关 = 暖色
+    var mid = (t && t._dark) ? '#1A1B20' : '#F6F1E7';
     return [neg, mixHex(neg, mid, 0.62), mixHex(neg, mid, 0.3), mid,
       mixHex(pos, mid, 0.3), mixHex(pos, mid, 0.62), pos];
   }
   function corrPos(t) {
+    if (t && t._dark) return t.accent || '#E2B96B';
     var ps = (window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0] || {};
     if (ps.id === 'contrast') return '#C0392B';
     if (ps.id === 'burgundy') return '#8C3A2E';
@@ -1100,6 +1102,7 @@
     return ps.down || '#B5484B';
   }
   function corrNeg(t) {
+    if (t && t._dark) return (t.series && t.series[1]) || '#7FA3C4';
     var ps = (window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0] || {};
     if (ps.id === 'contrast') return '#0B3C5D';
     if (ps.id === 'burgundy') return '#4A6E8A';

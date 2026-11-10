@@ -218,6 +218,43 @@
     return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
 
+  /* 深色主题下把色板颜色提亮，保证对比度 */
+  function hexToHsl(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, hh = 0, ss = 0;
+    if (d) {
+      ss = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) hh = ((g - b) / d + (g < b ? 6 : 0));
+      else if (mx === g) hh = (b - r) / d + 2;
+      else hh = (r - g) / d + 4;
+      hh /= 6;
+    }
+    return [hh * 360, ss * 100, l * 100];
+  }
+  function liftForDark(hex, minL) {
+    if (!hex || hex[0] !== '#') return hex;
+    var hsl = hexToHsl(hex);
+    var l = Math.max(hsl[2], minL || 56);
+    var s = Math.min(96, Math.max(28, hsl[1]));
+    var h = hsl[0] / 360, S = s / 100, L = l / 100;
+    function hue2rgb(p, q, t) {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    }
+    var q2 = L < 0.5 ? L * (1 + S) : L + S - L * S, p2 = 2 * L - q2;
+    var R = Math.round(hue2rgb(p2, q2, h + 1 / 3) * 255), G = Math.round(hue2rgb(p2, q2, h) * 255), B = Math.round(hue2rgb(p2, q2, h - 1 / 3) * 255);
+    return '#' + [R, G, B].map(function (v) { return ('0' + Math.max(0, Math.min(255, v)).toString(16)).slice(-2); }).join('');
+  }
+  function themeIsDark(t) {
+    var bg = (t && t.chart && t.chart.bg) || '#FFFFFF';
+    return hexToHsl(bg)[2] < 45;
+  }
+
   function getChartTheme() {
     var t = Themes.active();
     var c = Object.assign({}, t.chart);
@@ -226,12 +263,16 @@
     var pid = state.palette || 'consult';
     var ps = (window.ADV_PALETTES || []).filter(function (p) { return p.id === pid; })[0];
     c.paletteId = pid;
+    var dark = themeIsDark(t);
+    c._dark = dark;
     if (ps) {
-      c.series = ps.colors.slice();
-      if (ps.accent) c.accent = ps.accent;
-      if (ps.ink) c.text = ps.ink;
-      if (ps.up) c.up = ps.up;
-      if (ps.down) c.down = ps.down;
+      var lift = function (arr) { return (arr || []).map(function (x) { return dark ? liftForDark(x, 58) : x; }); };
+      c.series = lift(ps.colors);
+      c.paletteRamp = lift(ps.ramp);
+      if (ps.accent) c.accent = dark ? liftForDark(ps.accent, 62) : ps.accent;
+      if (ps.up) c.up = dark ? liftForDark(ps.up, 58) : ps.up;
+      if (ps.down) c.down = dark ? liftForDark(ps.down, 58) : ps.down;
+      if (!dark && ps.ink) c.text = ps.ink;
     }
     return c;
   }
@@ -2441,6 +2482,8 @@
 
   /* 分类看板：顶部说明 + 图表案例卡 */
   function renderCategoryDash(catId) {
+    state.catId = catId;
+    state.catChartId = null;
     if (!window.echarts) { withCharts(function () { renderCategoryDash(catId); }); return; }
     var _needD3 = false;
     (function () {
@@ -2530,6 +2573,7 @@
 
   /* 分类下的单图详情 */
   function openCatalogChart(catId, chartId) {
+    state.catId = catId; state.catChartId = chartId;
     if (!window.echarts) { withCharts(function () { openCatalogChart(catId, chartId); }); return; }
     var _ch0 = findChart(catId, chartId);
     if (_ch0 && SHOWCASE_TYPES[_ch0.type] && !window.d3) {
@@ -2633,7 +2677,7 @@
     });
 
     // 3. 数据看板（中国宏观 / 国际宏观 / 金融资产）
-    var finSub = expando(ICONS.perf, tr('数据看板', 'Data Boards'), 'cases');
+    var finSub = expando(ICONS.perf, tr('金融数据', 'Financial Data'), 'cases');
     [['china-macro', T('nav.china'), ICONS.macro, renderChinaMacro],
      ['intl-macro',  T('nav.intl'),  ICONS.globe, renderIntlMacro],
      ['finance',     T('nav.finance'), ICONS.perf, renderFinance]].forEach(function (c) {
@@ -3455,8 +3499,18 @@
   }
 
   /* ---------- 主题 ---------- */
+  function syncThemeSwitch() {
+    var box = el('theme-switch');
+    if (!box) return;
+    var id = Themes.active().id;
+    Array.prototype.forEach.call(box.querySelectorAll('.ts-opt'), function (b) {
+      b.classList.toggle('active', b.getAttribute('data-theme-id') === id);
+    });
+  }
+
   function buildThemeSelect() {
     var sel = el('theme-select');
+    if (!sel) return;
     Themes.ids().forEach(function (id) {
       var o = document.createElement('option');
       o.value = id;
@@ -3469,15 +3523,20 @@
     });
     sel.value = state.theme;
     sel.style.display = 'none';   // 整体只保留象牙白，配色在单图功能栏选择
+    bindThemeSwitch();
+    syncThemeSwitch();
     sel.addEventListener('change', function () {
       state.theme = sel.value;
       Themes.applyTheme(state.theme);
+      syncThemeSwitch();
       rerender();
       toast('已切换配色：' + Themes.active().name);
     });
   }
 
   function rerender() {
+    /* 上传数据图表：优先按导入视图重绘（配色/标注/主题切换都要生效） */
+    if (state.mode === 'imported' && state.table) { renderUserChart(false); return; }
     if (state.mode === 'season' && state.seasonItem && state.seasonCurrent) {
       openSheirongSeasonItem(state.seasonItem, state.seasonCurrent); return;
     }
@@ -3821,6 +3880,31 @@
     if (b) b.classList.toggle('active', state.labelMode && state.labelMode !== 'off');
   }
 
+
+  /* ---------- 主题切换（象牙白 / 黑金） ---------- */
+  function bindThemeSwitch() {
+    var box = el('theme-switch');
+    if (!box) return;
+    function paint(id) {
+      Array.prototype.forEach.call(box.querySelectorAll('.ts-opt'), function (b) {
+        b.classList.toggle('active', b.getAttribute('data-theme-id') === id);
+      });
+    }
+    Array.prototype.forEach.call(box.querySelectorAll('.ts-opt'), function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-theme-id');
+        Themes.applyTheme(id);
+        try { localStorage.setItem('adv-theme', id); } catch (e) {}
+        paint(id);
+        if (state.mode === 'catalog' && state.catId) { renderCategoryDash(state.catId); }
+        else if (state.mode === 'catalogChart' && state.catId) { openCatalogChart(state.catId, state.catChartId); }
+        else { rerender(); }
+        (state.catInsts || []).forEach(function (o) { try { o.inst.resize(); } catch (e) {} });
+      });
+    });
+    paint(Themes.active().id);
+  }
+
   function syncToolbar() {
     document.body.classList.toggle('is-home', state.mode === 'home');
     var tb = el('chart-toolbar');
@@ -3933,7 +4017,7 @@
 
   /* ---------- 雷达图：期数（月份）多选 ---------- */
   function radarCandidates() {
-    if (!state.table || !state.det) return [];
+    if (!state.table || !state.table.columns || !state.det) return [];
     var wide = state.det.orientation === 'wide';
     if (state.transposed) wide = !wide;
     if (wide) return state.det.numericCols.slice();
@@ -4002,6 +4086,8 @@
   function updatePreview() {
     var table = state.table;
     var tbl = el('preview-table');
+    if (!tbl) return;
+    if (!table || !table.columns) { tbl.innerHTML = '<tbody><tr><td class="hint">暂无数据</td></tr></tbody>'; return; }
     var timeCol = state.mapping.timeCol;
     var html = '<thead><tr>';
     table.columns.forEach(function (c) {
@@ -4993,6 +5079,7 @@
       Themes.applyTheme(cfg.theme);
       var ts = el('theme-select');
       if (ts) ts.value = cfg.theme;
+      syncThemeSwitch();
     }
     var data = {};
     if (cfg.data) data = cfg.data;
@@ -5689,7 +5776,10 @@
       var initLang = q.lang || (function () { try { return localStorage.getItem('afg_lang'); } catch (e) { return null; } })();
       window.I18N.setLang(initLang === 'en' ? 'en' : 'zh');
     }
+    var savedTheme = null;
+    try { savedTheme = localStorage.getItem('adv-theme'); } catch (e) {}
     if (q.theme && Themes.getTheme(q.theme)) state.theme = q.theme;
+    else if (savedTheme && Themes.getTheme(savedTheme)) state.theme = savedTheme;
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) state.currentTemplate = q.tpl;
     Themes.applyTheme(state.theme);
     if (window.WORLD_GEOJSON && window.echarts) { try { echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {} }
