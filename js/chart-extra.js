@@ -87,6 +87,28 @@
   }
 
 
+
+  /* 取当前色板对象 */
+  function paletteOf(t) {
+    var pid = (t && t.paletteId) || 'consult';
+    return (window.ADV_PALETTES || []).filter(function (x) { return x.id === pid; })[0] || null;
+  }
+  function isMultiHue(t) {
+    var p = paletteOf(t);
+    return !!(p && p.multiHue);
+  }
+  /* 分类配色：多色系用系列色；单色系用明度阶梯 */
+  function catColor(t, i, n) {
+    if (isMultiHue(t)) return seriesColor(t, i);
+    var rp = rampOf(t);
+    if (n && n > 1) {
+      // 在 1..ramp.length-1 之间均匀取样，避免最浅一档
+      var span = rp.length - 1;
+      var idx = 1 + Math.round(i / Math.max(1, n - 1) * (span - 1));
+      return rp[Math.min(span, idx)];
+    }
+    return rp[Math.min(i + 1, rp.length - 1)];
+  }
   /* 取当前色板的明度梯度 */
   function rampOf(t) {
     if (t && t.paletteRamp && t.paletteRamp.length) return t.paletteRamp;
@@ -173,8 +195,7 @@
       yAxis: yAxis(t, { name: d.unit || '', nameTextStyle: { color: muted(t), fontSize: 9, align: 'left' } }),
       series: d.series.map(function (s, i) {
         var isLast = (i === n - 1);
-        var multi = !!(window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0];
-        multi = !!(multi && multi.multiHue);
+        var multi = isMultiHue(t);
         var c1, c2, flat = false;
         if (multi) {
           c1 = seriesColor(t, i); c2 = c1; flat = true;      // 多色系：柱状图纯色不渐变
@@ -609,7 +630,7 @@
         labelLine: { length: 8, length2: 12, lineStyle: { color: rgba(ink(t), 0.22) } },
         emphasis: { scale: true, scaleSize: 6, itemStyle: { shadowBlur: 12, shadowColor: 'rgba(5,28,44,.18)' } },
         data: data.map(function (x, i) {
-          var c = rp[Math.min(i, rp.length - 1)] || seriesColor(t, i);
+          var c = catColor(t, i, data.length) || seriesColor(t, i);
           return { name: x.name, value: x.value,
             itemStyle: { color: c, borderWidth: i === 0 ? 0 : 2 },
             label: { fontWeight: i === 0 ? 800 : 400 } };
@@ -652,7 +673,7 @@
       yAxis: xAxis(t, { data: d.labels,
         axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT, fontWeight: 600 } }),
       series: d.series.map(function (sr, i) {
-        var c = rp[Math.min(i + 1, rp.length - 1)] || seriesColor(t, i);
+        var c = catColor(t, i, d.series.length) || seriesColor(t, i);
         return { name: sr.name, type: 'bar', stack: 'p', barWidth: 20,
           itemStyle: { color: c, borderColor: '#fff', borderWidth: 1 },
           data: sr.values.map(function (v, j) {
@@ -679,7 +700,7 @@
     root.forEach(function (g) { (g.children || []).forEach(function (c) { total += c.value; }); });
     total = total || 1;
     var groups = root.map(function (g, gi) {
-      var base = rp[Math.min(gi * 2, rp.length - 1)] || seriesColor(t, gi);
+      var base = isMultiHue(t) ? seriesColor(t, gi) : (rp[Math.min(gi * 2, rp.length - 1)] || seriesColor(t, gi));
       return {
         name: g.name,
         itemStyle: { color: base, borderColor: '#fff', borderWidth: 2, gapWidth: 2 },
@@ -1657,6 +1678,12 @@
     var narrow = W < 520;
     var rp = rampOf(t);
     var tree = JSON.parse(JSON.stringify(d.tree || {}));
+    /* 一级分支索引，用于多色系着色 */
+    var branchIdx = {}, bCounter = 0;
+    (tree.children || []).forEach(function (b, bi) {
+      branchIdx[b.name] = bi;
+      (function mark(nd) { branchIdx[nd.name] = bi; (nd.children || []).forEach(mark); })(b);
+    });
     /* 自底向上累计数值（叶子默认给定或按子节点求和） */
     function walk(node, depth) {
       node._d = depth;
@@ -1700,7 +1727,13 @@
             rich: { v: { color: muted(t), fontSize: 9, fontFamily: FONT } } }
         },
         itemStyle: {
-          color: function (p) { return rp[Math.min(p.data._d, rp.length - 1)] || seriesColor(t, p.data._d); },
+          color: function (p) {
+            if (isMultiHue(t)) {
+              var bi = branchIdx[p.data.name];
+              return (bi === undefined) ? ink(t) : seriesColor(t, bi % 6);
+            }
+            return rp[Math.min(p.data._d, rp.length - 1)] || seriesColor(t, p.data._d);
+          },
           borderColor: '#FFF', borderWidth: 1.5
         },
         emphasis: { itemStyle: { color: accentOf(t), shadowBlur: 8, shadowColor: 'rgba(5,28,44,.2)' } },

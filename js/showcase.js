@@ -166,8 +166,9 @@
         .attr('gradientUnits', 'userSpaceOnUse')
         .attr('x1', -outer).attr('y1', -outer).attr('x2', outer).attr('y2', outer);
       var baseC = pal(theme, d.index);
-      grd.append('stop').attr('offset', '0%').attr('stop-color', rgba(baseC, 0.82));
-      grd.append('stop').attr('offset', '100%').attr('stop-color', rgba(baseC, 0.30));
+      /* 同一色相做透明度渐变，多色系下丝带不混浊 */
+      grd.append('stop').attr('offset', '0%').attr('stop-color', rgba(baseC, 0.78));
+      grd.append('stop').attr('offset', '100%').attr('stop-color', rgba(baseC, 0.34));
     });
 
     var tipC = makeTip(el, theme);
