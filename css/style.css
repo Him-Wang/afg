@@ -28,6 +28,9 @@
   --down: #C0392B;
   --input-bg: #FFFFFF;
   --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  /* 悬停/代码块等极淡铺底：浅底和深底方向相反，所以做成变量 */
+  --wash: rgba(17,24,28,0.045);
+  --wash-strong: rgba(17,24,28,0.085);
 
   --header-h: 56px;
   --sidebar-w: 244px;
@@ -35,6 +38,21 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
                'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
   --font-mono: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', ui-monospace, 'Menlo', monospace;
+}
+
+/* 浅色档（象牙白）：脚本在首屏就会把 data-mode 标好，这里先把底色铺上，避免白闪/黑闪 */
+html[data-mode="light"] {
+  --bg: #FAFAF7;
+  --bg-elevated: #FFFFFF;
+  --panel: #FFFFFF;
+  --sidebar-bg: #F3F2EE;
+  --border: rgba(0,0,0,0.08);
+  --text: #1A1A1A;
+  --muted: #6B6B6B;
+  --input-bg: #FFFFFF;
+  --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  --wash: rgba(17,24,28,0.045);
+  --wash-strong: rgba(17,24,28,0.085);
 }
 
 * { box-sizing: border-box; }
@@ -107,7 +125,7 @@ html, body {
   border-left: 2px solid transparent;
   transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
-.nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.nav-item:hover { color: var(--text); background: var(--wash); }
 .nav-item.active {
   color: var(--text);
   border-left-color: var(--accent);
@@ -399,7 +417,7 @@ textarea.csv-area {
 .home-note { font-size: 12.5px; color: var(--muted); }
 .home-mcp { margin-top: 12px; padding: 16px 18px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; font-size: 13px; }
 .home-mcp h3 { margin: 0 0 6px; font-size: 14px; }
-.home-mcp code { background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.home-mcp code { background: var(--wash-strong); padding: 1px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
 
 /* 中国宏观数据一览（看板） */
 .nav-macro { color: var(--accent); font-weight: 600; }
@@ -592,13 +610,13 @@ body.is-home .chart-head { display: none; }
 .guide-sec h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--text); }
 .guide-sec p { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); line-height: 1.75; }
 .guide-sec ul { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.85; }
-.guide-code { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px;
+.guide-code { background: var(--wash-strong); border: 1px solid var(--border); border-radius: 8px;
   padding: 10px 12px; font-family: var(--font-mono, monospace); font-size: 11.5px;
   color: var(--text); white-space: pre-wrap; word-break: break-all; line-height: 1.65; margin: 0 0 10px; overflow-x: auto; }
 .guide-tip { font-size: 12px !important; color: var(--accent) !important; }
 .guide-table { width: 100%; border-collapse: collapse; margin: 0 0 10px; font-size: 12px; }
 .guide-table th, .guide-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; color: var(--muted); line-height: 1.7; }
-.guide-table th { color: var(--text); background: rgba(255,255,255,0.03); font-weight: 600; }
+.guide-table th { color: var(--text); background: var(--wash); font-weight: 600; }
 .guide-table code { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--accent); }
 
 /* 极简首页 */
@@ -758,7 +776,7 @@ body.is-home .chart-head { display: none; }
 .pick-wrap { margin: 14px 0 4px; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--bg-elevated); }
 .pick-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .pick-title { font-size: 11.5px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
-.pick-tabs { display: inline-flex; gap: 4px; background: rgba(26,26,46,.05); padding: 3px; border-radius: 20px; }
+.pick-tabs { display: inline-flex; gap: 4px; background: var(--wash); padding: 3px; border-radius: 20px; }
 .pick-tab { border: 0; background: transparent; padding: 5px 13px; border-radius: 16px; font-size: 12px; color: var(--muted); cursor: pointer; }
 .pick-tab.on { background: var(--accent); color: #fff; font-weight: 600; }
 .pick-recs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 9px; }
@@ -851,7 +869,7 @@ body.is-home .chart-head { display: none; }
 
 /* 卡片悬停增强 */
 .cat-card { transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
-.cat-card:hover { box-shadow: 0 10px 28px rgba(5,28,44,.10); }
+.cat-card:hover { box-shadow: 0 10px 28px var(--wash-strong); }
 .cat-card:hover .cat-card-foot { opacity: 1; transform: translateX(3px); }
 .cat-card-foot { transition: opacity .16s ease, transform .16s ease; }
 
@@ -861,7 +879,7 @@ body.is-home .chart-head { display: none; }
 /* 季节性小多图 */
 .season-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 10px 22px 20px; }
 .season-panel { transition: border-color .15s, box-shadow .15s, transform .15s; }
-.season-panel:hover { border-color: var(--accent); box-shadow: 0 8px 22px rgba(5,28,44,.10); transform: translateY(-1px); }
+.season-panel:hover { border-color: var(--accent); box-shadow: 0 8px 22px var(--wash-strong); transform: translateY(-1px); }
 .season-panel { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); overflow: hidden; display: flex; flex-direction: column; }
 .season-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 12px 14px 2px; }
 .season-name { font-size: 13px; font-weight: 700; color: var(--text); }
@@ -910,19 +928,44 @@ body.is-home .chart-head { display: none; }
   .chart-stage .chart-canvas.cat-single { margin: 8px 10px 0; }
 }
 
+/* ---------- 外观切换：白天 / 暗夜 / 跟随系统 ---------- */
+.appearance-switch {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px; height: 32px; border-radius: 8px;
+  background: var(--input-bg); border: 1px solid var(--border);
+}
+.appearance-switch .asw-btn {
+  appearance: none; -webkit-appearance: none;
+  width: 28px; height: 26px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--muted); cursor: pointer;
+  display: grid; place-items: center;
+  transition: color .15s ease, background .15s ease;
+}
+.appearance-switch .asw-btn svg { width: 15px; height: 15px; display: block; }
+.appearance-switch .asw-btn:hover { color: var(--text); background: var(--wash); }
+.appearance-switch .asw-btn.on {
+  background: var(--accent); color: #0E0F12;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.appearance-switch .asw-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 560px) {
+  .appearance-switch { height: 30px; }
+  .appearance-switch .asw-btn { width: 24px; height: 24px; border-radius: 5px; }
+  .appearance-switch .asw-btn svg { width: 13px; height: 13px; }
+}
 
 
 /* 首页 MCP 一键安装命令 */
 .home-mcp-cmd {
   margin: 10px 0 2px; padding: 10px 12px; border-radius: 8px;
-  background: rgba(11,42,69,.045); border: 1px dashed rgba(11,42,69,.22);
+  background: var(--wash); border: 1px dashed var(--border);
   font: 11.5px/1.6 var(--font-mono); color: var(--text);
   white-space: pre-wrap; word-break: break-all; overflow-x: auto;
   -webkit-user-select: all; user-select: all;
 }
 
 /* AI 指南：快速方式 + 折叠的手动步骤 */
-.guide-fast { border: 1px solid rgba(11,42,69,.16); background: rgba(11,42,69,.03); border-radius: 10px; }
+.guide-fast { border: 1px solid var(--border); background: var(--wash); border-radius: 10px; }
 .guide-manual { margin-top: 12px; }
 .guide-manual > summary {
   cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--muted);
@@ -959,3 +1002,11 @@ body.is-home .chart-head { display: none; }
 .fin-tab:hover { border-color: var(--accent); color: var(--text); }
 .fin-tab.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text); font-weight: 700; }
 .fin-body { padding: 0 0 6px; }
+
+/* 暗色兜底：这几处颜色原本是为浅色写死的，深底上会发闷 */
+html[data-mode="dark"] .coh-dot.conv { border-color: #5FBF95; }
+html[data-mode="dark"] .coh-dot.div { border-color: #E0716F; }
+html[data-mode="dark"] .coh-tag.conv { background: rgba(95,191,149,0.14); color: #7FD6AE; }
+html[data-mode="dark"] .coh-tag.div { background: rgba(224,113,111,0.14); color: #F09492; }
+html[data-mode="dark"] .cat-card:hover { box-shadow: 0 10px 28px rgba(0,0,0,.45); }
+html[data-mode="dark"] .season-panel:hover { box-shadow: 0 8px 22px rgba(0,0,0,.45); }

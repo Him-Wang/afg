@@ -10,6 +10,26 @@
   <meta name="supported-color-schemes" content="light" />
   <link rel="preload" as="font" type="font/woff2" href="fonts/inter-var.woff2" crossorigin />
   <title>ADV · Advanced Data Visualization</title>
+  <script>
+    /* 首屏防闪：在样式生效前先把背景铺成用户上次选的明暗，避免白闪一下 */
+    (function () {
+      var BG = { 'paper': '#FAFAF7', 'obsidian': '#0E0F12' };
+      var mode = 'system', byMode = {};
+      try {
+        mode = localStorage.getItem('afgAppearance') || 'system';
+        byMode = JSON.parse(localStorage.getItem('afgThemeByMode') || '{}') || {};
+      } catch (e) {}
+      var sysDark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var dark = mode === 'dark' || (mode === 'system' && sysDark);
+      var themeId = byMode[dark ? 'dark' : 'light'] || (dark ? 'obsidian' : 'paper');
+      var root = document.documentElement;
+      root.setAttribute('data-theme-boot', dark ? 'dark' : 'light');
+      root.setAttribute('data-mode', dark ? 'dark' : 'light');
+      /* 作者用「只有浅色」拦住手机强制深色；这里按用户选择显式覆盖，暗夜才是真暗 */
+      root.style.colorScheme = dark ? 'dark' : 'light';
+      root.style.background = BG[themeId] || (dark ? '#0E0F12' : '#FAFAF7');
+    })();
+  </script>
   <link rel="stylesheet" href="css/style.css?v=20261111f" />
 </head>
 <body>
@@ -24,6 +44,17 @@
       </div>
     </div>
     <div class="header-actions">
+      <div class="appearance-switch" id="appearance-switch" role="group" aria-label="外观">
+        <button type="button" class="asw-btn" data-appearance="light" aria-pressed="false" title="白天 · 浅色">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.1"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5l1.5 1.5M17 17l1.5 1.5M18.5 5.5L17 7M7 17l-1.5 1.5"/></svg>
+        </button>
+        <button type="button" class="asw-btn" data-appearance="dark" aria-pressed="false" title="暗夜 · 深色">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 14.3A8.7 8.7 0 0 1 9.7 3.4a8.7 8.7 0 1 0 10.9 10.9z"/></svg>
+        </button>
+        <button type="button" class="asw-btn" data-appearance="system" aria-pressed="false" title="跟随系统">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.6" width="18" height="12" rx="2"/><path d="M8.6 20h6.8M12 16.6V20"/></svg>
+        </button>
+      </div>
       <button class="btn ghost" id="btn-lang" title="Language">EN</button>
       <button class="btn ghost" id="btn-import" data-i18n="app.import">＋ 导入数据</button>
     </div>
