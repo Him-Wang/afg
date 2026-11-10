@@ -165,8 +165,9 @@
         .attr('id', 'chordGrad' + i)
         .attr('gradientUnits', 'userSpaceOnUse')
         .attr('x1', -outer).attr('y1', -outer).attr('x2', outer).attr('y2', outer);
-      grd.append('stop').attr('offset', '0%').attr('stop-color', rgba(pal(theme, d.index), 0.72));
-      grd.append('stop').attr('offset', '100%').attr('stop-color', rgba(accent(theme), 0.38));
+      var baseC = pal(theme, d.index);
+      grd.append('stop').attr('offset', '0%').attr('stop-color', rgba(baseC, 0.82));
+      grd.append('stop').attr('offset', '100%').attr('stop-color', rgba(baseC, 0.30));
     });
 
     var tipC = makeTip(el, theme);
@@ -175,7 +176,7 @@
       .attr('fill', function (d) { return 'url(#chordGrad' + d.source.index + ')'; })
       .attr('stroke', rgba(ink(theme), 0.12))
       .attr('stroke-width', 0.5)
-      .attr('opacity', 0.85)
+      .attr('opacity', 0.9)
       .style('cursor', 'pointer')
       .on('mouseenter', function (ev, d) {
         g.selectAll('path').transition().duration(120).attr('opacity', 0.12);
@@ -186,7 +187,7 @@
         tipC.show('<b>' + names[d.source.index] + ' → ' + names[d.target.index] + '</b><br/>规模 ' + d.source.value.toFixed(1), ev.offsetX || ev.layerX, ev.offsetY || ev.layerY);
       })
       .on('mouseleave', function () {
-        g.selectAll('path').transition().duration(150).attr('opacity', 0.85);
+        g.selectAll('path').transition().duration(150).attr('opacity', 0.9);
         d3.select(this).transition().duration(150).attr('stroke', rgba(ink(theme), 0.12));
         tipC.hide();
       });

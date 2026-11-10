@@ -1320,25 +1320,126 @@
   };
 
   /* ================= 6. 流动与转化 ================= */
+  /* ---------- 转化漏斗（顶刊/路演风格：阶段流失 + 转化率桥接） ---------- */
   B.funnel = function (el, d, t) {
     var steps = d.steps || [];
+    var W = (el && el.clientWidth) || 600;
+    var narrow = W < 480;
     var first = steps[0] ? steps[0].value : 1;
+    var rp = rampOf(t);
+    var last = steps.length ? steps[steps.length - 1].value : 0;
+    var losses = steps.map(function (s, i) {
+      if (!i) return null;
+      return steps[i - 1].value - s.value;
+    });
     return base(t, {
-      tooltip: tip(t, { formatter: function (p) { return p.name + ' ' + num(p.value) + ' (' + (p.value / first * 100).toFixed(1) + '%)'; } }),
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) {
+        var i = p.dataIndex, prev = i > 0 ? steps[i - 1].value : p.value;
+        return '<b>' + p.name + '</b><br/>' + num(p.value) + '（占总量 ' + (p.value / first * 100).toFixed(1) + '%）' +
+          (i > 0 ? '<br/>本环节转化 ' + (p.value / prev * 100).toFixed(1) + '%　流失 ' + num(prev - p.value) : '');
+      } }),
+      title: [
+        { text: '整体转化率', left: 12, top: 2,
+          textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT, fontWeight: 400 } },
+        { text: (last / first * 100).toFixed(1) + '%', left: 12, top: 14,
+          textStyle: { color: ink(t), fontSize: narrow ? 16 : 20, fontFamily: FONT, fontWeight: 800 } },
+        { text: steps.length + ' 个环节 · 首环节 ' + num(first), left: 12, top: narrow ? 34 : 40,
+          textStyle: { color: rgba(ink(t), 0.45), fontSize: 9, fontFamily: FONT } }
+      ],
       series: [{
-        type: 'funnel', left: '12%', right: '12%', top: 16, bottom: 12,
-        minSize: '18%', maxSize: '94%', sort: 'descending', gap: 2,
-        itemStyle: { borderColor: '#FFF', borderWidth: 2 },
-        label: { show: true, position: 'inside', color: '#fff', fontSize: 10.5, fontFamily: FONT,
+        type: 'funnel', left: narrow ? '16%' : '22%', right: narrow ? '34%' : '38%',
+        top: narrow ? 16 : 20, bottom: 18,
+        minSize: '20%', maxSize: '100%', sort: 'descending', gap: 5,
+        itemStyle: { borderWidth: 0, borderRadius: 2 },
+        label: { show: true, position: 'right', color: ink(t), fontFamily: FONT, lineHeight: 14, distance: 8,
           formatter: function (p) {
             var i = p.dataIndex;
             var prev = i > 0 ? steps[i - 1].value : p.value;
-            var stepRate = prev ? (p.value / prev * 100) : 100;
-            return p.name + '  ' + (p.value / first * 100).toFixed(0) + '%'
-              + (i > 0 ? '  ↓' + stepRate.toFixed(0) + '%' : '');
-          } },
+            var rate = prev ? (p.value / prev * 100) : 100;
+            return '{n|' + p.name + '} {v|' + num(p.value) + '}' + (i > 0 ? ' {d|↓' + rate.toFixed(0) + '%}' : '');
+          },
+          rich: { n: { fontSize: narrow ? 9 : 10.5, fontWeight: 700, color: ink(t), fontFamily: FONT },
+                  v: { fontSize: narrow ? 9 : 10.5, color: rgba(ink(t), 0.62), fontFamily: FONT },
+                  d: { fontSize: narrow ? 8 : 9.5, color: (t.down || '#C0392B'), fontFamily: FONT } } },
+        /* 阶段名 + 流失量放在左侧（用 labelLine 引出） */
+        data: steps.map(function (s, i) {
+          var c = rp[Math.min(i + 1, rp.length - 1)] || seriesColor(t, i);
+          return { name: s.name, value: s.value, itemStyle: { color: c },
+            label: { show: true },
+            emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(5,28,44,.2)' } } };
+        }),
+        labelLine: { show: true, length: 6, length2: 8, lineStyle: { color: rgba(ink(t), 0.25) } }
+      }]
+    });
+  };
 
-        data: steps.map(function (s, i) { return { name: s.name, value: s.value, itemStyle: { color: rgba(seriesColor(t, i), 0.9) } }; })
+  /* ---------- 桑基图（顶刊风格：列标题 + 数值标签 + 大流量标注） ---------- */
+  B.sankey = function (el, d, t) {
+    var nodes = (d.nodes || []).map(function (n) { return { name: n.name }; });
+    var links = (d.links || []).map(function (l) {
+      return { source: l.source, target: l.target, value: l.value };
+    });
+    var W = (el && el.clientWidth) || 700;
+    var narrow = W < 520;
+    var total = 0;
+    nodes.forEach(function (n) {
+      var out = 0, inn = 0;
+      links.forEach(function (l) { if (l.source === n.name) out += l.value; if (l.target === n.name) inn += l.value; });
+      total = Math.max(total, out, inn);
+    });
+    var sumIn = 0, sumOut = 0;
+    nodes.forEach(function (n) {
+      var hasIn = links.some(function (l) { return l.target === n.name; });
+      var hasOut = links.some(function (l) { return l.source === n.name; });
+      if (!hasIn) sumIn += links.filter(function (l) { return l.source === n.name; }).reduce(function (a, b) { return a + b.value; }, 0);
+      if (!hasOut) sumOut += links.filter(function (l) { return l.target === n.name; }).reduce(function (a, b) { return a + b.value; }, 0);
+    });
+    var palette = rampOf(t);
+    function nodeColor(name, i) {
+      var idx = nodes.findIndex(function (x) { return x.name === name; });
+      return seriesColor(t, idx % 6);
+    }
+    return base(t, {
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) {
+        if (p.dataType === 'edge') return p.data.source + ' → ' + p.data.target + '<br/>' + num(p.data.value);
+        return '<b>' + p.name + '</b>';
+      } }),
+      title: [
+        { text: '来源', left: '10%', top: 4, textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT, fontWeight: 600 } },
+        { text: '渠道', left: '50%', top: 4, textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT, fontWeight: 600 } },
+        { text: '结果', right: '10%', top: 4, textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT, fontWeight: 600 } },
+        { text: '总流入 ' + num(sumIn) + '　总产出 ' + num(sumOut), left: '2%', bottom: 2,
+          textStyle: { color: rgba(ink(t), 0.45), fontSize: 9, fontFamily: FONT } }
+      ],
+      series: [{
+        type: 'sankey', left: 10, right: 10, top: 30, bottom: 26,
+        nodeWidth: narrow ? 8 : 11, nodeGap: narrow ? 8 : 12,
+        draggable: false, focusNodeAdjacency: 'allEdges',
+        emphasis: { focus: 'adjacency' },
+        lineStyle: { color: 'source', curveness: 0.5, opacity: 0.32 },
+        itemStyle: { borderWidth: 0, borderRadius: 2 },
+        label: {
+          color: ink(t), fontSize: narrow ? 8 : 9.5, fontFamily: FONT, fontWeight: 600,
+          formatter: function (p) { return p.name; }
+        },
+        data: (function () {
+          /* 计算每个节点所在列：无入边=第 1 列，无出边=最后一列 */
+          var depth = {};
+          nodes.forEach(function (n) {
+            var hasIn = links.some(function (l) { return l.target === n.name; });
+            var hasOut = links.some(function (l) { return l.source === n.name; });
+            depth[n.name] = !hasIn ? 0 : (!hasOut ? 2 : 1);
+          });
+          return nodes.map(function (n, i) {
+            return { name: n.name, itemStyle: { color: seriesColor(t, i) },
+              label: { position: depth[n.name] === 2 ? 'left' : 'right',
+                color: depth[n.name] === 1 ? rgba(ink(t), 0.72) : ink(t) } };
+          });
+        })(),
+        links: links.map(function (l) {
+          return { source: l.source, target: l.target, value: l.value,
+            lineStyle: { opacity: 0.28 + Math.min(0.5, l.value / (total || 1) * 1.4) } };
+        })
       }]
     });
   };

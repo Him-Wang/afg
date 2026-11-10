@@ -254,11 +254,20 @@
     charts: [
       { id: 'funnel', name: '漏斗图', type: 'funnel', desc: '逐级转化与流失，定位瓶颈环节',
         data: function () { return { steps: [
-          { name: '曝光', value: 100 }, { name: '点击', value: 62 }, { name: '加购', value: 34 }, { name: '下单', value: 21 }, { name: '支付', value: 16 }] }; } },
+          { name: '曝光', value: 480000 }, { name: '点击', value: 96500 }, { name: '加购', value: 31200 },
+          { name: '下单', value: 12400 }, { name: '支付', value: 8600 }] }; } },
       { id: 'sankey', name: '桑基图', type: 'sankey', desc: '多级流向与分流比例，看资源如何在环节间流动',
-        data: function () { return { nodes: [{ name: '总流量', color: '#1A1A2E' }, { name: '自然搜索', color: '#C9A96A' }, { name: '付费广告', color: '#6F8FA8' }, { name: '社交', color: '#7FA06F' }, { name: '成交', color: '#9B7FB5' }, { name: '流失', color: '#C08484' }],
-          links: [{ source: '总流量', target: '自然搜索', value: 46 }, { source: '总流量', target: '付费广告', value: 32 }, { source: '总流量', target: '社交', value: 22 },
-            { source: '自然搜索', target: '成交', value: 28 }, { source: '自然搜索', target: '流失', value: 18 }, { source: '付费广告', target: '成交', value: 19 }, { source: '付费广告', target: '流失', value: 13 }, { source: '社交', target: '成交', value: 8 }, { source: '社交', target: '流失', value: 14 }], total: 100 }; } },
+        data: function () { return {
+          nodes: [{ name: '新客' }, { name: '老客' },
+                  { name: '自然搜索' }, { name: '付费广告' }, { name: '社交内容' },
+                  { name: '成交' }, { name: '加购未付' }, { name: '流失' }],
+          links: [
+            { source: '新客', target: '自然搜索', value: 24 }, { source: '新客', target: '付费广告', value: 26 }, { source: '新客', target: '社交内容', value: 15 },
+            { source: '老客', target: '自然搜索', value: 22 }, { source: '老客', target: '付费广告', value: 6 }, { source: '老客', target: '社交内容', value: 7 },
+            { source: '自然搜索', target: '成交', value: 30 }, { source: '自然搜索', target: '加购未付', value: 9 }, { source: '自然搜索', target: '流失', value: 7 },
+            { source: '付费广告', target: '成交', value: 17 }, { source: '付费广告', target: '加购未付', value: 8 }, { source: '付费广告', target: '流失', value: 7 },
+            { source: '社交内容', target: '成交', value: 8 }, { source: '社交内容', target: '加购未付', value: 4 }, { source: '社交内容', target: '流失', value: 10 }
+          ], total: 100 }; } },
       { id: 'chord', name: '和弦图', type: 'chord', desc: '两两之间的双向流量，看环形网络关系',
         data: function () { return { names: ['华东', '华南', '华北', '西南', '境外'],
           matrix: [[0, 32, 18, 9, 12], [28, 0, 14, 7, 16], [15, 11, 0, 5, 9], [8, 6, 4, 0, 3], [11, 14, 8, 2, 0]] }; } },
