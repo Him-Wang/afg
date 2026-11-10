@@ -1,26 +1,40 @@
-/* ADV 配色模板：4 套（3 套单色系 + 1 套高对比多色系） */
+/* ============================================================
+ * ADV 图表配色体系 — 4 套，参考顶级咨询 / 投行 / 期刊出版规范
+ *   01 麦肯锡深蓝 McKinsey Deep Blue
+ *   02 编辑多彩   Editorial Multi-hue
+ *   03 投行酒红   IB Burgundy
+ *   04 期刊墨绿   BCG Forest
+ * 每套含：系列色 series、明度阶梯 ramp（用于渐变/地图）、强调色 accent
+ * ============================================================ */
 (function (global) {
   'use strict';
   global.ADV_PALETTES = [
-    { id: 'consult', name: '顾问深蓝', nameEn: 'Consulting Navy',
-      colors: ['#051C2C', '#1B4B72', '#4A7FA8', '#A8C4D8', '#8A867E', '#B08A4F'],
-      ramp: ['#051C2C', '#1B4B72', '#4A7FA8', '#A8C4D8', '#D6E2EC'],
-      accent: '#B08A4F', ink: '#051C2C', neutral: '#C9C5BD',
-      up: '#1E7A46', down: '#B5484B' },
-    { id: 'contrast', name: '彩色对比', nameEn: 'Editorial Contrast',
-      colors: ['#0B3C5D', '#C0392B', '#C9A227', '#2E6B52', '#6B4C7A', '#4A4A52'],
-      ramp: ['#0B3C5D', '#C0392B', '#C9A227', '#2E6B52', '#6B4C7A'],
-      accent: '#C0392B', ink: '#12212B', neutral: '#C9C5BD',
-      up: '#2E6B52', down: '#C0392B', multiHue: true },
+    /* ---------- 01 麦肯锡深蓝 ---------- */
+    { id: 'consult', name: '麦肯锡深蓝', nameEn: 'McKinsey Blue',
+      colors: ['#0B2A45', '#1D5B7C', '#4C8CA8', '#9FC2CF', '#C8A45C', '#7C8B99'],
+      ramp: ['#0B2A45', '#1D5B7C', '#4C8CA8', '#9FC2CF', '#E5EEF3'],
+      accent: '#C8A45C', ink: '#0B2A45', neutral: '#C9C5BD',
+      up: '#2E7D5B', down: '#B4483F' },
+
+    /* ---------- 02 编辑多彩（低饱和多色相，供多系列对比） ---------- */
+    { id: 'contrast', name: '编辑多彩', nameEn: 'Editorial Multi',
+      colors: ['#1B3A57', '#A8763E', '#5B7F6B', '#8C3B3B', '#6E5A8A', '#8A8F98'],
+      ramp: ['#1B3A57', '#35688F', '#6E9CBE', '#B7CFE0', '#EDF2F6'],
+      accent: '#A8763E', ink: '#1B3A57', neutral: '#C9C5BD',
+      up: '#3F7F5F', down: '#8C3B3B', multiHue: true },
+
+    /* ---------- 03 投行酒红 ---------- */
     { id: 'burgundy', name: '投行酒红', nameEn: 'IB Burgundy',
-      colors: ['#3B0F18', '#7A2534', '#B05162', '#E0B7BE', '#8A867E', '#C7A269'],
-      ramp: ['#3B0F18', '#7A2534', '#B05162', '#E0B7BE', '#F3E3E6'],
-      accent: '#C7A269', ink: '#3B0F18', neutral: '#C9C5BD',
-      up: '#2F6B4F', down: '#A8354A' },
-    { id: 'forest', name: '期刊墨绿', nameEn: 'Journal Forest',
-      colors: ['#10322A', '#2E6B52', '#5E9A7E', '#B7D4C6', '#8A867E', '#C4A46B'],
-      ramp: ['#10322A', '#2E6B52', '#5E9A7E', '#B7D4C6', '#E2EEE7'],
-      accent: '#C4A46B', ink: '#10322A', neutral: '#C9C5BD',
-      up: '#1E7A46', down: '#B5484B' }
+      colors: ['#3A0F16', '#6E2230', '#A34A56', '#D4A7AC', '#B08A4F', '#8A8F98'],
+      ramp: ['#3A0F16', '#6E2230', '#A34A56', '#D4A7AC', '#F3E4E6'],
+      accent: '#B08A4F', ink: '#3A0F16', neutral: '#C9C5BD',
+      up: '#2F6B4F', down: '#9E2B3A' },
+
+    /* ---------- 04 期刊墨绿 ---------- */
+    { id: 'forest', name: '期刊墨绿', nameEn: 'BCG Forest',
+      colors: ['#0E3B32', '#1F6B57', '#4E9C82', '#A3CBB9', '#C8A45C', '#7C8B99'],
+      ramp: ['#0E3B32', '#1F6B57', '#4E9C82', '#A3CBB9', '#E3F0EA'],
+      accent: '#C8A45C', ink: '#0E3B32', neutral: '#C9C5BD',
+      up: '#1F6B57', down: '#B4483F' }
   ];
 })(window);

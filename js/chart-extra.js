@@ -45,7 +45,14 @@
   function yAxis(t, extra) {
     return Object.assign({
       type: 'value', axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 8 },
+      axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 8,
+        formatter: function (v) {
+          var a = Math.abs(v);
+          if (a >= 1e4) return (v / 1e4).toFixed(1) + '万';
+          if (a >= 1000) return v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+          if (a >= 10) return String(Math.round(v * 10) / 10);
+          return String(Math.round(v * 100) / 100);
+        } },
       splitNumber: 4,
       splitLine: { show: true, lineStyle: { color: rule(t), width: 1 } }
     }, extra || {});
@@ -1521,7 +1528,7 @@
     var rp = rampOf(t);
     var opt = geo(t, [{
       type: 'map', map: 'world', roam: true, zoom: narrow ? 1.35 : 1.05, nameProperty: 'name',
-      itemStyle: { areaColor: rgba(ink(t), 0.035), borderColor: rgba(ink(t), 0.10), borderWidth: 0.4 },
+      itemStyle: { areaColor: '#EFEDE7', borderColor: 'rgba(255,255,255,0.55)', borderWidth: 0.5 },
       emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.28) },
         label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT } },
       label: { show: true, color: ink(t), fontSize: 9, fontFamily: FONT, fontWeight: 700,
@@ -1535,8 +1542,8 @@
       text: [num(vmax), num(vmin)], calculable: false,
       formatter: function (v) { return useLog ? num(Math.exp(v) - 1) : num(v); },
       textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT },
-      inRange: { color: [rgba(rp[3] || '#A8C4D8', 0.35), rgba(rp[2] || '#4A7FA8', 0.7),
-        rp[1] || '#1B4B72', rp[0] || '#051C2C'] }
+      inRange: { color: [rp[4] || '#E5EEF3', rp[3] || '#9FC2CF', rp[2] || '#4C8CA8',
+        rp[1] || '#1D5B7C', rp[0] || '#0B2A45'] }
     };
     opt.title = [
       { text: d.metric || tr('区域指标', 'Regional metric'), left: 14, top: 8,

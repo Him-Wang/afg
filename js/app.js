@@ -213,6 +213,15 @@
     };
   }
 
+
+  /* 统一数值显示：最多两位小数，大数加千分位 */
+  function fmt2(v) {
+    if (v === null || v === undefined || v === '') return '';
+    var n = Number(v);
+    if (!isFinite(n)) return String(v);
+    if (Math.abs(n) >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    return String(Math.round(n * 100) / 100);
+  }
   function fmtNum(v) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -4192,7 +4201,7 @@
       html += '<tr>';
       table.columns.forEach(function (c) {
         var cls = (c === timeCol) ? 'pv-x' : ((state.mapping.yCols.indexOf(c) >= 0) ? 'pv-y' : '');
-        html += '<td class="' + cls + '">' + r[c] + '</td>';
+        html += '<td class="' + cls + '">' + fmt2(r[c]) + '</td>';
       });
       html += '</tr>';
     });
@@ -5136,7 +5145,7 @@
     var t = state.tfTable;
     var html = '<thead><tr>' + t.columns.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead><tbody>';
     t.rows.slice(0, 8).forEach(function (r) {
-      html += '<tr>' + t.columns.map(function (c) { return '<td>' + r[c] + '</td>'; }).join('') + '</tr>';
+      html += '<tr>' + t.columns.map(function (c) { return '<td>' + fmt2(r[c]) + '</td>'; }).join('') + '</tr>';
     });
     tbl.innerHTML = html + '</tbody>';
   }
