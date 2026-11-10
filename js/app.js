@@ -4259,6 +4259,8 @@
         syncSelectI18n();
         buildSidebar();
         if (state.mode === 'home') renderHome();
+        else if (state.mode === 'catalog' && state.catId) renderCategoryDash(state.catId);
+        else if (state.mode === 'catalogChart' && state.catId) openCatalogChart(state.catId, state.catChartId);
         else { try { rerender(); } catch (e) { if (window.I18N) window.I18N.apply(); } }
         if (window.I18N) window.I18N.apply();
         refreshFooter();
