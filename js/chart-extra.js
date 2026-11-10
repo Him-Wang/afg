@@ -1019,17 +1019,47 @@
 
   /* ================= 5. 关系与相关 ================= */
   B.scatter = function (el, d, t) {
+    var pts = d.points || [];
+    var series = [{
+      type: 'scatter', data: pts, symbolSize: 7,
+      itemStyle: { color: rgba(seriesColor(t, 0), 0.55), borderColor: rgba(seriesColor(t, 0), 0.95), borderWidth: 0.6 },
+      emphasis: { itemStyle: { color: seriesColor(t, 0) } }
+    }];
+    var fitEls = [];
+    if (d.fit && pts.length > 3) {
+      var n = pts.length, sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0;
+      pts.forEach(function (p) { sx += p[0]; sy += p[1]; sxx += p[0] * p[0]; sxy += p[0] * p[1]; syy += p[1] * p[1]; });
+      var den = n * sxx - sx * sx;
+      if (den) {
+        var k = (n * sxy - sx * sy) / den;
+        var b = (sy - k * sx) / n;
+        var r = (n * sxy - sx * sy) / Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
+        var xs = pts.map(function (p) { return p[0]; });
+        var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+        series.push({
+          type: 'line', data: [[x0, k * x0 + b], [x1, k * x1 + b]], showSymbol: false, silent: true, z: 5,
+          lineStyle: { color: accentOf(t), width: 1.8, type: 'dashed' },
+          endLabel: { show: false }
+        });
+        var r2 = r * r;
+        fitEls.push({ type: 'text', right: 14, top: 6, z: 10,
+          style: { text: 'y = ' + k.toFixed(2) + 'x ' + (b >= 0 ? '+ ' : '− ') + Math.abs(b).toFixed(1) +
+            '　R² = ' + r2.toFixed(3) + '　r = ' + r.toFixed(2),
+            fill: accentOf(t), font: '800 10px ' + FONT,
+            backgroundColor: 'rgba(255,255,255,.86)', padding: [4, 8], borderRadius: 4 } });
+      }
+    }
     return base(t, {
-      tooltip: tip(t, { trigger: 'item', formatter: function (p) { return d.xName + ' ' + num(p.value[0]) + '<br/>' + d.yName + ' ' + num(p.value[1]); } }),
-      grid: grid({ left: 6, right: 24, top: 18, bottom: 24 }),
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) {
+        if (p.seriesType === 'line') return '';
+        return d.xName + ' ' + num(p.value[0]) + '<br/>' + d.yName + ' ' + num(p.value[1]);
+      } }),
+      graphic: fitEls,
+      grid: grid({ left: 6, right: 24, top: 30, bottom: 26 }),
       xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
-        name: d.xName, nameLocation: 'middle', nameGap: 24, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
+        name: d.xName, nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
       yAxis: yAxis(t, { type: 'value', scale: true, name: d.yName, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
-      series: [{
-        type: 'scatter', data: d.points, symbolSize: 7,
-        itemStyle: { color: rgba(accent(t), 0.55), borderColor: rgba(accent(t), 0.95), borderWidth: 0.6 },
-        emphasis: { itemStyle: { color: accent(t) } }
-      }]
+      series: series
     });
   };
 
@@ -1049,17 +1079,155 @@
     });
   };
 
+  /* ---------- 相关性热力矩阵（发散色 + 数值 + 上下三角） ---------- */
   B.corrMatrix = function (el, d, t) {
-    var names = d.names, m = d.matrix, data = [];
-    for (var i = 0; i < names.length; i++) for (var j = 0; j < names.length; j++) data.push([j, i, m[i][j]]);
+    var names = d.names || [], M = d.matrix || [];
+    var n = names.length;
+    var W = (el && el.clientWidth) || 600, H = (el && el.clientHeight) || 300;
+    var narrow = W < 480;
+    var cells = [];
+    var minR = 1, maxR = -1;
+    for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) {
+      var v = M[i][j];
+      if (i === j) continue;
+      minR = Math.min(minR, v); maxR = Math.max(maxR, v);
+    }
+    for (var a = 0; a < n; a++) for (var b = 0; b < n; b++) {
+      cells.push([b, a, M[a][b]]);
+    }
     return base(t, {
-      tooltip: tip(t, { formatter: function (p) { return names[p.value[1]] + ' × ' + names[p.value[0]] + '<br/>r = ' + p.value[2].toFixed(2); } }),
-      grid: { left: 6, right: 14, top: 14, bottom: 40, containLabel: true },
-      xAxis: xAxis(t, { data: names, axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT, rotate: 30, margin: 6 } }),
-      yAxis: xAxis(t, { data: names, axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT } }),
-      visualMap: { min: -1, max: 1, show: false, inRange: { color: ['#6F8FA8', '#F7F4EC', '#A67C3D'] } },
-      series: [{ type: 'heatmap', data: data, itemStyle: { borderColor: '#FFF', borderWidth: 1.5 },
-        label: { show: true, color: ink(t), fontSize: 8.5, fontFamily: FONT, formatter: function (p) { return Math.abs(p.value[2]) > 0.05 ? p.value[2].toFixed(1) : '·'; } } }]
+      tooltip: tip(t, { formatter: function (p) {
+        return '<b>' + names[p.value[1]] + ' × ' + names[p.value[0]] + '</b><br/>相关系数 ' + p.value[2].toFixed(2);
+      } }),
+      grid: { left: narrow ? 74 : 88, right: narrow ? 56 : 74, top: 12, bottom: 12 },
+      xAxis: { type: 'category', data: names, position: 'top', splitArea: { show: false },
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT, rotate: 45, margin: 6,
+          interval: 0, width: 60, overflow: 'truncate' } },
+      yAxis: { type: 'category', data: names, inverse: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT,
+          interval: 0, width: 74, overflow: 'truncate' } },
+      visualMap: {
+        min: -1, max: 1, orient: 'vertical', right: 4, top: 'center', itemWidth: 10, itemHeight: narrow ? 80 : 120,
+        calculable: false, text: ['+1', '-1'], textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT },
+        inRange: { color: ['#1B4B72', '#4A7FA8', '#BFD3E2', '#F5F0E6', '#E8B9A8', '#C86A5A', '#8C3A2E'] }
+      },
+      series: [{
+        type: 'heatmap', data: cells,
+        label: { show: true, color: ink(t), fontSize: n > 8 ? 8 : 9.5, fontFamily: FONT,
+          formatter: function (p) { return Math.abs(p.value[2]) >= 0.995 ? '1' : p.value[2].toFixed(2); } },
+        itemStyle: { borderColor: '#FFFFFF', borderWidth: 1.5, borderRadius: 2 },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(5,28,44,.25)', borderColor: ink(t) } }
+      }]
+    });
+  };
+
+  /* ---------- 关联网络 + 热力矩阵（案例组合形态） ---------- */
+  B.corrNetwork = function (el, d, t) {
+    var names = d.names || [], M = d.matrix || [];
+    var n = names.length;
+    var W = (el && el.clientWidth) || 900;
+    var narrow = W < 620;
+    /* 节点圆环布局（左半区，坐标 0..1） */
+    var nodes = names.map(function (nm, i) {
+      var ang = -Math.PI / 2 + i * (2 * Math.PI / n);
+      return { name: nm, x: 0.5 + Math.cos(ang) * 0.46, y: 0.5 + Math.sin(ang) * 0.46,
+        symbolSize: 9, value: Math.round((1 + i) * 10) };
+    });
+    var links = [];
+    var strongPos = null, strongNeg = null;
+    for (var i = 0; i < n; i++) for (var j = i + 1; j < n; j++) {
+      var r = M[i][j];
+      if (Math.abs(r) < (narrow ? 0.42 : 0.22)) continue;
+      links.push({ source: names[i], target: names[j], value: Math.abs(r), sign: r > 0 ? 1 : -1,
+        lineStyle: { color: r > 0 ? '#2E6B52' : '#C0392B', opacity: Math.min(0.92, 0.25 + Math.abs(r) * 0.9),
+          width: 0.8 + Math.abs(r) * 5, curveness: 0.16 } });
+      if (r > 0 && (!strongPos || r > strongPos.r)) strongPos = { a: names[i], b: names[j], r: r };
+      if (r < 0 && (!strongNeg || r < strongNeg.r)) strongNeg = { a: names[i], b: names[j], r: r };
+    }
+    var cells = [];
+    for (var a = 0; a < n; a++) for (var b = 0; b < n; b++) cells.push([b, a, M[a][b]]);
+    var padTop = 76;
+    /* 卡片小尺寸：只画网络（矩阵点开大图看），避免两图挤压重叠 */
+    if (narrow) {
+      var linksS = [];
+      for (var si = 0; si < n; si++) for (var sj = si + 1; sj < n; sj++) {
+        var rr = M[si][sj];
+        if (Math.abs(rr) < 0.25) continue;
+        linksS.push({ source: names[si], target: names[sj], value: Math.abs(rr), sign: rr > 0 ? 1 : -1,
+          lineStyle: { color: rr > 0 ? '#2E6B52' : '#C0392B',
+            opacity: Math.min(0.95, 0.35 + Math.abs(rr) * 0.9), width: 1 + Math.abs(rr) * 5.5, curveness: 0.14 } });
+      }
+      nodes = nodes.map(function (nd) { nd.x = 0.5 + (nd.x - 0.5) * 0.92; nd.y = 0.5 + (nd.y - 0.5) * 0.92; return nd; });
+      return base(t, {
+        tooltip: tip(t, { formatter: function (p) {
+          if (p.dataType === 'edge') return '<b>' + p.data.source + ' — ' + p.data.target + '</b><br/>相关 ' + (p.data.sign > 0 ? '+' : '') + p.data.value.toFixed(2);
+          if (p.seriesType === 'graph') return '<b>' + p.name + '</b>';
+          return '';
+        } }),
+        title: [{ text: '关联网络', left: 2, top: 2, textStyle: { color: muted(t), fontSize: 9.5, fontWeight: 700, fontFamily: FONT } }],
+        series: [{
+          type: 'graph', layout: 'none', left: 6, top: 16, width: '96%', height: '90%',
+          roam: false, draggable: false,
+          data: nodes.map(function (nd, i) {
+            return { name: nd.name, x: nd.x, y: nd.y, symbolSize: 9,
+              itemStyle: { color: seriesColor(t, i), borderColor: '#fff', borderWidth: 1.5 },
+              label: { show: true, position: nd.x > 0.52 ? 'left' : 'right', fontSize: 7.5,
+                fontFamily: FONT, color: ink(t), distance: 4,
+                formatter: nd.name.length > 5 ? nd.name.slice(0, 4) + '…' : nd.name } };
+          }),
+          links: linksS, lineStyle: { curveness: 0.14 },
+          emphasis: { focus: 'adjacency' }
+        }]
+      });
+    }
+    return base(t, {
+      tooltip: tip(t, { formatter: function (p) {
+        if (p.seriesType === 'graph' && p.dataType === 'edge') {
+          return '<b>' + p.data.source + ' — ' + p.data.target + '</b><br/>相关系数 ' + (p.data.sign > 0 ? '+' : '-') + p.data.value.toFixed(2);
+        }
+        if (p.seriesType === 'graph') return '<b>' + p.name + '</b>';
+        if (p.seriesType === 'heatmap') return '<b>' + names[p.value[1]] + ' × ' + names[p.value[0]] + '</b><br/>' + p.value[2].toFixed(2);
+        return '';
+      } }),
+      title: [
+        { text: '相关性网络', left: '1%', top: 2, textStyle: { color: muted(t), fontSize: 10, fontWeight: 700, fontFamily: FONT } },
+        { text: '相关性矩阵（日收益率 · 红色为正 · 蓝色为负）', left: narrow ? '1%' : '38%', top: 2,
+          textStyle: { color: muted(t), fontSize: 10, fontWeight: 700, fontFamily: FONT } },
+        { text: (strongPos ? '最强正相关 ' + strongPos.a + ' × ' + strongPos.b + '  +' + strongPos.r.toFixed(2) : '') +
+                (strongNeg ? '　｜　最强负相关 ' + strongNeg.a + ' × ' + strongNeg.b + '  ' + strongNeg.r.toFixed(2) : ''),
+          left: '1%', bottom: 2, textStyle: { color: rgba(ink(t), 0.55), fontSize: 9, fontFamily: FONT } }
+      ],
+      grid: { left: narrow ? '44%' : '46%', right: narrow ? 56 : 70, top: padTop, bottom: 30 },
+      xAxis: { type: 'category', data: names, position: 'top', splitArea: { show: false },
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: muted(t), fontSize: 7.5, fontFamily: FONT, rotate: 55, interval: 0, margin: 4, width: 56, overflow: 'truncate' } },
+      yAxis: { type: 'category', data: names, inverse: true, splitArea: { show: false },
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: muted(t), fontSize: 7.5, fontFamily: FONT, interval: 0, width: 60, overflow: 'truncate' } },
+      visualMap: { min: -1, max: 1, orient: 'vertical', right: 2, top: 'center', itemWidth: 8, itemHeight: 70,
+        calculable: false, text: ['+1', '-1'], textStyle: { color: muted(t), fontSize: 8, fontFamily: FONT },
+        inRange: { color: ['#1B4B72', '#4A7FA8', '#BFD3E2', '#F5F0E6', '#E8B9A8', '#C86A5A', '#8C3A2E'] } },
+      series: [
+        { type: 'graph', layout: 'none', left: 4, top: 22, width: narrow ? '40%' : '42%', height: '80%',
+          coordinateSystem: null, roam: false, draggable: false,
+          data: nodes.map(function (nd, i) {
+            return { name: nd.name, x: nd.x, y: nd.y, symbolSize: 9 + (i % 3) * 2,
+              itemStyle: { color: seriesColor(t, i) },
+              label: { show: true, position: nd.x > 0.52 ? 'left' : 'right', fontSize: 8, fontFamily: FONT,
+                color: ink(t), distance: 5,
+                formatter: nd.name.length > 6 ? nd.name.slice(0, 5) + '…' : nd.name } };
+          }),
+          links: links,
+          lineStyle: { curveness: 0.16 },
+          emphasis: { focus: 'adjacency', lineStyle: { width: 4 } },
+          label: { show: true } },
+        { type: 'heatmap', data: cells,
+          itemStyle: { borderColor: '#FFFFFF', borderWidth: 1, borderRadius: 1.5 },
+          label: { show: !narrow && W >= 760, color: ink(t), fontSize: 7, fontFamily: FONT,
+            formatter: function (p) { var v = p.value[2]; return Math.abs(v) >= 0.995 ? '1' : v.toFixed(2); } } }
+      ]
     });
   };
 

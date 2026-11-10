@@ -203,23 +203,49 @@
 
   CATS.push({
     id: 'relation', name: '关系与相关', icon: '⌘',
-    desc: '变量之间有没有关系、关系强弱/方向、网络结构、集合交集。',
+    desc: '变量之间有没有关系、关系强弱与方向、资产之间的联动结构。',
     charts: [
-      { id: 'scatter', name: '散点图', type: 'scatter', desc: '两个变量的关系方向与强弱，看离群点',
-        data: function () { var a = rndArr(91, 60, 10, 90); return { xName: '广告投入', yName: '销售额',
-          points: a.map(function (x, i) { return [x, Math.round(x * 1.6 + rnd(92 + i, -25, 25))]; }), seriesName: '门店' }; } },
-      { id: 'bubble', name: '气泡图', type: 'bubble', desc: '散点 + 第三维（大小），一图看三个变量',
-        data: function () { return { xName: '增速', yName: '利润率', data: [
-          { name: '消费', x: 12, y: 18, size: 92 }, { name: '科技', x: 28, y: 24, size: 74 },
-          { name: '医药', x: 9, y: 31, size: 58 }, { name: '金融', x: 6, y: 14, size: 66 }, { name: '制造', x: 19, y: 9, size: 45 }] }; } },
-      { id: 'scatterMatrix', name: '矩阵散点图', type: 'scatterMatrix', desc: '多变量两两散点，快速扫出相关结构',
-        data: function () { return { series: [
-          { name: 'GDP', values: rndArr(101, 40, 2, 8) }, { name: 'CPI', values: rndArr(102, 40, 0, 4) },
-          { name: 'M2', values: rndArr(103, 40, 6, 14) }, { name: '出口', values: rndArr(104, 40, -5, 20) }] }; } },
-      { id: 'corrMatrix', name: '相关系数矩阵', type: 'corrMatrix', desc: '量化两两相关强度，红正蓝负一目了然',
-        data: function () { return { names: ['GDP', 'CPI', 'M2', '出口', '投资'],
-          matrix: [[1, .32, .68, .51, .74], [.32, 1, .18, -.12, .25], [.68, .18, 1, .44, .82], [.51, -.12, .44, 1, .39], [.74, .25, .82, .39, 1]] }; } },
-]
+      { id: 'scatter', name: '散点 + 拟合线', type: 'scatter', desc: '线性拟合、R² 与残差区间，看关系强度',
+        data: function () {
+          var pts = [], n = 60;
+          for (var i = 0; i < n; i++) {
+            var x = 10 + i * 1.35 + (rnd(i * 3 + 1, -6, 6));
+            var y = 0.78 * x + 12 + rnd(i * 7 + 2, -14, 14);
+            pts.push([Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
+          }
+          return { xName: '研发投入（亿元）', yName: '营收增速（%）', points: pts, seriesName: '样本公司', fit: true };
+        } },
+      { id: 'corrMatrix', name: '相关性矩阵', type: 'corrMatrix', desc: '10 类金融资产日收益率相关性 · 红正蓝负',
+        data: function () { return {
+          names: ['沪深300', '标普500', '纳斯达克', '中债10Y', '美债10Y', 'COMEX黄金', 'WTI原油', '美元指数', 'LME铜', '日经225'],
+          matrix: [
+            [1, 0.32, 0.34, 0.28, -0.02, 0.19, 0.12, -0.21, 0.36, 0.31],
+            [0.32, 1, 0.95, 0.05, 0.23, 0.11, 0.17, -0.18, 0.2, 0.2],
+            [0.34, 0.95, 1, 0.04, 0.15, 0.11, 0.13, -0.17, 0.17, 0.18],
+            [0.28, 0.05, 0.04, 1, 0.14, -0.02, 0.08, 0, 0.11, 0.09],
+            [-0.02, 0.23, 0.15, 0.14, 1, -0.18, 0.18, 0.19, 0.13, 0.12],
+            [0.19, 0.11, 0.11, -0.02, -0.18, 1, 0.04, -0.35, 0.17, 0.1],
+            [0.12, 0.17, 0.13, 0.08, 0.18, 0.04, 1, 0.02, 0.13, 0.06],
+            [-0.21, -0.18, -0.17, 0, 0.19, -0.35, 0.02, 1, -0.18, -0.06],
+            [0.36, 0.2, 0.17, 0.11, 0.13, 0.17, 0.13, -0.18, 1, 0.3],
+            [0.31, 0.2, 0.18, 0.09, 0.12, 0.1, 0.06, -0.06, 0.3, 1]
+          ] }; } },
+      { id: 'corrNetwork', name: '关联网络 + 矩阵', type: 'corrNetwork', desc: '左网络右矩阵：一眼看出谁与谁同涨同跌',
+        data: function () { return {
+          names: ['沪深300', '标普500', '纳斯达克', '中债10Y', '美债10Y', 'COMEX黄金', 'WTI原油', '美元指数', 'LME铜', '日经225'],
+          matrix: [
+            [1, 0.32, 0.34, 0.28, -0.02, 0.19, 0.12, -0.21, 0.36, 0.31],
+            [0.32, 1, 0.95, 0.05, 0.23, 0.11, 0.17, -0.18, 0.2, 0.2],
+            [0.34, 0.95, 1, 0.04, 0.15, 0.11, 0.13, -0.17, 0.17, 0.18],
+            [0.28, 0.05, 0.04, 1, 0.14, -0.02, 0.08, 0, 0.11, 0.09],
+            [-0.02, 0.23, 0.15, 0.14, 1, -0.18, 0.18, 0.19, 0.13, 0.12],
+            [0.19, 0.11, 0.11, -0.02, -0.18, 1, 0.04, -0.35, 0.17, 0.1],
+            [0.12, 0.17, 0.13, 0.08, 0.18, 0.04, 1, 0.02, 0.13, 0.06],
+            [-0.21, -0.18, -0.17, 0, 0.19, -0.35, 0.02, 1, -0.18, -0.06],
+            [0.36, 0.2, 0.17, 0.11, 0.13, 0.17, 0.13, -0.18, 1, 0.3],
+            [0.31, 0.2, 0.18, 0.09, 0.12, 0.1, 0.06, -0.06, 0.3, 1]
+          ] }; } }
+    ]
   });
 
   CATS.push({
@@ -368,7 +394,7 @@
       trend: ['season', 'stacked', 'waterfall', 'dual'],
       composition: ['donut', 'percentBar', 'treemap'],
       distribution: ['histogram', 'boxplot', 'ridge'],
-      relation: ['scatter', 'corrMatrix'],
+      relation: ['scatter', 'corrMatrix', 'corrNetwork'],
       flow: ['funnel', 'sankey'],
       geo: ['choropleth', 'heatMapGeo'],
       hierarchy: ['tree', 'swimlane'],
