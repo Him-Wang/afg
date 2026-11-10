@@ -898,10 +898,4 @@ body.is-home .chart-head { display: none; }
   .chart-stage .chart-canvas.cat-single { margin: 8px 10px 0; }
 }
 
-/* 主题切换（白 / 黑金） */
-.theme-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--input-bg); }
-.ts-opt { border: 0; background: transparent; color: var(--muted); font: 600 12px Inter, "PingFang SC", sans-serif;
-  padding: 6px 12px; cursor: pointer; transition: background .15s, color .15s; }
-.ts-opt:hover { color: var(--text); }
-.ts-opt.active { background: var(--accent); color: #fff; }
-[data-theme="midnight-gold"] .ts-opt.active { color: #131313; }
+

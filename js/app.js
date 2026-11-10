@@ -3498,16 +3498,6 @@
     });
   }
 
-  /* ---------- 主题 ---------- */
-  function syncThemeSwitch() {
-    var box = el('theme-switch');
-    if (!box) return;
-    var id = Themes.active().id;
-    Array.prototype.forEach.call(box.querySelectorAll('.ts-opt'), function (b) {
-      b.classList.toggle('active', b.getAttribute('data-theme-id') === id);
-    });
-  }
-
   function buildThemeSelect() {
     var sel = el('theme-select');
     if (!sel) return;
@@ -3523,12 +3513,9 @@
     });
     sel.value = state.theme;
     sel.style.display = 'none';   // 整体只保留象牙白，配色在单图功能栏选择
-    bindThemeSwitch();
-    syncThemeSwitch();
     sel.addEventListener('change', function () {
       state.theme = sel.value;
       Themes.applyTheme(state.theme);
-      syncThemeSwitch();
       rerender();
       toast('已切换配色：' + Themes.active().name);
     });
@@ -3880,30 +3867,6 @@
     if (b) b.classList.toggle('active', state.labelMode && state.labelMode !== 'off');
   }
 
-
-  /* ---------- 主题切换（象牙白 / 黑金） ---------- */
-  function bindThemeSwitch() {
-    var box = el('theme-switch');
-    if (!box) return;
-    function paint(id) {
-      Array.prototype.forEach.call(box.querySelectorAll('.ts-opt'), function (b) {
-        b.classList.toggle('active', b.getAttribute('data-theme-id') === id);
-      });
-    }
-    Array.prototype.forEach.call(box.querySelectorAll('.ts-opt'), function (b) {
-      b.addEventListener('click', function () {
-        var id = b.getAttribute('data-theme-id');
-        Themes.applyTheme(id);
-        try { localStorage.setItem('adv-theme', id); } catch (e) {}
-        paint(id);
-        if (state.mode === 'catalog' && state.catId) { renderCategoryDash(state.catId); }
-        else if (state.mode === 'catalogChart' && state.catId) { openCatalogChart(state.catId, state.catChartId); }
-        else { rerender(); }
-        (state.catInsts || []).forEach(function (o) { try { o.inst.resize(); } catch (e) {} });
-      });
-    });
-    paint(Themes.active().id);
-  }
 
   function syncToolbar() {
     document.body.classList.toggle('is-home', state.mode === 'home');
@@ -5079,7 +5042,6 @@
       Themes.applyTheme(cfg.theme);
       var ts = el('theme-select');
       if (ts) ts.value = cfg.theme;
-      syncThemeSwitch();
     }
     var data = {};
     if (cfg.data) data = cfg.data;
@@ -5776,10 +5738,8 @@
       var initLang = q.lang || (function () { try { return localStorage.getItem('afg_lang'); } catch (e) { return null; } })();
       window.I18N.setLang(initLang === 'en' ? 'en' : 'zh');
     }
-    var savedTheme = null;
-    try { savedTheme = localStorage.getItem('adv-theme'); } catch (e) {}
-    if (q.theme && Themes.getTheme(q.theme)) state.theme = q.theme;
-    else if (savedTheme && Themes.getTheme(savedTheme)) state.theme = savedTheme;
+    state.theme = 'paper';
+    try { localStorage.removeItem('adv-theme'); } catch (e) {}
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) state.currentTemplate = q.tpl;
     Themes.applyTheme(state.theme);
     if (window.WORLD_GEOJSON && window.echarts) { try { echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {} }
