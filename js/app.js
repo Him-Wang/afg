@@ -1353,6 +1353,190 @@
   }
 
 
+
+  /* ---------- 通用悬浮提示（哑铃图 / 平行坐标共用） ---------- */
+  function makeHoverTip(dom) {
+    if (getComputedStyle(dom).position === 'static') dom.style.position = 'relative';
+    var tip = document.createElement('div');
+    tip.className = 'adv-hover-tip';
+    tip.style.cssText = 'position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;' +
+      'background:#fff;border:1px solid rgba(26,26,46,.12);border-radius:8px;padding:8px 10px;' +
+      'font:11.5px/1.65 Inter,"PingFang SC",sans-serif;color:#051C2C;' +
+      'box-shadow:0 8px 24px rgba(20,20,35,.14);z-index:30;white-space:nowrap;';
+    dom.appendChild(tip);
+    return {
+      el: tip,
+      show: function (html, mx, my) {
+        tip.innerHTML = html;
+        tip.style.opacity = 1;
+        var w = tip.offsetWidth, h = tip.offsetHeight;
+        var lx = mx + 16, ly = my - h - 12;
+        if (lx + w > dom.clientWidth - 6) lx = mx - w - 16;
+        if (ly < 4) ly = my + 16;
+        tip.style.left = Math.max(4, lx) + 'px';
+        tip.style.top = Math.min(dom.clientHeight - h - 4, Math.max(4, ly)) + 'px';
+      },
+      hide: function () { tip.style.opacity = 0; }
+    };
+  }
+
+  /* ---------- 哑铃图：整行悬浮高亮 + 数值提示 ---------- */
+  function attachDumbbellHover(inst, data) {
+    if (!inst || inst._dumbbellBound || !data || !data.rows) return;
+    inst._dumbbellBound = true;
+    var zr = inst.getZr(), dom = inst.getDom();
+    var tip = makeHoverTip(dom);
+    var rows = data.rows.slice().sort(function (a, b) { return (b.to - b.from) - (a.to - a.from); });
+    var up = (Themes.active().chart.up) || '#1E7A46';
+    var down = (Themes.active().chart.down) || '#C0392B';
+    var hl = null, lastIdx = -2;
+    function rowIdx(pt) {
+      if (!pt) return -1;
+      var y = pt[1];
+      var opt = inst.getOption();
+      var n = rows.length;
+      var grid0 = opt.grid && opt.grid[0];
+      if (!grid0) return -1;
+      var top = grid0.top || 0, bottom = inst.getHeight() - (grid0.bottom || 0);
+      if (y < top - 6 || y > bottom + 6) return -1;
+      var idx = Math.round((y - top) / ((bottom - top) / Math.max(1, n - 1)));
+      return Math.max(0, Math.min(n - 1, idx));
+    }
+    zr.on('mousemove', function (e) {
+      var pt = null;
+      try { pt = inst.convertFromPixel({ yAxisIndex: 0 }, [e.offsetX, e.offsetY]); } catch (err) {}
+      var idx = (pt && isFinite(pt[1])) ? Math.round(pt[1]) : rowIdx([e.offsetX, e.offsetY]);
+      if (idx < 0 || idx >= rows.length || idx !== idx) { hide(); return; }
+      var r = rows[idx];
+      var dv = r.to - r.from;
+      var col = dv >= 0 ? up : down;
+      if (idx !== lastIdx) {
+        lastIdx = idx;
+        try {
+          if (hl) { zr.remove(hl); hl = null; }
+          var opt = inst.getOption();
+          var g = opt.grid && opt.grid[0];
+          hl = new echarts.graphic.Rect({
+            silent: true, z: 1,
+            shape: { x: 0, y: 0, width: 0, height: 0 },
+            style: { fill: ChartFactory.hexToRgba((Themes.active().chart.text || '#051C2C'), 0.05), r: 6 }
+          });
+          zr.add(hl);
+        } catch (err) {}
+      }
+      if (hl) {
+        try {
+          var y = inst.convertToPixel({ seriesIndex: 1 }, [r.from, idx]);
+          var p1 = inst.convertToPixel({ seriesIndex: 1 }, [r.from, idx]);
+          var p2 = inst.convertToPixel({ seriesIndex: 1 }, [r.to, idx]);
+          var opt2 = inst.getOption(), g2 = opt2.grid && opt2.grid[0];
+          var left = (g2 && g2.left) || 60, right = inst.getWidth() - ((g2 && g2.right) || 20);
+          var rowGap = 26;
+          hl.setShape({ x: left - 6, y: (p1 ? p1[1] : e.offsetY) - rowGap / 2,
+            width: Math.max(40, right - left + 12), height: rowGap });
+        } catch (err) {}
+      }
+      tip.show('<b>' + r.name + '</b><br/>' +
+        (data.fromLabel || '起始') + '　' + fmtNum(r.from) + '<br/>' +
+        (data.toLabel || '当前') + '　' + fmtNum(r.to) + '<br/>' +
+        '变化　<b style="color:' + col + '">' + (dv >= 0 ? '+' : '') + (Math.round(dv * 10) / 10) + '</b>',
+        e.offsetX, e.offsetY);
+    });
+    zr.on('globalout', hide);
+    function hide() {
+      lastIdx = -2;
+      tip.hide();
+      if (hl) { try { zr.remove(hl); } catch (e) {} hl = null; }
+    }
+  }
+
+  /* ---------- 平行坐标：按几何位置找最近的样本线，高亮并显示各维数值 ---------- */
+  function attachParallelHover(inst, data) {
+    if (!inst || inst._parallelBound || !data || !data.rows) return;
+    inst._parallelBound = true;
+    var zr = inst.getZr(), dom = inst.getDom();
+    var tip = makeHoverTip(dom);
+    var dims = data.dims || [];
+    var rows = data.rows || [];
+    var n = dims.length;
+    var focus = -1;
+
+    function axes() {
+      var o = inst.getOption();
+      var pp = (o.parallel && o.parallel[0]) || {};
+      var W = inst.getWidth(), H = inst.getHeight();
+      function px(v, total) {
+        if (typeof v === 'number') return v;
+        if (typeof v === 'string' && v.indexOf('%') >= 0) return parseFloat(v) / 100 * total;
+        return 0;
+      }
+      var left = px(pp.left, W) || 44, right = px(pp.right, W) || 40;
+      var top = px(pp.top, H) || 56, bottom = px(pp.bottom, H) || 28;
+      var pas = o.parallelAxis || [];
+      var info = pas.map(function (a, k) {
+        var vals = rows.map(function (r) { return r.values[k]; });
+        var mn = (a.min !== undefined && a.min !== null) ? a.min : Math.min.apply(null, vals);
+        var mx = (a.max !== undefined && a.max !== null) ? a.max : Math.max.apply(null, vals);
+        return { min: mn, max: mx };
+      });
+      var spanX = (W - left - right) / Math.max(1, n - 1);
+      var box = (H - top - bottom);
+      function xOf(k) { return left + k * spanX; }
+      function yOf(k, v) {
+        var it = info[k] || { min: 0, max: 1 };
+        var t = (v - it.min) / ((it.max - it.min) || 1);
+        return top + (1 - Math.max(0, Math.min(1, t))) * box;
+      }
+      return { xOf: xOf, yOf: yOf, top: top, bottom: top + box, left: left, right: W - right };
+    }
+
+    function hide() {
+      tip.hide();
+      if (focus >= 0) {
+        try {
+          var o = inst.getOption();
+          inst.setOption({ series: o.series.map(function (sr, i) {
+            return { lineStyle: { opacity: (i === focus) ? 1 : 0.55, width: (i === focus) ? 3 : 1.5 } };
+          }) });
+        } catch (e) {}
+        focus = -1;
+      }
+    }
+
+    zr.on('mousemove', function (e) {
+      var g = axes();
+      var mx = e.offsetX, my = e.offsetY;
+      if (mx < g.left - 30 || mx > g.right + 30 || my < g.top - 40 || my > g.bottom + 20) { hide(); return; }
+      var best = -1, bestD = 16;
+      rows.forEach(function (r, i) {
+        for (var k = 0; k < n - 1; k++) {
+          var x1 = g.xOf(k), x2 = g.xOf(k + 1);
+          if (mx < x1 - 2 || mx > x2 + 2) continue;
+          var y1 = g.yOf(k, r.values[k]), y2 = g.yOf(k + 1, r.values[k + 1]);
+          var t = (x2 === x1) ? 0 : (mx - x1) / (x2 - x1);
+          var y = y1 + (y2 - y1) * t;
+          var d = Math.abs(y - my);
+          if (d < bestD) { bestD = d; best = i; }
+        }
+      });
+      if (best < 0) { hide(); return; }
+      if (best !== focus) {
+        focus = best;
+        try {
+          inst.setOption({ series: rows.map(function (sr, i) {
+            return { lineStyle: { opacity: (i === focus) ? 1 : 0.18, width: (i === focus) ? 3.2 : 1.4 } };
+          }) });
+        } catch (err) {}
+      }
+      var r = rows[best];
+      var lines = dims.map(function (nm, k) {
+        return '<span style="color:#8A8F98">' + nm + '</span>　<b>' + fmtNum(r.values[k]) + '</b>';
+      }).join('<br/>');
+      tip.show('<b>' + r.name + '</b><br/>' + lines, mx, my);
+    });
+    zr.on('globalout', hide);
+  }
+
   /* ---------- 雷达图：悬停高亮（按指标轴 + 按月份曲线） ---------- */
   function attachRadarHover(inst, radarData) {
     if (!inst || inst._radarBound || !radarData || !radarData.indicators) return;
@@ -2660,6 +2844,8 @@
       var _cdata = (window.localizeDemo ? localizeDemo(ch.data()) : ch.data());
       var inst = ChartFactory.render(c, ch.type, _cdata, theme);
       if (ch.type === 'radar') attachRadarHover(inst, _cdata);
+      if (ch.type === 'dumbbell') attachDumbbellHover(inst, _cdata);
+      if (ch.type === 'parallel') attachParallelHover(inst, _cdata);
       state.echartsEl = c;
       requestAnimationFrame(function () { try { inst.resize(); } catch (e) {} });
     } catch (e) {}
@@ -4392,6 +4578,8 @@
       var c = document.createElement('div'); c.className = 'chart-canvas'; el('chart-stage').appendChild(c);
       var uinst = ChartFactory.render(c, type, data, theme);
       if (type === 'radar') attachRadarHover(uinst, data);
+      if (type === 'dumbbell') attachDumbbellHover(uinst, data);
+      if (type === 'parallel') attachParallelHover(uinst, data);
       attachAnnotationHandler(uinst);
       attachExtremeLabels(uinst);
       state.echartsEl = c;
