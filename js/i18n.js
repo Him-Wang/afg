@@ -109,6 +109,7 @@
       'ex.tRadar': '雷达图（最新快照）',
       'ex.tRank': '横向排名（最新值）',
       'ex.pick': '选择指标',
+      'ind.title': '选择指标', 'ind.sub': '点击增删要绘制的指标（当前已选中的高亮显示）',
       'ex.hint': '可跨板块多选，例如「制造业PMI」+「GDP」做关联',
       'ex.gen': '生成图表',
       'ex.clear': '清空选择',
@@ -129,6 +130,7 @@
     },
     en: {
       'app.import': '＋ Import data',
+      'ind.title': 'Select indicators', 'ind.sub': 'Click to add or remove series — selected ones are highlighted',
       'tb.palette': '🎨 Palette', 'tb.labels': '◉ Labels', 'labels.all': 'All values',
       'labels.extreme': 'Extremes', 'labels.off': 'Hide labels',
       'app.importTitle': 'Import data', 'app.importSub': 'Everything runs in your browser — nothing is uploaded to any server.',
