@@ -408,21 +408,27 @@
 
   /* ================= 2. 趋势与时间 ================= */
   function timeAxis(t, labels) {
+    var n = (labels || []).length;
+    /* 约 6 个均匀刻度；月/日频统一显示到「年-月」，并去除重复标签 */
+    var step = Math.max(1, Math.ceil(n / 6));
+    var lastShown = null;
     return xAxis(t, {
       data: labels, boundaryGap: false,
       axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 10,
         hideOverlap: true,
         interval: function (idx, val) {
-          var s = String(val);
-          if (idx === 0) return false;
-          var m = s.match(/^(\d{4})-(\d{2})$/);
-          if (m) return m[2] === '01';
-          return idx % Math.ceil(labels.length / 6) === 0;
+          if (idx % step !== 0) return false;
+          if (val === lastShown) return false;     // 去重：同月多点时只标一次
+          lastShown = val;
+          return true;
         },
         formatter: function (v) {
           var s = String(v);
+          var d = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (d) return d[1] + '-' + d[2];
           var m = s.match(/^(\d{4})-(\d{2})$/);
-          return m ? (m[2] === '01' ? m[1] : '') : s;
+          if (m) return m[1] + '-' + m[2];
+          return s;
         } }
     });
   }
@@ -563,14 +569,59 @@
   };
 
   B.heatmap = function (el, d, t) {
-    var data = [];
-    d.yLabels.forEach(function (y, yi) { d.xLabels.forEach(function (x, xi) { data.push([xi, yi, d.values[yi][xi]]); }); });
-    var vals = data.map(function (p) { return p[2]; });
+    /* 兼容两种数据形状：
+       ① 矩阵：{ xLabels, yLabels, values: [[...],[...]] }  （行=Y，列=X）
+       ② 三元组：{ xLabels, yLabels, values: [[x, y, v], ...] }（内置构建器/官方示例用法） */
+    var xLabels = (d.xLabels || []).slice();
+    var yLabels = (d.yLabels || []).slice();
+    var raw = d.values || [];
+
+    var isMatrix = raw.length > 0 &&
+      yLabels.length > 0 && xLabels.length > 0 &&
+      raw.length === yLabels.length &&
+      Array.isArray(raw[0]) && raw[0].length === xLabels.length &&
+      !(raw.length === 3 && Array.isArray(raw[0]) && raw[0].length === 3 && xLabels.length === 3 && yLabels.length === 3 && d.__triples);
+
+    /* 三元组判断：每行都是 [x, y, v] 且长度恰为 3，且不满足矩阵行列关系 */
+    var looksTriple = raw.length > 0 && raw.every(function (r) {
+      return Array.isArray(r) && r.length === 3 && typeof r[0] === 'number' && typeof r[1] === 'number';
+    });
+    var matrixByShape = raw.length > 0 && yLabels.length > 0 && xLabels.length > 0 &&
+      raw.length === yLabels.length && Array.isArray(raw[0]) && raw[0].length === xLabels.length;
+
+    var data = [], matrixMode;
+    if (looksTriple && !matrixByShape) matrixMode = false;
+    else if (matrixByShape) matrixMode = true;
+    else if (looksTriple) matrixMode = false;
+    else matrixMode = true;
+
+    if (matrixMode) {
+      raw.forEach(function (row, yi) {
+        (row || []).forEach(function (v, xi) { data.push([xi, yi, v]); });
+      });
+      if (!xLabels.length && raw.length) {
+        var cols = Math.max.apply(null, raw.map(function (r) { return (r || []).length; }));
+        for (var i = 0; i < cols; i++) xLabels.push(String(i + 1));
+      }
+      if (!yLabels.length) raw.forEach(function (_, yi) { yLabels.push(String(yi + 1)); });
+    } else {
+      data = raw.map(function (r) { return [r[0], r[1], r[2]]; });
+      if (!xLabels.length) {
+        var maxX = Math.max.apply(null, data.map(function (p) { return p[0]; }));
+        for (var a = 0; a <= maxX; a++) xLabels.push(String(a + 1));
+      }
+      if (!yLabels.length) {
+        var maxY = Math.max.apply(null, data.map(function (p) { return p[1]; }));
+        for (var b = 0; b <= maxY; b++) yLabels.push(String(b + 1));
+      }
+    }
+    var vals = data.map(function (p) { return p[2]; }).filter(function (v) { return v !== null && v !== undefined && !isNaN(v); });
+    if (!vals.length) vals = [0, 1];
     return base(t, {
-      tooltip: tip(t, { trigger: 'item', formatter: function (p) { return d.yLabels[p.value[1]] + ' · ' + d.xLabels[p.value[0]] + '<br/>' + num(p.value[2]); } }),
+      tooltip: tip(t, { trigger: 'item', formatter: function (p) { return (yLabels[p.value[1]] || '') + ' · ' + (xLabels[p.value[0]] || '') + '<br/>' + num(p.value[2]); } }),
       grid: { left: 6, right: 16, top: 14, bottom: 18, containLabel: true },
-      xAxis: xAxis(t, { data: d.xLabels, splitArea: { show: false } }),
-      yAxis: xAxis(t, { data: d.yLabels, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
+      xAxis: xAxis(t, { data: xLabels, splitArea: { show: false } }),
+      yAxis: xAxis(t, { data: yLabels, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
       visualMap: {
         min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), show: false,
         inRange: { color: [rgba(ink(t), 0.05), rgba(accent(t), 0.45), accent(t)] }
@@ -696,6 +747,9 @@
     var rp = rampOf(t);
     var TW = (el && el.clientWidth) || 500, TH = (el && el.clientHeight) || 240;
     var root = d.data || [];
+    /* 扁平数据（没有 children）自动包成一层分组，避免画布空白 */
+    var hasChildren = root.some(function (g) { return g && g.children && g.children.length; });
+    if (root.length && !hasChildren) root = [{ name: d.rootName || '全部', children: root }];
     var total = 0;
     root.forEach(function (g) { (g.children || []).forEach(function (c) { total += c.value; }); });
     total = total || 1;
@@ -1099,7 +1153,7 @@
     var maxS = Math.max.apply(null, d.data.map(function (x) { return x.size; }));
     return base(t, {
       tooltip: tip(t, { formatter: function (p) { return p.name + '<br/>' + d.xName + ' ' + p.value[0] + '<br/>' + d.yName + ' ' + p.value[1]; } }),
-      grid: grid({ left: 6, right: 24, top: 18, bottom: 24 }),
+      grid: grid({ left: 6, right: 24, top: 34, bottom: 24 }),
       xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
         name: d.xName, nameLocation: 'middle', nameGap: 24, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
       yAxis: yAxis(t, { type: 'value', scale: true, name: d.yName, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
@@ -1975,7 +2029,7 @@
     var maxS = Math.max.apply(null, d.data.map(function (x) { return x.size; }));
     return base(t, {
       tooltip: tip(t, { formatter: function (p) { return p.name + '<br/>' + d.xName + ' ' + p.value[0] + '<br/>' + d.yName + ' ' + p.value[1]; } }),
-      grid: grid({ left: 6, right: 24, top: 18, bottom: 24 }),
+      grid: grid({ left: 6, right: 24, top: 34, bottom: 24 }),
       xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
         name: d.xName, nameLocation: 'middle', nameGap: 24, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
       yAxis: yAxis(t, { type: 'value', scale: true, name: d.yName, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),

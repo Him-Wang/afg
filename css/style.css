@@ -179,7 +179,7 @@ html, body {
 
 /* KPI 卡片版式 */
 .kpi-grid {
-  min-height: 560px; height: auto;
+  min-height: auto; height: auto; align-content: start;
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 14px; padding: 18px; overflow: auto;
 }
@@ -187,6 +187,7 @@ html, body {
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--bg-elevated); padding: 18px;
   display: flex; flex-direction: column; gap: 10px;
+  min-height: 190px;
 }
 .kpi-card .kpi-label { font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
 .kpi-card .kpi-value { font-size: 30px; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.5px; }

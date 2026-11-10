@@ -5403,6 +5403,44 @@
 
   function applyChartConfig(cfg, skipOverlayMerge) {
     var type = cfg.type || 'area';
+
+    /* KPI 卡片：走站内卡片视图（与示例路径一致），不走 ECharts 构建器 */
+    if (type === 'kpi') {
+      var kdata = null;
+      if (cfg.data && cfg.data.cards) kdata = cfg.data;
+      else if (cfg.cards) kdata = { cards: cfg.cards };
+      else if (cfg.labels && cfg.series) {
+        kdata = { cards: cfg.series.map(function (sr, i) {
+          var vals = (sr.values || []).filter(function (v) { return v !== null && v !== undefined && !isNaN(v); });
+          var last = vals.length ? vals[vals.length - 1] : null;
+          var prev = vals.length > 1 ? vals[vals.length - 2] : null;
+          var delta = (last !== null && prev !== null && prev !== 0) ? ((last - prev) / Math.abs(prev) * 100) : null;
+          return {
+            label: sr.name || String(i + 1),
+            value: last === null ? '—' : fmtNum(last) + (cfg.unit || ''),
+            delta: delta === null ? '' : (delta >= 0 ? '+' : '') + delta.toFixed(1) + '%',
+            dir: (delta !== null && delta < 0) ? 'neg' : 'pos',
+            spark: vals.slice(-12)
+          };
+        }) };
+      }
+      if (!kdata || !kdata.cards || !kdata.cards.length) { toast('KPI 数据为空'); return; }
+      state.chartConfig = cfg;
+      clearStage();
+      state.mode = 'imported'; state.isImported = true; state.viewKey = cfg.viewKey || 'imported';
+      state.currentTemplate = null; state.dataset = null; state.dashboardDatasets = null;
+      state.table = null; state.det = null;
+      highlightNav(null);
+      el('btn-events').style.display = 'none';
+      el('stat-badge').style.display = 'none';
+      renderKpi(kdata);
+      state.echartsEl = null;
+      setHead({ title: cfg.title || 'KPI', subtitle: tr('核心指标看板', 'Key metrics'), unit: '', source: '' });
+      el('hint').textContent = tr('AI 生成 · KPI 卡片', 'AI generated · KPI cards');
+      syncToolbar();
+      return;
+    }
+
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
     state.chartConfig = cfg;
     if (cfg && cfg.labels && cfg.series) state.lastChart = cfg;
@@ -5420,7 +5458,11 @@
     }
     var data = {};
     if (cfg.data) data = cfg.data;
+    else if (cfg.xLabels !== undefined && cfg.values !== undefined) data = { xLabels: cfg.xLabels, yLabels: cfg.yLabels || [], values: cfg.values };   // 热力图
     else if (cfg.values !== undefined && cfg.labels !== undefined) data = { labels: cfg.labels, values: cfg.values };   // 瀑布图等 {labels, values}
+    else if (type === 'rank' && cfg.labels !== undefined && cfg.series !== undefined) {
+      data = { categories: cfg.labels, values: (cfg.series[0] && cfg.series[0].values) || [], unit: cfg.unit };
+    }
     else if (cfg.labels !== undefined && cfg.series !== undefined) data = { labels: cfg.labels, series: cfg.series };
     else if (cfg.indicators !== undefined && cfg.series !== undefined) data = { indicators: cfg.indicators, series: cfg.series };
     else if (cfg.series !== undefined) data = { series: cfg.series };            // 散点矩阵 / 相关性等无时间轴图表
@@ -6143,24 +6185,28 @@
         var raw = String(q.chart || '');
         /* 兼容：URL 查询里 '+' 会被解析成空格，标准 base64 需要还原 */
         var tries = [raw, raw.replace(/ /g, '+'), raw.replace(/ /g, '%2B')];
-        for (var ti = 0; ti < tries.length; ti++) {
-          try {
-            var cfg = JSON.parse(b64Decode(tries[ti]));
-            applyChartConfig(cfg);
-            return;
-          } catch (e) { /* 尝试下一种 */ }
+        var cfg = null;
+        for (var ti = 0; ti < tries.length && cfg === null; ti++) {
+          try { cfg = JSON.parse(b64Decode(tries[ti])); } catch (e) { /* 尝试下一种 */ }
         }
-        toast(tr('图表链接无效', 'Invalid chart link'));
+        if (cfg === null) { toast(tr('图表链接无效（数据解析失败）', 'Invalid chart link (cannot parse)')); return; }
+        try { applyChartConfig(cfg); }
+        catch (e) { toast(tr('图表渲染失败：', 'Render failed: ') + (e && e.message ? e.message : '')); }
       };
       if (window.echarts) renderFromLink();
       else withCharts(renderFromLink);
       return;
     }
-    if (q.tpl && DataLoader.SAMPLES[q.tpl]) renderTemplate(q.tpl);
-    else if (q.view === 'macro') renderChinaMacro();
-    else if (q.view === 'finance') renderFinance();
-    else if (q.view === 'intl') renderIntlMacro();
-    else renderHome();
+    var bootWithTemplate = function () {
+      if (q.tpl && DataLoader.SAMPLES[q.tpl]) renderTemplate(q.tpl);
+      else if (q.view === 'macro') renderChinaMacro();
+      else if (q.view === 'finance') renderFinance();
+      else if (q.view === 'intl') renderIntlMacro();
+      else renderHome();
+    };
+    /* 深链接（示例模板 / 数据看板）都要画图，等引擎就绪再渲染；首页不必等 */
+    if (q.tpl || q.view) withCharts(bootWithTemplate);
+    else bootWithTemplate();
   }
 
   document.addEventListener('DOMContentLoaded', init);

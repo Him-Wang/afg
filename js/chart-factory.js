@@ -292,12 +292,22 @@
   }
 
   /* ---------- 横向排名 ---------- */
+  function fmtNumJs(v) {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    var n = Number(v);
+    if (Math.abs(n) >= 10000) return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return String(Math.round(n * 100) / 100);
+  }
+
   function rank(el, data, theme) {
     var sorted = data.categories.map(function (c, i) { return { c: c, v: data.values[i] }; })
       .sort(function (a, b) { return a.v - b.v; });
+    /* 单位可由数据指定：百分比数据用 %，计数/金额等用自定义单位 */
+    var unit = (data && data.unit !== undefined && data.unit !== null) ? String(data.unit) : '%';
+    var isPct = unit === '%';
     var option = {
       backgroundColor: theme.bg,
-      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) { return p.name + (isEnLang() ? ': ' : '：') + p.value + '%'; } }),
+      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) { return p.name + (isEnLang() ? ': ' : '：') + fmtNumJs(p.value) + unit; } }),
       grid: { top: 12, left: 12, right: 52, bottom: 12, containLabel: true },
       xAxis: [Object.assign({ type: 'value', splitLine: { lineStyle: { color: theme.grid } } }, axisCommon(theme))],
       yAxis: [Object.assign({
@@ -310,7 +320,10 @@
         type: 'bar', data: sorted.map(function (d) { return d.v; }),
         barWidth: '58%',
         label: { show: true, position: 'right', color: theme.muted, fontSize: 11,
-          formatter: function (p) { return (p.value > 0 ? '+' : '') + p.value + '%'; } },
+          formatter: function (p) {
+            var v = fmtNumJs(p.value);
+            return (isPct && p.value > 0 ? '+' : '') + v + unit;
+          } },
         itemStyle: {
           color: function (p) { return p.value >= 0 ? theme.up : theme.down; },
           borderRadius: 3
