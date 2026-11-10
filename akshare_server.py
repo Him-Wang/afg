@@ -1,25 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-AFG 本地数据服务示例（akshare）
+ADV 本地数据服务示例（akshare）
 
-这是一个把 akshare 数据暴露成 JSON 接口、供 AFG 网页「真实数据 → 自定义 API」调用的示例。
+这是一个把 akshare 数据暴露成 JSON 接口、供 ADV 网页「真实数据 → 自定义 API」调用的示例。
 
 安装与启动：
     1) pip install akshare
     2) python akshare_server.py
     3) 服务监听 http://127.0.0.1:8765
 
-在 AFG 里使用：
+在 ADV 里使用：
     打开「🌐 真实数据」→ 在「自定义 API」里填：
         http://127.0.0.1:8765/ak?func=stock_zh_a_hist&symbol=000001&period=daily
     点「加载」即可出图。
 
 ⚠️ 关于「其他用户用网页版能否使用」：
     这个服务跑在你自己的电脑上（127.0.0.1），只有你自己能访问。
-    其他用户打开你部署的 AFG 网页（如 https://saviorbill.github.io/afg/）时，
+    其他用户打开你部署的 ADV 网页（如 https://saviorbill.github.io/adv/）时，
     浏览器无法访问你本机的 127.0.0.1，所以他们也用不了这个本地服务。
     要让所有人能用，需要把这个服务部署到一台公网服务器（并加 CORS），
-    或者干脆直接用 FRED 这类公网 API（AFG 已内置 FRED 支持）。
+    或者干脆直接用 FRED 这类公网 API（ADV 已内置 FRED 支持）。
 """
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -31,14 +31,14 @@ HOST, PORT = "127.0.0.1", 8765
 
 
 def df_to_table(df, x_col, y_cols):
-    """把 DataFrame 转成 AFG 可识别的 {columns, rows}，空值转 None"""
+    """把 DataFrame 转成 ADV 可识别的 {columns, rows}，空值转 None"""
     columns = [x_col] + y_cols
     rows = []
     for _, r in df.iterrows():
         row = {x_col: str(r[x_col])}
         for c in y_cols:
             v = r[c]
-            # 空值/NaN -> None（AFG 会跳过，不显示为 0）
+            # 空值/NaN -> None（ADV 会跳过，不显示为 0）
             if v is None or (isinstance(v, float) and v != v):
                 row[c] = None
             else:
@@ -70,7 +70,7 @@ def fetch_data(func, params):
         return df_to_table(df, "日期", ["今值"])
 
     if func == "index_global":
-        # 全球指数实时行情（示例，非时间序列，AFG 会按柱状图渲染）
+        # 全球指数实时行情（示例，非时间序列，ADV 会按柱状图渲染）
         df = ak.stock_zh_index_spot_em()
         return df_to_table(df, "名称", ["最新价", "涨跌幅"])
 

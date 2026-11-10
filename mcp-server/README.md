@@ -1,11 +1,11 @@
-# AFG MCP Server · 完整配置教程
+# ADV MCP Server · 完整配置教程
 
-让 AI（Cursor / Claude Code / Claude Desktop / Kimi / WorkBuddy / DeepSeek Harness 等）直接调用 `make_chart` 工具，生成 **AFG 高级金融图表链接**。
+让 AI（Cursor / Claude Code / Claude Desktop / Kimi / WorkBuddy / DeepSeek Harness 等）直接调用 `make_chart` 工具，生成 **ADV 高级金融图表链接**。
 
 > **不想装东西？** 直接用「零安装」方式：把下面这段发给任意 AI，它自己就能拼出图表链接。
 >
 > ```
-> 请用 AFG 帮我做图，直接输出可点击的图表链接。
+> 请用 ADV 帮我做图，直接输出可点击的图表链接。
 > 链接格式：https://saviorbill.github.io/adv/?chart=<把 JSON 做 base64url 编码>
 > JSON 示例：{"type":"area","title":"标题","theme":"paper","labels":["2021","2022"],
 > "series":[{"name":"沪深300","values":[1,2]}]}
@@ -13,7 +13,7 @@
 > theme 可选：paper/midnight-gold/tradingview-dark/emerald/graphite
 > ```
 >
-> 下面是「配置 MCP」的完整流程（配一次，以后直接说「用 AFG 画图」）。
+> 下面是「配置 MCP」的完整流程（配一次，以后直接说「用 ADV 画图」）。
 
 ---
 
@@ -36,7 +36,7 @@ node -v
 
 ```bash
 git clone https://github.com/saviorbill/adv.git
-cd afg/mcp-server
+cd adv/mcp-server
 npm install
 ```
 
@@ -44,7 +44,7 @@ npm install
 
 1. 浏览器打开 https://github.com/saviorbill/adv
 2. 点绿色 **Code** → **Download ZIP**
-3. 解压，终端进入解压后的 `afg/mcp-server` 文件夹
+3. 解压，终端进入解压后的 `adv/mcp-server` 文件夹
 4. 执行 `npm install`
 
 看到 `added N packages` 就成功了。
@@ -59,16 +59,16 @@ npm install
 pwd
 ```
 
-把输出路径后面接上 `/server.js`。例如输出是 `/Users/xiaoming/afg/mcp-server`，完整路径就是：
+把输出路径后面接上 `/server.js`。例如输出是 `/Users/xiaoming/adv/mcp-server`，完整路径就是：
 
 ```
-/Users/xiaoming/afg/mcp-server/server.js
+/Users/xiaoming/adv/mcp-server/server.js
 ```
 
 Windows 路径长这样（反斜杠）：
 
 ```
-C:\Users\xiaoming\afg\mcp-server\server.js
+C:\Users\xiaoming\adv\mcp-server\server.js
 ```
 
 > 小技巧：可以把 `server.js` 文件从访达/资源管理器**拖进终端**，它会自动补出完整路径。
@@ -82,9 +82,9 @@ C:\Users\xiaoming\afg\mcp-server\server.js
 ```json
 {
   "mcpServers": {
-    "afg-charts": {
+    "adv-charts": {
       "command": "node",
-      "args": ["/Users/xiaoming/afg/mcp-server/server.js"]
+      "args": ["/Users/xiaoming/adv/mcp-server/server.js"]
     }
   }
 }
@@ -94,8 +94,8 @@ C:\Users\xiaoming\afg\mcp-server\server.js
 
 | 客户端 | 怎么配 |
 |---|---|
-| **Cursor** | 设置 → **Features** → **MCP** → **+ Add new MCP server**：Name 填 `afg-charts`，Type 选 `command`，Command 填 `node /完整路径/mcp-server/server.js`。<br>或在项目根目录新建 `.cursor/mcp.json`，粘贴上面 JSON。 |
-| **Claude Code** | 终端执行一行：<br>`claude mcp add afg-charts -- node /完整路径/mcp-server/server.js` |
+| **Cursor** | 设置 → **Features** → **MCP** → **+ Add new MCP server**：Name 填 `adv-charts`，Type 选 `command`，Command 填 `node /完整路径/mcp-server/server.js`。<br>或在项目根目录新建 `.cursor/mcp.json`，粘贴上面 JSON。 |
+| **Claude Code** | 终端执行一行：<br>`claude mcp add adv-charts -- node /完整路径/mcp-server/server.js` |
 | **Claude Desktop** | 编辑后**完全退出**（Cmd+Q）再打开：<br>Mac：`~/Library/Application Support/Claude/claude_desktop_config.json`<br>Windows：`%APPDATA%\Claude\claude_desktop_config.json` |
 | **Kimi / WorkBuddy** | 设置里的 **MCP**（或「工具」）页面 → 添加服务器 → 类型 `stdio` → 命令 `node` → 参数填 `/完整路径/mcp-server/server.js` |
 | **DeepSeek Harness** | MCP 配置里加入上面的 JSON |
@@ -115,7 +115,7 @@ C:\Users\xiaoming\afg\mcp-server\server.js
 如果它列出 `make_chart`，就配置成功了。之后直接用自然语言：
 
 ```
-用 AFG 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题
+用 ADV 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题
 ```
 
 AI 会返回 `https://saviorbill.github.io/adv/?chart=...` 链接，点开就是图。
@@ -127,8 +127,8 @@ AI 会返回 `https://saviorbill.github.io/adv/?chart=...` 链接，点开就是
 | 现象 | 原因 / 解决 |
 |---|---|
 | `node: command not found` | Node.js 没装好或没进 PATH。重装 Node.js，**重启终端**。Windows 试 `where node`。 |
-| 路径里有空格 | JSON 里直接写不用转义；终端命令里要加引号：`"node" "/My Folder/afg/mcp-server/server.js"` |
-| 客户端列表里没有 afg-charts | JSON 格式错（逗号/引号）。贴到 [jsonlint.com](https://jsonlint.com/) 校验。 |
+| 路径里有空格 | JSON 里直接写不用转义；终端命令里要加引号：`"node" "/My Folder/adv/mcp-server/server.js"` |
+| 客户端列表里没有 adv-charts | JSON 格式错（逗号/引号）。贴到 [jsonlint.com](https://jsonlint.com/) 校验。 |
 | 想确认服务器本身能跑 | 终端执行 `node /完整路径/mcp-server/server.js`，光标停住不返回、无报错 = 正常（stdio 服务）。 |
 | 改了配置还是不行 | **完全退出**客户端再启动（Mac：活动监视器确认进程已结束）。 |
 
@@ -169,8 +169,8 @@ JSON 示例：
 
 ## 自定义部署地址
 
-如果 AFG 部署在别处，用环境变量覆盖：
+如果 ADV 部署在别处，用环境变量覆盖：
 
 ```bash
-AFG_BASE_URL=https://你的域名/ node server.js
+ADV_BASE_URL=https://你的域名/ node server.js
 ```

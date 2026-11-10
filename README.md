@@ -53,7 +53,7 @@ cd mcp-server && npm install
 ```json
 {
   "mcpServers": {
-    "afg-charts": {
+    "adv-charts": {
       "command": "node",
       "args": ["/完整路径/adv/mcp-server/server.js"]
     }
@@ -190,7 +190,7 @@ Add to your MCP config:
 ```json
 {
   "mcpServers": {
-    "afg-charts": {
+    "adv-charts": {
       "command": "node",
       "args": ["/absolute/path/to/adv/mcp-server/server.js"]
     }

@@ -2,14 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-// AFG 部署地址（可用环境变量覆盖）
-const AFG_BASE = (process.env.AFG_BASE_URL || "https://saviorbill.github.io/adv/").replace(/\/?$/, "/");
+// ADV 部署地址（可用环境变量覆盖）
+const ADV_BASE = (process.env.ADV_BASE_URL || "https://saviorbill.github.io/adv/").replace(/\/?$/, "/");
 
-const server = new McpServer({ name: "afg-charts", version: "1.0.0" });
+const server = new McpServer({ name: "adv-charts", version: "1.0.0" });
 
 server.tool(
   "make_chart",
-  "根据数据生成一张高级金融图表（AFG），返回一个可直接打开/分享的图表链接。" +
+  "根据数据生成一张高级金融图表（ADV），返回一个可直接打开/分享的图表链接。" +
   "传入图表类型、标题、横轴标签和若干数据系列；可选配色主题。" +
   "当用户没有指定主题时，默认用 midnight-gold（黑金，适合路演/深色演示）。",
   {
@@ -29,7 +29,7 @@ server.tool(
     const config = { type, title, labels, series };
     if (theme) config.theme = theme;
     const b64 = Buffer.from(JSON.stringify(config), "utf8").toString("base64url");
-    const url = AFG_BASE + "?chart=" + b64;
+    const url = ADV_BASE + "?chart=" + b64;
     return {
       content: [{
         type: "text",

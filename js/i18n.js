@@ -267,7 +267,7 @@
   function setLang(l) {
     LANG = (l === 'en') ? 'en' : 'zh';
     document.documentElement.setAttribute('lang', LANG === 'en' ? 'en' : 'zh-CN');
-    try { localStorage.setItem('afg_lang', LANG); } catch (e) {}
+    try { localStorage.setItem('adv_lang', LANG); } catch (e) {}
     applyI18n();
   }
   function getLang() { return LANG; }

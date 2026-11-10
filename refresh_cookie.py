@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-AFG Cookie 自动刷新：用浏览器（Kimi WebBridge）从 r.datayes.com 提取最新登录 Cookie
+ADV Cookie 自动刷新：用浏览器（Kimi WebBridge）从 r.datayes.com 提取最新登录 Cookie
 
 原理：
     你的浏览器（Chrome）保持登录 r.datayes.com，会话 Cookie 会一直有效。
     本脚本调用 WebBridge 打开该页面、抓取 gw.datayes.com 请求头里的 Cookie，
-    存到 ~/.afg/datayes_cookie.txt，供 update_data.py 使用。
+    存到 ~/.adv/datayes_cookie.txt，供 update_data.py 使用。
 
 前置：
     1. Chrome 安装 Kimi WebBridge 扩展并已连接（127.0.0.1:10086）
@@ -24,7 +24,7 @@ import time
 import urllib.request
 
 DAEMON = "http://127.0.0.1:10086"
-COOKIE_FILE = os.path.expanduser("~/.afg/datayes_cookie.txt")
+COOKIE_FILE = os.path.expanduser("~/.adv/datayes_cookie.txt")
 PAGE = "https://r.datayes.com/data/monitor_detail/myself?slotId=468498"
 
 

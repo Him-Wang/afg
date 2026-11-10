@@ -698,14 +698,14 @@
   function saveLocal() {
     if (!state.table) { toast('当前没有可保存的数据'); return; }
     try {
-      localStorage.setItem('afgData', JSON.stringify({ table: state.table, title: el('chart-title').textContent || '我的数据' }));
+      localStorage.setItem('advData', JSON.stringify({ table: state.table, title: el('chart-title').textContent || '我的数据' }));
       toast('已保存到浏览器');
     } catch (e) { toast('保存失败：' + e.message); }
   }
 
   function restoreLocal() {
     try {
-      var raw = localStorage.getItem('afgData');
+      var raw = localStorage.getItem('advData');
       if (!raw) { toast('浏览器中还没有保存的数据'); return; }
       var obj = JSON.parse(raw);
       applyRemoteTable(obj.table, obj.title || '我的数据');
@@ -1951,7 +1951,7 @@
     var h = document.createElement('div');
     h.className = 'home-view';
     var fbCount = 0;
-    try { fbCount = (JSON.parse(localStorage.getItem('afg_feedback') || '[]') || []).length; } catch (e) {}
+    try { fbCount = (JSON.parse(localStorage.getItem('adv_feedback') || '[]') || []).length; } catch (e) {}
     h.innerHTML =
       '<div class="home-layout">' +
       '<div class="home-main">' +
@@ -2026,10 +2026,10 @@
         '',
         'STEP 1 — If you have terminal / file access:',
         '  a) run `node -v` (if Node.js is missing, tell me the download link and stop)',
-        '  b) git clone https://github.com/saviorbill/adv.git ~/afg',
-        '  c) cd ~/afg/mcp-server && npm install',
+        '  b) git clone https://github.com/saviorbill/adv.git ~/adv',
+        '  c) cd ~/adv/mcp-server && npm install',
         '  d) add this to YOUR OWN MCP config, then reload:',
-        '     {"mcpServers":{"afg-charts":{"command":"node","args":["<the real absolute path of ~/afg/mcp-server/server.js>"]}}}',
+        '     {"mcpServers":{"adv-charts":{"command":"node","args":["<the real absolute path of ~/adv/mcp-server/server.js>"]}}}',
         '  e) confirm the `make_chart` tool is available',
         '',
         'STEP 2 — If you cannot install anything (chat-only), use links instead:',
@@ -2044,10 +2044,10 @@
         '',
         '第一步：如果你有终端 / 文件权限',
         '  a) 运行 node -v 检查环境（如果没有 Node.js，把下载地址给我就停下）',
-        '  b) git clone https://github.com/saviorbill/adv.git ~/afg',
-        '  c) cd ~/afg/mcp-server && npm install',
+        '  b) git clone https://github.com/saviorbill/adv.git ~/adv',
+        '  c) cd ~/adv/mcp-server && npm install',
         '  d) 把下面这段加进你自己的 MCP 配置，然后重载：',
-        '     {"mcpServers":{"afg-charts":{"command":"node","args":["<~/afg/mcp-server/server.js 的真实绝对路径>"]}}}',
+        '     {"mcpServers":{"adv-charts":{"command":"node","args":["<~/adv/mcp-server/server.js 的真实绝对路径>"]}}}',
         '  e) 确认你能看到 make_chart 工具',
         '',
         '第二步：如果你不能安装（比如纯聊天环境），改用链接方式',
@@ -4669,9 +4669,9 @@
           encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
         // 本地留档（便于同一浏览器复看）
         try {
-          var hist = JSON.parse(localStorage.getItem('afg_feedback') || '[]');
+          var hist = JSON.parse(localStorage.getItem('adv_feedback') || '[]');
           hist.push({ type: f.type, content: f.content, contact: f.contact, view: f.view, at: new Date().toISOString() });
-          localStorage.setItem('afg_feedback', JSON.stringify(hist.slice(-50)));
+          localStorage.setItem('adv_feedback', JSON.stringify(hist.slice(-50)));
         } catch (e) {}
         window.open(url, '_blank');
         toast(window.I18N.t('fb.done.github'));
@@ -6113,7 +6113,7 @@
     try { new URLSearchParams(location.search).forEach(function (v, k) { q[k] = v; }); } catch (e) {}
     // 语言：URL 参数 > 本地存储 > 默认中文
     if (window.I18N) {
-      var initLang = q.lang || (function () { try { return localStorage.getItem('afg_lang'); } catch (e) { return null; } })();
+      var initLang = q.lang || (function () { try { return localStorage.getItem('adv_lang'); } catch (e) { return null; } })();
       window.I18N.setLang(initLang === 'en' ? 'en' : 'zh');
     }
     state.theme = 'paper';

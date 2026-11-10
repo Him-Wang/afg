@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-AFG 数据自动更新脚本 v2（免登录，akshare + yfinance）
+ADV 数据自动更新脚本 v2（免登录，akshare + yfinance）
 
 数据源：
     金融数据：A股指数用 akshare，全球指数/商品/外汇/VIX/美债用 yfinance
