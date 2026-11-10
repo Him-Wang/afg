@@ -1079,6 +1079,40 @@
     });
   };
 
+
+  /* ---------- 配色模板 → 相关性发散色（负=蓝/正=红金） ---------- */
+  function divergingOf(t) {
+    var ps = (window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0] || {};
+    var neg = (ps.colors && ps.colors[1]) || '#1B4B72';   // 负相关 = 冷色
+    var pos = ps.down || ps.accent || '#B5484B';          // 正相关 = 暖色
+    if (ps.id === 'contrast') { neg = '#0B3C5D'; pos = '#C0392B'; }
+    if (ps.id === 'burgundy') { neg = '#4A6E8A'; pos = '#8C3A2E'; }
+    if (ps.id === 'forest') { neg = '#3E6B7A'; pos = '#8A6A2F'; }
+    var mid = '#F6F1E7';
+    return [neg, mixHex(neg, mid, 0.62), mixHex(neg, mid, 0.3), mid,
+      mixHex(pos, mid, 0.3), mixHex(pos, mid, 0.62), pos];
+  }
+  function corrPos(t) {
+    var ps = (window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0] || {};
+    if (ps.id === 'contrast') return '#C0392B';
+    if (ps.id === 'burgundy') return '#8C3A2E';
+    if (ps.id === 'forest') return '#8A6A2F';
+    return ps.down || '#B5484B';
+  }
+  function corrNeg(t) {
+    var ps = (window.ADV_PALETTES || []).filter(function (x) { return x.id === ((t && t.paletteId) || 'consult'); })[0] || {};
+    if (ps.id === 'contrast') return '#0B3C5D';
+    if (ps.id === 'burgundy') return '#4A6E8A';
+    if (ps.id === 'forest') return '#3E6B7A';
+    return (ps.colors && ps.colors[1]) || '#1B4B72';
+  }
+  function mixHex(a, b, t) {
+    function h2r(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join(''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+    var A = h2r(a), B = h2r(b);
+    var o = A.map(function (v, i) { return Math.round(v + (B[i] - v) * t); });
+    return '#' + o.map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+  }
+
   /* ---------- 相关性热力矩阵（发散色 + 数值 + 上下三角） ---------- */
   B.corrMatrix = function (el, d, t) {
     var names = d.names || [], M = d.matrix || [];
@@ -1099,11 +1133,11 @@
       tooltip: tip(t, { formatter: function (p) {
         return '<b>' + names[p.value[1]] + ' × ' + names[p.value[0]] + '</b><br/>相关系数 ' + p.value[2].toFixed(2);
       } }),
-      grid: { left: narrow ? 74 : 88, right: narrow ? 56 : 74, top: 12, bottom: 12 },
+      grid: { left: narrow ? 74 : 92, right: narrow ? 40 : 62, top: narrow ? 54 : 58, bottom: 10 },
       xAxis: { type: 'category', data: names, position: 'top', splitArea: { show: false },
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT, rotate: 45, margin: 6,
-          interval: 0, width: 60, overflow: 'truncate' } },
+        axisLabel: { color: muted(t), fontSize: narrow ? 7 : 7.5, fontFamily: FONT, rotate: 0,
+          margin: 7, interval: 0, width: narrow ? 40 : 52, overflow: 'break', lineHeight: 9 } },
       yAxis: { type: 'category', data: names, inverse: true,
         axisLine: { show: false }, axisTick: { show: false },
         axisLabel: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT,
@@ -1111,7 +1145,7 @@
       visualMap: {
         min: -1, max: 1, orient: 'vertical', right: 4, top: 'center', itemWidth: 10, itemHeight: narrow ? 80 : 120,
         calculable: false, text: ['+1', '-1'], textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT },
-        inRange: { color: ['#1B4B72', '#4A7FA8', '#BFD3E2', '#F5F0E6', '#E8B9A8', '#C86A5A', '#8C3A2E'] }
+        inRange: { color: divergingOf(t) }
       },
       series: [{
         type: 'heatmap', data: cells,
@@ -1141,7 +1175,7 @@
       var r = M[i][j];
       if (Math.abs(r) < (narrow ? 0.42 : 0.22)) continue;
       links.push({ source: names[i], target: names[j], value: Math.abs(r), sign: r > 0 ? 1 : -1,
-        lineStyle: { color: r > 0 ? '#2E6B52' : '#C0392B', opacity: Math.min(0.92, 0.25 + Math.abs(r) * 0.9),
+        lineStyle: { color: r > 0 ? corrPos(t) : corrNeg(t), opacity: Math.min(0.92, 0.25 + Math.abs(r) * 0.9),
           width: 0.8 + Math.abs(r) * 5, curveness: 0.16 } });
       if (r > 0 && (!strongPos || r > strongPos.r)) strongPos = { a: names[i], b: names[j], r: r };
       if (r < 0 && (!strongNeg || r < strongNeg.r)) strongNeg = { a: names[i], b: names[j], r: r };
@@ -1156,7 +1190,7 @@
         var rr = M[si][sj];
         if (Math.abs(rr) < 0.25) continue;
         linksS.push({ source: names[si], target: names[sj], value: Math.abs(rr), sign: rr > 0 ? 1 : -1,
-          lineStyle: { color: rr > 0 ? '#2E6B52' : '#C0392B',
+          lineStyle: { color: rr > 0 ? corrPos(t) : corrNeg(t),
             opacity: Math.min(0.95, 0.35 + Math.abs(rr) * 0.9), width: 1 + Math.abs(rr) * 5.5, curveness: 0.14 } });
       }
       nodes = nodes.map(function (nd) { nd.x = 0.5 + (nd.x - 0.5) * 0.92; nd.y = 0.5 + (nd.y - 0.5) * 0.92; return nd; });
@@ -1191,6 +1225,18 @@
         if (p.seriesType === 'heatmap') return '<b>' + names[p.value[1]] + ' × ' + names[p.value[0]] + '</b><br/>' + p.value[2].toFixed(2);
         return '';
       } }),
+      graphic: (function () {
+        var up = corrPos(t), dn = corrNeg(t);
+        var gx = 8;
+        return [
+          { type: 'text', left: gx, top: 22, z: 20, style: { text: '连线', fill: muted(t), font: '600 8.5px ' + FONT } },
+          { type: 'line', left: gx + 30, top: 27, z: 20, shape: { x1: 0, y1: 0, x2: 16, y2: 0 }, style: { stroke: up, lineWidth: 2.6 } },
+          { type: 'text', left: gx + 50, top: 22, z: 20, style: { text: '正相关', fill: ink(t), font: '8px ' + FONT } },
+          { type: 'line', left: gx + 30, top: 40, z: 20, shape: { x1: 0, y1: 0, x2: 16, y2: 0 }, style: { stroke: dn, lineWidth: 2.6 } },
+          { type: 'text', left: gx + 50, top: 35, z: 20, style: { text: '负相关', fill: ink(t), font: '8px ' + FONT } },
+          { type: 'text', left: gx, top: 52, z: 20, style: { text: '粗细 = |相关系数|', fill: muted(t), font: '8px ' + FONT } }
+        ];
+      })(),
       title: [
         { text: '相关性网络', left: '1%', top: 2, textStyle: { color: muted(t), fontSize: 10, fontWeight: 700, fontFamily: FONT } },
         { text: '相关性矩阵（日收益率 · 红色为正 · 蓝色为负）', left: narrow ? '1%' : '38%', top: 2,
@@ -1199,18 +1245,18 @@
                 (strongNeg ? '　｜　最强负相关 ' + strongNeg.a + ' × ' + strongNeg.b + '  ' + strongNeg.r.toFixed(2) : ''),
           left: '1%', bottom: 2, textStyle: { color: rgba(ink(t), 0.55), fontSize: 9, fontFamily: FONT } }
       ],
-      grid: { left: narrow ? '44%' : '46%', right: narrow ? 56 : 70, top: padTop, bottom: 30 },
+      grid: { left: narrow ? '44%' : '46%', right: narrow ? 56 : 70, top: 104, bottom: 34 },
       xAxis: { type: 'category', data: names, position: 'top', splitArea: { show: false },
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: muted(t), fontSize: 7.5, fontFamily: FONT, rotate: 55, interval: 0, margin: 4, width: 56, overflow: 'truncate' } },
+        axisLabel: { color: muted(t), fontSize: 7.5, fontFamily: FONT, rotate: 90, interval: 0, margin: 8 } },
       yAxis: { type: 'category', data: names, inverse: true, splitArea: { show: false },
         axisLine: { show: false }, axisTick: { show: false },
         axisLabel: { color: muted(t), fontSize: 7.5, fontFamily: FONT, interval: 0, width: 60, overflow: 'truncate' } },
       visualMap: { min: -1, max: 1, orient: 'vertical', right: 2, top: 'center', itemWidth: 8, itemHeight: 70,
         calculable: false, text: ['+1', '-1'], textStyle: { color: muted(t), fontSize: 8, fontFamily: FONT },
-        inRange: { color: ['#1B4B72', '#4A7FA8', '#BFD3E2', '#F5F0E6', '#E8B9A8', '#C86A5A', '#8C3A2E'] } },
+        inRange: { color: divergingOf(t) } },
       series: [
-        { type: 'graph', layout: 'none', left: 4, top: 22, width: narrow ? '40%' : '42%', height: '80%',
+        { type: 'graph', layout: 'none', left: 4, top: 46, width: narrow ? '40%' : '42%', height: '74%',
           coordinateSystem: null, roam: false, draggable: false,
           data: nodes.map(function (nd, i) {
             return { name: nd.name, x: nd.x, y: nd.y, symbolSize: 9 + (i % 3) * 2,

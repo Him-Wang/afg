@@ -205,15 +205,15 @@
     id: 'relation', name: '关系与相关', icon: '⌘',
     desc: '变量之间有没有关系、关系强弱与方向、资产之间的联动结构。',
     charts: [
-      { id: 'scatter', name: '散点 + 拟合线', type: 'scatter', desc: '线性拟合、R² 与残差区间，看关系强度',
+      { id: 'scatter', name: '两资产散点 + 拟合线', type: 'scatter', desc: '沪深300 与 标普500 日收益率：线性拟合与 R²',
         data: function () {
-          var pts = [], n = 60;
-          for (var i = 0; i < n; i++) {
-            var x = 10 + i * 1.35 + (rnd(i * 3 + 1, -6, 6));
-            var y = 0.78 * x + 12 + rnd(i * 7 + 2, -14, 14);
-            pts.push([Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
+          var pts = [];
+          for (var i = 0; i < 90; i++) {
+            var x = rnd(i * 13 + 5, -320, 320) / 100;            // 沪深300 日收益率 %
+            var y = 0.62 * x + rnd(i * 29 + 7, -120, 120) / 100; // 标普500，带噪声
+            pts.push([Math.round(x * 100) / 100, Math.round(y * 100) / 100]);
           }
-          return { xName: '研发投入（亿元）', yName: '营收增速（%）', points: pts, seriesName: '样本公司', fit: true };
+          return { xName: '沪深300 日收益率（%）', yName: '标普500 日收益率（%）', points: pts, seriesName: '交易日', fit: true };
         } },
       { id: 'corrMatrix', name: '相关性矩阵', type: 'corrMatrix', desc: '10 类金融资产日收益率相关性 · 红正蓝负',
         data: function () { return {
