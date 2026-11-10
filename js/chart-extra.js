@@ -1486,38 +1486,62 @@
   }
   B.choropleth = function (el, d, t) {
     _GEO_EL = el;
+    var _rawMap = {};
     var W = (el && el.clientWidth) || 700;
     var narrow = W < 520;
-    var vals = [
-      { name: 'China', value: 5.2, cn: '中国' }, { name: 'United States', value: 2.8, cn: '美国' },
-      { name: 'Germany', value: 1.6, cn: '德国' }, { name: 'Japan', value: 1.2, cn: '日本' },
-      { name: 'India', value: 6.8, cn: '印度' }, { name: 'Brazil', value: 2.9, cn: '巴西' },
-      { name: 'United Kingdom', value: 1.4, cn: '英国' }, { name: 'France', value: 1.1, cn: '法国' },
-      { name: 'Canada', value: 2.0, cn: '加拿大' }, { name: 'Australia', value: 2.4, cn: '澳大利亚' },
-      { name: 'Russia', value: 1.3, cn: '俄罗斯' }, { name: 'Indonesia', value: 5.0, cn: '印尼' },
-      { name: 'Mexico', value: 2.6, cn: '墨西哥' }, { name: 'Saudi Arabia', value: 3.9, cn: '沙特' },
-      { name: 'South Africa', value: 0.9, cn: '南非' }, { name: 'Nigeria', value: 3.1, cn: '尼日利亚' },
-      { name: 'Egypt', value: 4.2, cn: '埃及' }, { name: 'Argentina', value: -1.2, cn: '阿根廷' },
-      { name: 'South Korea', value: 2.2, cn: '韩国' }, { name: 'Italy', value: 0.8, cn: '意大利' }
-    ];
-    var top = vals.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
+    var vals = d.data || [];
+    if (!vals.length) {
+      vals = [
+        { name: 'China', value: 5.2 }, { name: 'United States', value: 2.8 },
+        { name: 'Germany', value: 1.6 }, { name: 'Japan', value: 1.2 },
+        { name: 'India', value: 6.8 }, { name: 'Brazil', value: 2.9 }
+      ];
+    }
+    var nums = vals.map(function (x) { return x.value; }).filter(function (v) { return isFinite(v); });
+    var vmin = Math.min.apply(null, nums.concat([0]));
+    var vmax = Math.max.apply(null, nums.concat([0]));
+    var top = vals.slice().filter(function (x) { return x.label !== false; })
+      .sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
+    var topNames = {};
+    top.forEach(function (x) { topNames[x.name] = x.cn || x.name; });
+    /* 重尾数据（如 GDP 总量）用对数映射，否则小国几乎看不见 */
+    var sortedN = nums.slice().sort(function (a, b) { return a - b; });
+    var medN = sortedN[Math.floor(sortedN.length / 2)] || 0;
+    var skew = medN > 0 ? vmax / medN : 99;
+    var useLog = skew >= 8 && vmin >= 0;
+    var f = useLog ? function (v) { return Math.log(1 + Math.max(0, v)); } : function (v) { return v; };
+    var mapData = vals.map(function (x) { _rawMap[x.name] = x.value; return { name: x.name, value: f(x.value) }; });
+    var _vt = base(t).tooltip;
+    _vt = Object.assign({}, _vt, { formatter: function (p) {
+      var rv = _rawMap[p.name];
+      return '<b>' + (p.name) + '</b><br/>' + (d.metric || '') + ' ' + (rv === undefined ? '—' : num(rv));
+    } });
+    var fmin = Math.min.apply(null, vals.map(function (x) { return f(x.value); }));
+    var fmax = Math.max.apply(null, vals.map(function (x) { return f(x.value); }));
     var rp = rampOf(t);
     var opt = geo(t, [{
-      type: 'map', map: 'world', roam: true, zoom: narrow ? 1.35 : 1.1, nameProperty: 'name',
+      type: 'map', map: 'world', roam: true, zoom: narrow ? 1.35 : 1.05, nameProperty: 'name',
       itemStyle: { areaColor: rgba(ink(t), 0.035), borderColor: rgba(ink(t), 0.10), borderWidth: 0.4 },
-      emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.28) }, label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT } },
-      label: { show: false }, data: vals
+      emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.28) },
+        label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT } },
+      label: { show: true, color: ink(t), fontSize: 9, fontFamily: FONT, fontWeight: 700,
+        formatter: function (p) { return topNames[p.name] || ''; } },
+      data: mapData
     }]);
+    opt.tooltip = _vt;
     opt.visualMap = {
-      min: -2, max: 7, left: 10, bottom: 10, orient: 'horizontal', itemWidth: 10, itemHeight: narrow ? 76 : 110,
-      text: ['高', '低'], calculable: false,
+      min: fmin, max: fmax, left: 12, bottom: 12, orient: 'horizontal',
+      itemWidth: 10, itemHeight: narrow ? 70 : 108,
+      text: [num(vmax), num(vmin)], calculable: false,
+      formatter: function (v) { return useLog ? num(Math.exp(v) - 1) : num(v); },
       textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT },
-      inRange: { color: [rgba(rp[2] || '#A8C4D8', 0.35), rgba(rp[2] || '#A8C4D8', 0.7), rp[1] || '#1B4B72', rp[0] || '#051C2C'] }
+      inRange: { color: [rgba(rp[3] || '#A8C4D8', 0.35), rgba(rp[2] || '#4A7FA8', 0.7),
+        rp[1] || '#1B4B72', rp[0] || '#051C2C'] }
     };
     opt.title = [
-      { text: d.metric || '人均 GDP（万元）', left: 14, top: 8,
+      { text: d.metric || tr('区域指标', 'Regional metric'), left: 14, top: 8,
         textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT, fontWeight: 700 } },
-      { text: '前 5 名 · ' + top.map(function (x) { return x.cn + ' ' + x.value; }).join('　'),
+      { text: '前 5 名 · ' + top.map(function (x) { return (x.cn || x.name) + ' ' + num(x.value); }).join('　') + (useLog ? '　· 对数色阶' : ''),
         left: 14, top: 26, textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT } }
     ];
     return opt;
@@ -2324,44 +2348,6 @@
       series: series
     }, extra || {}));
   }
-  B.choropleth = function (el, d, t) {
-    _GEO_EL = el;
-    var W = (el && el.clientWidth) || 700;
-    var narrow = W < 520;
-    var vals = [
-      { name: 'China', value: 5.2, cn: '中国' }, { name: 'United States', value: 2.8, cn: '美国' },
-      { name: 'Germany', value: 1.6, cn: '德国' }, { name: 'Japan', value: 1.2, cn: '日本' },
-      { name: 'India', value: 6.8, cn: '印度' }, { name: 'Brazil', value: 2.9, cn: '巴西' },
-      { name: 'United Kingdom', value: 1.4, cn: '英国' }, { name: 'France', value: 1.1, cn: '法国' },
-      { name: 'Canada', value: 2.0, cn: '加拿大' }, { name: 'Australia', value: 2.4, cn: '澳大利亚' },
-      { name: 'Russia', value: 1.3, cn: '俄罗斯' }, { name: 'Indonesia', value: 5.0, cn: '印尼' },
-      { name: 'Mexico', value: 2.6, cn: '墨西哥' }, { name: 'Saudi Arabia', value: 3.9, cn: '沙特' },
-      { name: 'South Africa', value: 0.9, cn: '南非' }, { name: 'Nigeria', value: 3.1, cn: '尼日利亚' },
-      { name: 'Egypt', value: 4.2, cn: '埃及' }, { name: 'Argentina', value: -1.2, cn: '阿根廷' },
-      { name: 'South Korea', value: 2.2, cn: '韩国' }, { name: 'Italy', value: 0.8, cn: '意大利' }
-    ];
-    var top = vals.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
-    var rp = rampOf(t);
-    var opt = geo(t, [{
-      type: 'map', map: 'world', roam: true, zoom: narrow ? 1.35 : 1.1, nameProperty: 'name',
-      itemStyle: { areaColor: rgba(ink(t), 0.035), borderColor: rgba(ink(t), 0.10), borderWidth: 0.4 },
-      emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.28) }, label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT } },
-      label: { show: false }, data: vals
-    }]);
-    opt.visualMap = {
-      min: -2, max: 7, left: 10, bottom: 10, orient: 'horizontal', itemWidth: 10, itemHeight: narrow ? 76 : 110,
-      text: ['高', '低'], calculable: false,
-      textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT },
-      inRange: { color: [rgba(rp[2] || '#A8C4D8', 0.35), rgba(rp[2] || '#A8C4D8', 0.7), rp[1] || '#1B4B72', rp[0] || '#051C2C'] }
-    };
-    opt.title = [
-      { text: d.metric || '人均 GDP（万元）', left: 14, top: 8,
-        textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT, fontWeight: 700 } },
-      { text: '前 5 名 · ' + top.map(function (x) { return x.cn + ' ' + x.value; }).join('　'),
-        left: 14, top: 26, textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT } }
-    ];
-    return opt;
-  };
   B.symbolMap = function (el, d, t) {
     _GEO_EL = el;
     var pts = d.points || [];
@@ -2722,6 +2708,62 @@
       })
     });
   };
+  /* ---------- 组合图：柱（总量，左轴）+ 折线（比率，右轴） ---------- */
+  B.combo = function (el, d, t) {
+    var series = d.series || [];
+    var labels = d.labels || [];
+    var W = (el && el.clientWidth) || 700;
+    var narrow = W < 520;
+    if (!series.length) return base(t, {});
+    /* 第一条走柱（左轴），其余走线（右轴） */
+    var bars = series[0];
+    var lines = series.slice(1);
+    var out = [{
+      name: bars.name, type: 'bar', yAxisIndex: 0, barMaxWidth: 26,
+      data: bars.values, z: 2,
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: rgba(seriesColor(t, 0), 0.92) },
+        { offset: 1, color: rgba(seriesColor(t, 0), 0.42) }]),
+        borderRadius: [3, 3, 0, 0] },
+      label: { show: false }
+    }];
+    lines.forEach(function (ln, i) {
+      out.push({
+        name: ln.name, type: 'line', yAxisIndex: 1, data: ln.values, z: 5,
+        smooth: 0.25, showSymbol: true, symbol: 'circle', symbolSize: 5,
+        lineStyle: { color: seriesColor(t, i + 1), width: 2.2 },
+        itemStyle: { color: seriesColor(t, i + 1), borderColor: '#fff', borderWidth: 1.5 },
+        endLabel: { show: true, color: seriesColor(t, i + 1), fontSize: 9, fontFamily: FONT,
+          formatter: function (p) { return num(p.value); } }
+      });
+    });
+    var isRatio = function (nm) { return /增速|率|占比|percent|growth|rate|%/i.test(String(nm || '')); };
+    return base(t, {
+      tooltip: tip(t, { trigger: 'axis', axisPointer: { type: 'shadow' },
+        formatter: function (ps) {
+          var head = '<b>' + (ps[0] ? ps[0].axisValue : '') + '</b>';
+          var rows = ps.map(function (p) {
+            var v = p.value;
+            var showPct = p.seriesIndex > 0 && isRatio(p.seriesName) && Math.abs(v) < 3;
+            return p.marker + p.seriesName + '　' + (showPct ? (v * 100).toFixed(1) + '%' : num(v));
+          });
+          return head + '<br/>' + rows.join('<br/>');
+        } }),
+      legend: legend(t, { data: series.map(function (x) { return x.name; }) }),
+      grid: grid({ top: 44, left: 8, right: narrow ? 40 : 58, bottom: 8 }),
+      xAxis: xAxis(t, { data: labels, axisLabel: { color: ink(t), fontSize: narrow ? 7.5 : 9, fontFamily: FONT,
+        interval: labels.length > 14 ? Math.ceil(labels.length / 12) : 0, rotate: narrow ? 40 : 0, hideOverlap: true } }),
+      yAxis: [
+        Object.assign(yAxis(t, {}), { splitLine: { lineStyle: { color: rule(t) } } }),
+        Object.assign(yAxis(t, { splitLine: { show: false } }), {
+          position: 'right',
+          axisLabel: { color: muted(t), fontSize: 8.5, fontFamily: FONT,
+            formatter: function (v) { return lines.length && isRatio(lines[0].name) && Math.abs(v) < 3 ? (v * 100).toFixed(0) + '%' : num(v); } } })
+      ],
+      series: out
+    });
+  };
+
   B.streamgraph = function (el, d, t) {
     var data = [];
     d.topics.forEach(function (tp) {

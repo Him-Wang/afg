@@ -713,7 +713,20 @@
     toast('数据 JSON 已导出（可放到 GitHub 仓库用 URL 载入）');
   }
 
-  var TYPE_LABELS = { line: '折线图', area: '面积图', bar: '柱状图', stacked: '堆叠面积', rank: '横向排名', candlestick: 'K 线', radar: '雷达图', stackedBar: '堆叠柱状', perf: '业绩评估', worldMap: '世界地图', scatterMatrix: '散点矩阵' };
+  var TYPE_LABELS = {
+    line: '折线图', area: '面积图', bar: '柱状图', stacked: '堆叠面积', rank: '横向排名',
+    candlestick: 'K 线', radar: '雷达图', stackedBar: '堆叠柱状', perf: '业绩评估',
+    worldMap: '世界地图', scatterMatrix: '散点矩阵',
+    step: '阶梯线', season: '季节性对比', streamgraph: '主题河流图',
+    combo: '柱+线组合', dual: '双轴对比', dumbbell: '哑铃图', bullet: 'KPI 达成', tornado: '龙卷风图',
+    percentBar: '百分比堆叠', pie: '饼图', donut: '环形图', treemap: '矩形树图', sunburst: '旭日图', waterfall: '瀑布图',
+    histogram: '直方图', boxplot: '分布条带', ridge: '山脊图', violin: '小提琴图',
+    scatter: '散点图', bubble: '气泡图', heatmap: '热力图', corrMatrix: '相关性矩阵',
+    funnel: '漏斗图', sankey: '桑基图',
+    choropleth: '分级统计图', heatMapGeo: '热点地图', symbolMap: '标记地图',
+    tree: '树形图', orgChart: '组织架构', icicle: '冰柱图', swimlane: '泳道图',
+    control: '控制图', parallel: '平行坐标'
+  };
 
   /* ---------- 通用 ---------- */
   var toastTimer = null;
@@ -845,6 +858,8 @@
 
   function renderValueLabels(inst) {
     if (!inst || !inst.getDom) return;
+    /* 最新值只在金融资产类图表展示：横向对比等场景下标在最后一个点上没有意义 */
+    var showLatest = !!state.finItem || state.mode === 'finance';
     var container = inst.getDom();
     if (!container) return;
     Array.prototype.forEach.call(container.querySelectorAll('.last-tag, .ext-label'), function (n) { n.remove(); });
@@ -884,7 +899,8 @@
         catch (e) { return null; }
       }
       var sname = ser.name || '';
-      var pLast = px(lastP); if (pLast) items.push({ px: pLast[0], py: pLast[1], text: labelNum(lastP.v), color: c, kind: 'latest', pri: 1, seriesName: sname });
+      var pLast = showLatest ? px(lastP) : null;
+      if (pLast) items.push({ px: pLast[0], py: pLast[1], text: labelNum(lastP.v), color: c, kind: 'latest', pri: 1, seriesName: sname });
       if (state.labelMode === 'extreme' && vals.length > 3) {
         var pHi = px(hiP); if (pHi && hiP.i !== lastP.i) if (labelNum(hiP.v) !== labelNum(lastP.v)) items.push({ px: pHi[0], py: pHi[1], text: labelNum(hiP.v), color: '#B5484B', kind: 'max', pri: 2, seriesName: sname });
         var pLo = px(loP); if (pLo && loP.i !== lastP.i && loP.i !== hiP.i) if (labelNum(loP.v) !== labelNum(lastP.v) && labelNum(loP.v) !== labelNum(hiP.v)) items.push({ px: pLo[0], py: pLo[1], text: labelNum(loP.v), color: '#1E7A46', kind: 'min', pri: 3, seriesName: sname });
@@ -3705,22 +3721,99 @@
 
   /* ---------- 导入后：制图方式（ADV 推荐 / 我自己选） ---------- */
   var PICK_GROUPS = [
-    { name: '趋势', types: [['line', '折线图'], ['area', '面积图'], ['stacked', '堆叠面积'], ['step', '阶梯线']] },
-    { name: '比较', types: [['bar', '柱状图'], ['rank', '横向排名'], ['dual', '双轴对比'], ['radar', '雷达图']] },
-    { name: '构成', types: [['stackedBar', '堆叠柱状'], ['pie', '饼图'], ['donut', '环形图'], ['treemap', '矩形树图']] },
-    { name: '关系', types: [['scatterMatrix', '矩阵散点'], ['bubble', '气泡图'], ['heatmap', '热力图']] }
+    { name: '趋势', types: [['line', '折线图'], ['area', '面积图'], ['stacked', '堆叠面积'], ['step', '阶梯线'], ['season', '季节性对比'], ['streamgraph', '主题河流图']] },
+    { name: '比较', types: [['bar', '柱状图'], ['rank', '横向排名'], ['combo', '柱+线组合'], ['dual', '双轴对比'], ['radar', '雷达图'], ['dumbbell', '哑铃图'], ['bullet', 'KPI 达成'], ['tornado', '龙卷风图']] },
+    { name: '构成', types: [['stackedBar', '堆叠柱状'], ['percentBar', '百分比堆叠'], ['pie', '饼图'], ['donut', '环形图'], ['treemap', '矩形树图'], ['sunburst', '旭日图'], ['waterfall', '瀑布图']] },
+    { name: '分布', types: [['histogram', '直方图'], ['boxplot', '分布条带'], ['ridge', '山脊图'], ['violin', '小提琴图']] },
+    { name: '关系', types: [['scatter', '散点图'], ['bubble', '气泡图'], ['scatterMatrix', '矩阵散点'], ['heatmap', '热力图'], ['corrMatrix', '相关性矩阵']] },
+    { name: '流向', types: [['funnel', '漏斗图'], ['sankey', '桑基图']] },
+    { name: '地理', types: [['choropleth', '分级统计图'], ['heatMapGeo', '热点地图'], ['symbolMap', '标记地图']] },
+    { name: '层级', types: [['tree', '树形图'], ['orgChart', '组织架构'], ['icicle', '冰柱图'], ['swimlane', '泳道图']] },
+    { name: '特殊', types: [['control', '控制图'], ['parallel', '平行坐标']] }
   ];
   var PICK_DESC = {
     line: '看趋势与拐点', area: '强调累计量', stacked: '总量与结构', step: '阶跃变化',
-    bar: '分类对比', rank: '排序展示', dual: '量纲不同的双指标', radar: '多维能力',
-    stackedBar: '分类内部构成', pie: '占比（≤6类）', donut: '占比+中心指标', treemap: '层级占比',
-    scatterMatrix: '多变量相关性', bubble: '三维关系', heatmap: '二维矩阵热力'
+    season: '同月跨年对比', streamgraph: '多主题此消彼长',
+    bar: '分类对比', rank: '排序展示', combo: '柱看总量、线看比率', dual: '量纲不同的双指标',
+    radar: '多维能力', dumbbell: '两期差距', bullet: '对照目标', tornado: '双向对比',
+    stackedBar: '分类内部构成', percentBar: '只比结构', pie: '占比（≤6类）', donut: '占比+中心指标',
+    treemap: '层级占比', sunburst: '多级圆环', waterfall: '增减拆解',
+    histogram: '分布形状', boxplot: '分位区间', ridge: '分布位移', violin: '分布密度',
+    scatter: '两变量关系', bubble: '三维关系', scatterMatrix: '多变量两两', heatmap: '二维矩阵',
+    corrMatrix: '相关性矩阵',
+    funnel: '逐级转化', sankey: '多级分流',
+    choropleth: '按地区着色', heatMapGeo: '热点聚集', symbolMap: '按点标记',
+    tree: '层级结构', orgChart: '组织架构', icicle: '层级占比横条', swimlane: '跨部门流程',
+    control: '过程监控', parallel: '多维比较'
   };
+
+
+  /* ---------- 地理：国家/地区名称映射 ---------- */
+  var GEO_NAME_CN = {
+    '中国':'China','美国':'United States','德国':'Germany','日本':'Japan','印度':'India','英国':'United Kingdom',
+    '法国':'France','意大利':'Italy','加拿大':'Canada','巴西':'Brazil','俄罗斯':'Russia','韩国':'South Korea',
+    '澳大利亚':'Australia','西班牙':'Spain','墨西哥':'Mexico','印度尼西亚':'Indonesia','印尼':'Indonesia',
+    '荷兰':'Netherlands','沙特阿拉伯':'Saudi Arabia','沙特':'Saudi Arabia','土耳其':'Turkey','瑞士':'Switzerland',
+    '波兰':'Poland','阿根廷':'Argentina','瑞典':'Sweden','比利时':'Belgium','泰国':'Thailand','爱尔兰':'Ireland',
+    '以色列':'Israel','阿联酋':'United Arab Emirates','新加坡':'Singapore','菲律宾':'Philippines','越南':'Vietnam',
+    '马来西亚':'Malaysia','南非':'South Africa','丹麦':'Denmark','挪威':'Norway','奥地利':'Austria','伊朗':'Iran',
+    '哥伦比亚':'Colombia','智利':'Chile','芬兰':'Finland','孟加拉国':'Bangladesh','埃及':'Egypt','巴基斯坦':'Pakistan',
+    '尼日利亚':'Nigeria','捷克':'Czech Republic','葡萄牙':'Portugal','希腊':'Greece','新西兰':'New Zealand',
+    '中国香港':'China','中国台湾':'China','香港':'China','台湾':'China','俄罗斯联邦':'Russia'
+  };
+  function toMapName(v) {
+    var t0 = String(v == null ? '' : v).trim();
+    if (!t0) return null;
+    if (GEO_NAME_CN[t0]) return GEO_NAME_CN[t0];
+    if (/^[A-Za-z][A-Za-z\s\.\-']*$/.test(t0)) return t0;
+    return null;
+  }
+  function countryColScore(table, col) {
+    if (!table || !table.rows || !table.rows.length) return 0;
+    var hit = 0, tot = 0;
+    table.rows.forEach(function (r) {
+      var v = String(r[col] == null ? '' : r[col]).trim();
+      if (!v) return;
+      tot++;
+      if (toMapName(v)) hit++;
+    });
+    return tot ? hit / tot : 0;
+  }
 
   function suggestCharts(det, table) {
     var out = [];
     var nSeries = state.mapping.yCols.length;
     var isTS = det && det.isTimeSeries;
+
+    /* ① 国家/地区列 → 地理分级统计图优先 */
+    var geoCol = null;
+    if (table) {
+      if (countryColScore(table, state.mapping.timeCol) >= 0.6) geoCol = state.mapping.timeCol;
+      if (!geoCol) table.columns.forEach(function (c) {
+        if (geoCol) return;
+        if (c === state.mapping.timeCol) return;
+        if (!isNaN(toNum(table.rows[0] && table.rows[0][c]))) return;
+        if (countryColScore(table, c) >= 0.6) geoCol = c;
+      });
+    }
+    if (geoCol) {
+      out.push({ t: 'choropleth', why: '检测到「' + geoCol + '」是国家/地区，可在世界地图上按数值着色' });
+    }
+
+    /* ② 量纲差异大的两个指标 → 柱+线组合 */
+    var yc = state.mapping.yCols || [];
+    if (yc.length === 2 && table) {
+      var med = yc.map(function (c) {
+        var vv = table.rows.map(function (r) { return toNum(r[c]); }).filter(function (v) { return isFinite(v); });
+        vv.sort(function (a, b) { return a - b; });
+        return Math.abs(vv[Math.floor(vv.length / 2)] || 0) || 1;
+      });
+      var big = Math.max(med[0], med[1]), small = Math.min(med[0], med[1]);
+      if (big / small >= 8) {
+        out.push({ t: 'combo', why: '两个指标量纲差 ' + Math.round(big / small) + '×，建议柱（总量）+ 线（比率）双轴' });
+      }
+    }
+
     if (isTS) {
       out.push({ t: 'line', why: '时间序列最通用：看趋势、拐点与节奏' });
       if (nSeries <= 2) out.push({ t: 'area', why: '强调累积量级，视觉重量更强' });
@@ -3944,16 +4037,44 @@
     state.isPriceData = isPriceLike(table, state.det);
     var _lbls = table.rows.slice(0, 20).map(function (r) { return String(r[state.det.timeCol]); });
     state.dataFreq = DataLoader.inferFreq(_lbls);
-    state.mapping.timeCol = state.det.timeCol;
-    state.mapping.yCols = state.det.ohlc ? [] : state.det.numericCols.filter(function (c) { return c !== state.det.timeCol; });
-    state.mapping.chartType = state.det.ohlc ? 'candlestick' : (state.det.isTimeSeries ? 'line' : 'bar');
+    /* 智能选定 X 列：
+       ① 有国家/地区列 → 用它当分类轴（便于做地图/排名）
+       ② 否则若 X 列是「排名/序号」这类无意义列 → 换成第一个文本列 */
+    var _geoCol = null, _geoScore = 0;
+    table.columns.forEach(function (c) {
+      var sc = countryColScore(table, c);
+      if (sc >= 0.6 && sc > _geoScore) { _geoScore = sc; _geoCol = c; }
+    });
+    var _rankLike = function (c) {
+      if (/排名|序号|序次|rank|no\.?/i.test(String(c))) return true;
+      var vals = table.rows.map(function (r) { return toNum(r[c]); }).filter(function (v) { return isFinite(v); });
+      if (vals.length < 5) return false;
+      var sorted = vals.slice().sort(function (a, b) { return a - b; });
+      var seq = true;
+      for (var i = 0; i < sorted.length; i++) { if (Math.abs(sorted[i] - (i + 1)) > 1e-9) { seq = false; break; } }
+      return seq;
+    };
+    var _xCol = state.det.timeCol;
+    if (_geoCol) _xCol = _geoCol;
+    else if (_rankLike(_xCol)) {
+      var txtCol = table.columns.filter(function (c) {
+        return c !== _xCol && table.rows.some(function (r) { return String(r[c] || '').trim() !== '' && !isFinite(toNum(r[c])); });
+      })[0];
+      if (txtCol) _xCol = txtCol;
+    }
+    state.mapping.timeCol = _xCol;
+    state.mapping.yCols = state.det.ohlc ? [] : state.det.numericCols.filter(function (c) {
+      return c !== _xCol && !_rankLike(c);
+    });
+    state.mapping.chartType = state.det.ohlc ? 'candlestick'
+      : (_geoCol ? 'choropleth' : (state.det.isTimeSeries ? 'line' : 'bar'));
     state.transposed = false;
     if (el('btn-swapxy')) el('btn-swapxy').classList.remove('active');
 
     el('mapping-area').style.display = '';
     el('dataset-picker').style.display = 'none';
     var info = '检测到 ' + table.rows.length + ' 行 × ' + table.columns.length + ' 列 · 推荐：' +
-      (TYPE_LABELS[state.mapping.chartType] || state.mapping.chartType) + '　|　X 列：' + state.det.timeCol;
+      (TYPE_LABELS[state.mapping.chartType] || state.mapping.chartType) + '　|　X 列：' + state.mapping.timeCol;
     if (state.det.ohlc) info += '　·　已识别 OHLC 列';
     else if (state.det.isTimeSeries) info += '（时间序列）';
     else info += '（分类/实体）';
@@ -4186,7 +4307,49 @@
       var labels = rows.map(function (r) { return String(r[state.mapping.timeCol]); });
       var type = state.mapping.chartType;
       var data;
-      if (type === 'rank') {
+      if (type === 'choropleth') {
+        /* 找到国家/地区列（优先 X 列，其次自动识别） */
+        var geoCol = state.mapping.timeCol;
+        if (countryColScore(table, geoCol) < 0.6) {
+          var bestCol = null, bestScore = 0;
+          table.columns.forEach(function (c) {
+            if (c === state.mapping.timeCol) return;
+            if (!isNaN(toNum(rows[0] && rows[0][c]))) return;
+            var sc = countryColScore(table, c);
+            if (sc > bestScore) { bestScore = sc; bestCol = c; }
+          });
+          if (bestCol) geoCol = bestCol;
+        }
+        var valCol = yCols[0];
+        var gdata = rows.map(function (r) {
+          var nm = toMapName(r[geoCol]);
+          if (!nm) return null;
+          return { name: nm, cn: String(r[geoCol]).trim(), value: vnum(r[valCol]) };
+        }).filter(function (x) { return x && isFinite(x.value); });
+        if (!gdata.length) { toast('未识别到国家/地区名称，无法绘制地图'); return; }
+        data = { data: gdata, metric: valCol + (state.det && state.det.orientation === 'wide' ? '' : '') };
+        labels = rows.map(function (r) { return String(r[geoCol]); });
+      } else if (type === 'funnel') {
+        var fv = rows.map(function (r) { return { name: String(r[state.mapping.timeCol]), value: vnum(r[yCols[0]]) }; })
+          .filter(function (x) { return isFinite(x.value) && x.value > 0; })
+          .sort(function (a, b) { return b.value - a.value; }).slice(0, 8);
+        data = { steps: fv };
+      } else if (type === 'control') {
+        var cv = rows.map(function (r) { return vnum(r[yCols[0]]); }).filter(function (v) { return isFinite(v); });
+        if (cv.length < 6) { toast('控制图至少需要 6 个数据点'); return; }
+        var cm0 = cv.reduce(function (a, b) { return a + b; }, 0) / cv.length;
+        var sd0 = Math.sqrt(cv.reduce(function (a, b) { return a + (b - cm0) * (b - cm0); }, 0) / cv.length) || 1;
+        data = { labels: labels.slice(0, cv.length), values: cv,
+          mean: cm0, ucl: cm0 + 3 * sd0, lcl: cm0 - 3 * sd0 };
+      } else if (type === 'parallel') {
+        data = { dims: yCols.slice(0, 6),
+          rows: rows.slice(0, 12).map(function (r) {
+            return { name: String(r[state.mapping.timeCol]), values: yCols.slice(0, 6).map(function (c) { return vnum(r[c]); }) };
+          }) };
+      } else if (type === 'combo') {
+        var sers = yCols.map(function (c) { return { name: c, values: rows.map(function (r) { return vnum(r[c]); }) }; });
+        data = { labels: labels, series: sers };
+      } else if (type === 'rank') {
         var col = yCols[0];
         data = { categories: labels, values: rows.map(function (r) { return vnum(r[col]); }) };
       } else if (type === 'radar') {
