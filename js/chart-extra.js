@@ -1779,166 +1779,6 @@
     });
   };
 
-  /* ================= 9. 特殊 ================= */
-  B.control = function (el, d, t) {
-    var W = (el && el.clientWidth) || 600;
-    var narrow = W < 480;
-    var vals = d.values || [];
-    var mean = d.mean, ucl = d.ucl, lcl = d.lcl;
-    var sd = (ucl - mean) / 3 || 1;
-    /* 越界点 */
-    var bad = [];
-    vals.forEach(function (v, i) { if (v > ucl || v < lcl) bad.push({ value: [i, v] }); });
-    var cpk = Math.min((ucl - mean) / (3 * sd), (mean - lcl) / (3 * sd));
-    var rp = rampOf(t);
-    function endLbl(txt, color) {
-      return narrow ? { show: false } : { show: true, formatter: txt, color: color, fontSize: 8.5, fontFamily: FONT, distance: 4 };
-    }
-    return base(t, {
-      tooltip: tip(t, { trigger: 'axis' }),
-      grid: grid({ left: 8, right: narrow ? 14 : 56, top: narrow ? 34 : 30, bottom: 12 }),
-      title: [
-        { text: 'Cpk', left: 10, top: 2, textStyle: { color: muted(t), fontSize: 8.5, fontFamily: FONT, fontWeight: 400 } },
-        { text: cpk.toFixed(2), left: 10, top: 12,
-          textStyle: { color: cpk >= 1.33 ? (t.up || '#1E7A46') : (t.down || '#C0392B'), fontSize: narrow ? 14 : 17, fontFamily: FONT, fontWeight: 800 } },
-        { text: '越界 ' + bad.length + ' 点', right: 10, top: 12,
-          textStyle: { color: bad.length ? (t.down || '#C0392B') : muted(t), fontSize: 9, fontFamily: FONT, fontWeight: 700 } }
-      ],
-      xAxis: timeAxis(t, d.labels),
-      yAxis: yAxis(t, { scale: true, splitNumber: 4 }),
-      series: [
-        /* UCL / LCL 之间的控制带 */
-        { type: 'line', data: vals.map(function () { return ucl; }), showSymbol: false, silent: true, z: 2,
-          lineStyle: { color: rgba(t.down || '#B5484B', 0.7), type: 'dashed', width: 1 },
-          endLabel: endLbl('UCL', t.down || '#B5484B') },
-        { type: 'line', data: vals.map(function () { return lcl; }), showSymbol: false, silent: true, z: 2,
-          lineStyle: { color: rgba(t.down || '#B5484B', 0.7), type: 'dashed', width: 1 },
-          endLabel: endLbl('LCL', t.down || '#B5484B') },
-        { type: 'line', data: vals.map(function () { return mean; }), showSymbol: false, silent: true, z: 2,
-          lineStyle: { color: rgba(ink(t), 0.4), width: 1 },
-          endLabel: endLbl('CL', muted(t)) },
-        { type: 'line', data: vals, showSymbol: false, z: 3,
-          lineStyle: { color: seriesColor(t, 0), width: 1.8 },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: rgba(seriesColor(t, 0), 0.16) }, { offset: 1, color: rgba(seriesColor(t, 0), 0.01) }]) } },
-        { type: 'scatter', data: bad, symbolSize: 7, z: 6, itemStyle: { color: t.down || '#B5484B', borderColor: '#fff', borderWidth: 1.5 },
-          label: { show: bad.length > 0 && !narrow, position: 'top', distance: 5, color: t.down || '#B5484B',
-            fontSize: 8.5, fontFamily: FONT, fontWeight: 700, formatter: function (p) { return num(p.value[1]); } } }
-      ]
-    });
-  };
-  B.parallel = function (el, d, t) {
-    var W = (el && el.clientWidth) || 600;
-    var narrow = W < 480;
-    var dims = (d.dims || []).slice();
-    if (narrow && dims.length > 4) dims = dims.slice(0, 4);
-    var rows = (d.rows || []).map(function (r) { return { name: r.name, values: r.values.slice(0, dims.length) }; });
-    /* 综合得分（各维归一化后求均值）→ 高亮最优 */
-    var mins = dims.map(function (_, i) { return Math.min.apply(null, rows.map(function (r) { return r.values[i]; })); });
-    var maxs = dims.map(function (_, i) { return Math.max.apply(null, rows.map(function (r) { return r.values[i]; })); });
-    var scores = rows.map(function (r) {
-      var s = 0;
-      r.values.forEach(function (v, i) { s += (v - mins[i]) / ((maxs[i] - mins[i]) || 1); });
-      return s / dims.length;
-    });
-    var best = scores.indexOf(Math.max.apply(null, scores));
-    return base(t, {
-      tooltip: tip(t, { trigger: 'item' }),
-      legend: legend(t, { data: rows.map(function (r) { return r.name; }), itemGap: narrow ? 8 : 14 }),
-      title: narrow ? undefined : [
-        { text: '综合最优', left: 12, bottom: 2, textStyle: { color: muted(t), fontSize: 8.5, fontFamily: FONT, fontWeight: 400 } },
-        { text: rows[best] ? rows[best].name + ' ' + (scores[best] * 100).toFixed(0) + ' 分' : '—', left: 62, bottom: 0,
-          textStyle: { color: accentOf(t), fontSize: 12, fontFamily: FONT, fontWeight: 800 } }
-      ],
-      parallelAxis: dims.map(function (n, i) {
-        return { dim: i, name: n,
-          nameTextStyle: { color: muted(t), fontSize: narrow ? 8 : 9.5, fontFamily: FONT, padding: [0, 0, 3, 0] },
-          axisLine: { lineStyle: { color: rgba(ink(t), 0.16) } },
-          axisLabel: { show: !narrow, color: muted(t), fontSize: 8.5, fontFamily: FONT, formatter: function (v) { return Math.round(v); } },
-          axisTick: { show: false } };
-      }),
-      parallel: { left: narrow ? 22 : 40, right: narrow ? 22 : 34, top: narrow ? 48 : 42, bottom: narrow ? 18 : 26 },
-      series: rows.map(function (r, i) {
-        var isBest = i === best;
-        return { name: r.name, type: 'parallel', data: [r.values], smooth: 0.2,
-          lineStyle: { width: isBest ? (narrow ? 2.4 : 3) : (narrow ? 1.1 : 1.5),
-            color: isBest ? accentOf(t) : seriesColor(t, i),
-            opacity: isBest ? 1 : 0.42 },
-          z: isBest ? 10 : 1 };
-      })
-    });
-  };
-  B.streamgraph = function (el, d, t) {
-    var data = [];
-    d.topics.forEach(function (tp) {
-      tp.values.forEach(function (v, i) {
-        var lb = String(d.labels[i]);
-        var dt = lb.indexOf('-') > 0 ? lb + '-01' : lb + '-01-01';
-        data.push([dt, v, tp.name]);
-      });
-    });
-    var W = (el && el.clientWidth) || 700;
-    var narrow = W < 520;
-    /* 末期份额：用于右侧末端标注 */
-    var lastIdx = d.labels.length - 1;
-    var lastVals = d.topics.map(function (tp) { return { name: tp.name, v: tp.values[lastIdx] || 0 }; });
-    var totLast = lastVals.reduce(function (a, b) { return a + b.v; }, 0) || 1;
-    return base(t, {
-      tooltip: tip(t, { trigger: 'axis' }),
-      legend: legend(t, { data: d.topics.map(function (x) { return x.name; }) }),
-      title: narrow ? undefined : [{ text: '末期结构', left: 12, top: 2,
-        textStyle: { color: muted(t), fontSize: 8.5, fontFamily: FONT, fontWeight: 600 } }],
-      graphic: narrow ? [] : lastVals.map(function (lv, i) {
-        return { type: 'text', right: 8, top: 22 + i * 13, z: 20,
-          style: { text: lv.name + '  ' + (lv.v / totLast * 100).toFixed(0) + '%',
-            fill: (t.series || [])[i % (t.series || []).length] || ink(t),
-            font: '700 8.5px ' + FONT, textAlign: 'right' } };
-      }),
-      singleAxis: {
-        type: 'time', bottom: 18, top: 36, left: 18, right: narrow ? 18 : 96,
-        axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT, hideOverlap: true },
-        axisLine: { lineStyle: { color: rgba(ink(t), 0.12) } }, axisTick: { show: false },
-        splitLine: { show: false }
-      },
-      series: [{
-        type: 'themeRiver', data: data, emphasis: { focus: 'series' },
-        label: { show: false }, itemStyle: { opacity: 0.85 },
-        color: (t.series || ['#1A1A2E', '#A67C3D', '#6F8FA8', '#7A5C3E'])
-      }]
-    });
-  };
-  B.beeswarm = function (el, d, t) {
-    var cats = d.categories || [], groups = d.groups || [];
-    var pts = [];
-    groups.forEach(function (g, gi) {
-      var sorted = g.slice().sort(function (a, b) { return a - b; });
-      var placed = [];
-      sorted.forEach(function (v) {
-        var jx = 0, k = 0;
-        while (placed.some(function (o) { return Math.abs(o.v - v) < 1.6 && Math.abs(o.jx - jx) < 0.10; }) && k < 26) {
-          jx = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.10; k++;
-        }
-        placed.push({ v: v, jx: jx });
-        pts.push([v, gi + Math.max(-0.36, Math.min(0.36, jx)) * 1.2]);
-      });
-    });
-    return base(t, {
-      tooltip: tip(t, { formatter: function (p) { return num(p.value[0]); } }),
-      grid: grid({ left: 6, right: 18, top: 14, bottom: 18 }),
-      xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: true, lineStyle: { color: rule(t) } } }),
-      yAxis: xAxis(t, { data: cats, axisLabel: { color: ink(t), fontSize: 11, fontFamily: FONT } }),
-      series: [
-        { type: 'scatter', data: pts, symbolSize: 4,
-          itemStyle: { color: rgba(accent(t), 0.55), borderColor: rgba(accent(t), 0.9), borderWidth: 0.5 } },
-        { type: 'scatter', silent: true, symbolSize: 0.1,
-          data: groups.map(function (g, gi) { return [quantile(g, 0.5), gi]; }),
-          label: { show: true, position: 'top', distance: 4, color: accent(t), fontSize: 9, fontWeight: 700, fontFamily: FONT,
-            backgroundColor: '#fff', padding: [1, 3], borderRadius: 2,
-            formatter: function (p) { return 'med ' + num(p.value[0]); } } }
-      ]
-    });
-  };
-
   B.ridge = function (el, d, t) {
     /* 最新一组放最上面 */
     var labels = (d.labels || []).slice().reverse(), groups = (d.groups || []).slice().reverse();
@@ -2794,18 +2634,28 @@
     function endLbl(txt, color) {
       return narrow ? { show: false } : { show: true, formatter: txt, color: color, fontSize: 8.5, fontFamily: FONT, distance: 4 };
     }
+    var cpkColor = cpk >= 1.33 ? (t.up || '#1E7A46') : (t.down || '#C0392B');
+    var badgeH = narrow ? 26 : 30;
     return base(t, {
       tooltip: tip(t, { trigger: 'axis' }),
-      grid: grid({ left: 8, right: narrow ? 14 : 56, top: narrow ? 34 : 30, bottom: 12 }),
-      title: [
-        { text: 'Cpk', left: 10, top: 2, textStyle: { color: muted(t), fontSize: 8.5, fontFamily: FONT, fontWeight: 400 } },
-        { text: cpk.toFixed(2), left: 10, top: 12,
-          textStyle: { color: cpk >= 1.33 ? (t.up || '#1E7A46') : (t.down || '#C0392B'), fontSize: narrow ? 14 : 17, fontFamily: FONT, fontWeight: 800 } },
-        { text: '越界 ' + bad.length + ' 点', right: 10, top: 12,
-          textStyle: { color: bad.length ? (t.down || '#C0392B') : muted(t), fontSize: 9, fontFamily: FONT, fontWeight: 700 } }
+      /* 顶部留出徽标高度，避免与 Y 轴顶部刻度重叠 */
+      grid: grid({ left: 8, right: narrow ? 14 : 56, top: badgeH + 34, bottom: 12 }),
+      graphic: [
+        /* Cpk 徽标底板 */
+        { type: 'rect', left: 8, top: 8, z: 9,
+          shape: { width: narrow ? 74 : 86, height: badgeH, r: 4 },
+          style: { fill: rgba(cpkColor, 0.10), stroke: rgba(cpkColor, 0.35), lineWidth: 1 } },
+        { type: 'text', left: 16, top: 8 + (badgeH - 12) / 2 - 1, z: 10,
+          style: { text: 'Cpk', fill: muted(t), font: '600 8.5px ' + FONT } },
+        { type: 'text', left: narrow ? 42 : 48, top: 8 + (badgeH - 14) / 2 - 1, z: 10,
+          style: { text: cpk.toFixed(2), fill: cpkColor, font: '800 13px ' + FONT } },
+        /* 越界计数贴右 */
+        { type: 'text', right: 10, top: 12 + badgeH / 2 - 6, z: 10,
+          style: { text: '越界 ' + bad.length + ' 点', fill: bad.length ? (t.down || '#C0392B') : muted(t),
+            font: '700 9px ' + FONT } }
       ],
       xAxis: timeAxis(t, d.labels),
-      yAxis: yAxis(t, { scale: true, splitNumber: 4 }),
+      yAxis: yAxis(t, { scale: true, splitNumber: 4, boundaryGap: [0, 0.06] }),
       series: [
         /* UCL / LCL 之间的控制带 */
         { type: 'line', data: vals.map(function () { return ucl; }), showSymbol: false, silent: true, z: 2,
@@ -2844,23 +2694,27 @@
     var best = scores.indexOf(Math.max.apply(null, scores));
     return base(t, {
       tooltip: tip(t, { trigger: 'item' }),
-      legend: legend(t, { data: rows.map(function (r) { return r.name; }), itemGap: narrow ? 8 : 14 }),
+      legend: legend(t, { data: rows.map(function (r) { return r.name; }), itemGap: narrow ? 8 : 14, top: 2 }),
       title: narrow ? undefined : [
-        { text: '综合最优', left: 12, bottom: 2, textStyle: { color: muted(t), fontSize: 8.5, fontFamily: FONT, fontWeight: 400 } },
-        { text: rows[best] ? rows[best].name + ' ' + (scores[best] * 100).toFixed(0) + ' 分' : '—', left: 62, bottom: 0,
-          textStyle: { color: accentOf(t), fontSize: 12, fontFamily: FONT, fontWeight: 800 } }
+        { text: '综合最优', right: 12, top: 2, textStyle: { color: muted(t), fontSize: 8.5, fontFamily: FONT, fontWeight: 400 } },
+        { text: rows[best] ? rows[best].name + ' ' + (scores[best] * 100).toFixed(0) + ' 分' : '—', right: 60, top: 2,
+          textStyle: { color: accentOf(t), fontSize: 11, fontFamily: FONT, fontWeight: 800 } }
       ],
       parallelAxis: dims.map(function (n, i) {
-        return { dim: i, name: n,
-          nameTextStyle: { color: muted(t), fontSize: narrow ? 8 : 9.5, fontFamily: FONT, padding: [0, 0, 3, 0] },
+        /* 显式给定取值范围，保证连线严格落在轴内 */
+        var lo = mins[i], hi = maxs[i];
+        var pad = (hi - lo) * 0.08 || Math.abs(hi || 1) * 0.1 || 1;
+        return { dim: i, name: n, min: Math.round(lo - pad), max: Math.round(hi + pad),
+          nameGap: narrow ? 10 : 14,
+          nameTextStyle: { color: muted(t), fontSize: narrow ? 8 : 9.5, fontFamily: FONT, padding: [0, 0, 4, 0] },
           axisLine: { lineStyle: { color: rgba(ink(t), 0.16) } },
           axisLabel: { show: !narrow, color: muted(t), fontSize: 8.5, fontFamily: FONT, formatter: function (v) { return Math.round(v); } },
           axisTick: { show: false } };
       }),
-      parallel: { left: narrow ? 22 : 40, right: narrow ? 22 : 34, top: narrow ? 48 : 42, bottom: narrow ? 18 : 26 },
+      parallel: { left: narrow ? 24 : 44, right: narrow ? 24 : 40, top: narrow ? 62 : 58, bottom: narrow ? 20 : 28 },
       series: rows.map(function (r, i) {
         var isBest = i === best;
-        return { name: r.name, type: 'parallel', data: [r.values], smooth: 0.2,
+        return { name: r.name, type: 'parallel', data: [r.values], smooth: 0,
           lineStyle: { width: isBest ? (narrow ? 2.4 : 3) : (narrow ? 1.1 : 1.5),
             color: isBest ? accentOf(t) : seriesColor(t, i),
             opacity: isBest ? 1 : 0.42 },
