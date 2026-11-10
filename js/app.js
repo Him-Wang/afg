@@ -5406,15 +5406,21 @@
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
     state.chartConfig = cfg;
     if (cfg && cfg.labels && cfg.series) state.lastChart = cfg;
-    // 应用主题（链接可携带）
+    // 应用主题（链接可携带；现已只有象牙白一套）
     if (cfg.theme && Themes.getTheme(cfg.theme)) {
       state.theme = cfg.theme;
       Themes.applyTheme(cfg.theme);
       var ts = el('theme-select');
       if (ts) ts.value = cfg.theme;
     }
+    /* 链接可携带配色模板：consult / contrast / burgundy / forest */
+    if (cfg.palette) {
+      var okPal = (window.ADV_PALETTES || []).some(function (x) { return x.id === cfg.palette; });
+      if (okPal) state.palette = cfg.palette;
+    }
     var data = {};
     if (cfg.data) data = cfg.data;
+    else if (cfg.values !== undefined && cfg.labels !== undefined) data = { labels: cfg.labels, values: cfg.values };   // 瀑布图等 {labels, values}
     else if (cfg.labels !== undefined && cfg.series !== undefined) data = { labels: cfg.labels, series: cfg.series };
     else if (cfg.indicators !== undefined && cfg.series !== undefined) data = { indicators: cfg.indicators, series: cfg.series };
     else if (cfg.series !== undefined) data = { series: cfg.series };            // 散点矩阵 / 相关性等无时间轴图表
@@ -6132,11 +6138,23 @@
     if (el('btn-watermark')) el('btn-watermark').classList.add('active');
     el('footer-note').textContent = 'Advanced Data Visualization (ADV) · ' + tr('数据仅本地处理','All data processed locally') + ' · ' + tr('生成于','generated') + ' ' + new Date().toLocaleDateString(isEn() ? 'en-US' : 'zh-CN');
     if (q.chart) {
-      try {
-        var cfg = JSON.parse(b64Decode(q.chart));
-        applyChartConfig(cfg);
-        return;
-      } catch (e) { toast('图表链接无效'); }
+      /* 链接里的图需要 ECharts，首屏是懒加载的，先确保库就绪再渲染 */
+      var renderFromLink = function () {
+        var raw = String(q.chart || '');
+        /* 兼容：URL 查询里 '+' 会被解析成空格，标准 base64 需要还原 */
+        var tries = [raw, raw.replace(/ /g, '+'), raw.replace(/ /g, '%2B')];
+        for (var ti = 0; ti < tries.length; ti++) {
+          try {
+            var cfg = JSON.parse(b64Decode(tries[ti]));
+            applyChartConfig(cfg);
+            return;
+          } catch (e) { /* 尝试下一种 */ }
+        }
+        toast(tr('图表链接无效', 'Invalid chart link'));
+      };
+      if (window.echarts) renderFromLink();
+      else withCharts(renderFromLink);
+      return;
     }
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) renderTemplate(q.tpl);
     else if (q.view === 'macro') renderChinaMacro();

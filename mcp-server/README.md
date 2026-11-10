@@ -7,10 +7,10 @@
 > ```
 > 请用 ADV 帮我做图，直接输出可点击的图表链接。
 > 链接格式：https://saviorbill.github.io/adv/?chart=<把 JSON 做 base64url 编码>
-> JSON 示例：{"type":"area","title":"标题","theme":"paper","labels":["2021","2022"],
+> JSON 示例：{"type":"area","title":"标题","palette":"consult","labels":["2021","2022"],
 > "series":[{"name":"沪深300","values":[1,2]}]}
 > type 可选：line/area/bar/stacked/stackedBar/radar/scatterMatrix/heatmap/donut/treemap
-> theme 可选：paper/midnight-gold/tradingview-dark/emerald/graphite
+> palette 可选：consult(麦肯锡深蓝)/contrast(编辑多彩)/burgundy(投行酒红)/forest(期刊墨绿)
 > ```
 >
 > 下面是「配置 MCP」的完整流程（配一次，以后直接说「用 ADV 画图」）。
@@ -115,7 +115,7 @@ C:\Users\xiaoming\adv\mcp-server\server.js
 如果它列出 `make_chart`，就配置成功了。之后直接用自然语言：
 
 ```
-用 ADV 画一张近 5 年沪深300和中证500的对比折线图，用象牙白主题
+用 ADV 画一张近 5 年沪深300和中证500的对比折线图，用投行酒红配色
 ```
 
 AI 会返回 `https://saviorbill.github.io/adv/?chart=...` 链接，点开就是图。
@@ -142,7 +142,7 @@ AI 会返回 `https://saviorbill.github.io/adv/?chart=...` 链接，点开就是
 | `title` | 图表标题 |
 | `labels` | 横轴标签数组，如 `["2020","2021","2022"]` |
 | `series` | `[{name, values}]`，每条 values 与 labels 等长 |
-| `theme` | `midnight-gold`(默认) / `tradingview-dark` / `paper` / `emerald` / `graphite` |
+| `palette` | `consult`(默认·麦肯锡深蓝) / `contrast`(编辑多彩) / `burgundy`(投行酒红) / `forest`(期刊墨绿) |
 
 ### 输出链接格式
 
@@ -156,7 +156,7 @@ JSON 示例：
 {
   "type": "scatterMatrix",
   "title": "资产相关系数矩阵",
-  "theme": "paper",
+  "palette": "consult",
   "series": [
     { "name": "沪深300", "values": [1,2,3,4,5,6,7,8,9,10] },
     { "name": "中证500", "values": [1.2,2.1,3.3,4.1,5.2,6.1,7.3,8.1,9.2,10.1] },

@@ -117,7 +117,7 @@
     '<p>Quit the client <b>completely</b> (not just close the window) and reopen. Then ask:</p>',
     '<pre class="guide-code">What tools do you have? Is make_chart available?</pre>',
     '<p>If it lists <code>make_chart</code>, it works. Then just say:</p>',
-    '<pre class="guide-code">Chart CSI300 vs CSI500 over the last 5 years with ADV, paper theme</pre>',
+    '<pre class="guide-code">Chart CSI300 vs CSI500 over the last 5 years with ADV, burgundy palette</pre>',
     '</div>',
 
     '<div class="guide-sec">',
