@@ -1,5 +1,16 @@
 # ADV MCP Server · 完整配置教程
 
+## ⚡ 最快方式：一行命令
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/saviorbill/adv/main/mcp-server/install.sh)"
+```
+
+脚本会自动：克隆到 `~/.adv` → `npm install` → 打印可直接粘贴的 MCP 配置 → 自检启动。
+也可以把这句话直接发给你的 AI：「用上面这条命令帮我装好 ADV 的 MCP 服务，并写进你自己的配置，然后调用 make_chart 自检」。
+
+---
+
 让 AI（Cursor / Claude Code / Claude Desktop / Kimi / WorkBuddy / DeepSeek Harness 等）直接调用 `make_chart` 工具，生成 **ADV 高级金融图表链接**。
 
 > **不想装东西？** 直接用「零安装」方式：把下面这段发给任意 AI，它自己就能拼出图表链接。
@@ -144,6 +155,9 @@ AI 会返回 `https://saviorbill.github.io/adv/?chart=...` 链接，点开就是
 | `series` | `[{name, values}]`，每条 values 与 labels 等长（工具会校验，不等长直接报错） |
 | `palette` | `consult`(默认·麦肯锡深蓝) / `contrast`(编辑多彩) / `burgundy`(投行酒红) / `forest`(期刊墨绿) |
 | `unit` | 单位，`rank` / `kpi` 等图表使用，如 `"次"`、`"亿元"` |
+
+> **数据量限制**：普通图表单图 ≤ 60 个数据点；热力图单元格 ≤ 400 个；生成的链接 ≤ 7800 字符。
+> 超限会直接返回错误并提示降采样——这是为了避免超长链接被聊天客户端截断。
 
 ### 支持的类型
 

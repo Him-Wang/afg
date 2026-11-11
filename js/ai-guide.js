@@ -5,6 +5,14 @@
   var REPO = 'https://github.com/saviorbill/adv';
 
   var ZH = [
+    '<div class="guide-sec guide-fast">',
+    '<h4>最快方式 · 复制一段话给你的 AI（推荐）</h4>',
+    '<p>不用自己装。回到首页点「复制给 AI 的安装指令」，把整段话粘给你的 AI（Cursor / Claude Code / 其它支持 MCP 的客户端），它会自己下载、安装、写配置、自检。</p>',
+    '<p>也可以直接把下面这一行发给 AI，让它执行：</p>',
+    '<pre class="guide-code">bash -c "$(curl -fsSL https://raw.githubusercontent.com/saviorbill/adv/main/mcp-server/install.sh)"</pre>',
+    '<p class="guide-tip">脚本做的事：克隆到 <code>~/.adv</code> → <code>npm install</code> → 打印可直接粘贴的 MCP 配置 → 自检启动。装完重启客户端即可。</p>',
+    '</div>',
+    '<details class="guide-manual"><summary>手动配置（进阶 / AI 装不上时再用）</summary>',
     '<div class="guide-sec">',
     '<h4>第 1 步 · 确认电脑有 Node.js</h4>',
     '<p>打开「终端」（Mac：启动台搜「终端」；Windows：开始菜单搜 PowerShell），输入下面命令后回车：</p>',
@@ -69,9 +77,17 @@
     '<li><b>改了配置还是不行</b>：完全退出客户端（Mac 用 Cmd+Q / 活动监视器确认进程已结束）再启动。</li>',
     '</ul>',
     '</div>'
-  ].join('\n');
+  ].join('\n') + '</details>';
 
   var EN = [
+    '<div class="guide-sec guide-fast">',
+    '<h4>Fastest way · Copy one message to your AI (recommended)</h4>',
+    '<p>No manual setup. On the home page click “Copy setup prompt”, paste the whole message into your AI (Cursor / Claude Code / any MCP client) — it will download, install, write the config and self-test.</p>',
+    '<p>Or give your AI this single line to run:</p>',
+    '<pre class="guide-code">bash -c "$(curl -fsSL https://raw.githubusercontent.com/saviorbill/adv/main/mcp-server/install.sh)"</pre>',
+    '<p class="guide-tip">The script clones into <code>~/.adv</code>, runs <code>npm install</code>, prints a ready-to-paste MCP config and self-tests the server.</p>',
+    '</div>',
+    '<details class="guide-manual"><summary>Manual setup (advanced / if your AI cannot install)</summary>',
     '<div class="guide-sec">',
     '<h4>Step 1 · Check Node.js</h4>',
     '<p>Open Terminal (macOS) or PowerShell (Windows) and run:</p>',
@@ -130,7 +146,7 @@
     '<li><b>Still failing</b> — fully quit and restart the client.</li>',
     '</ul>',
     '</div>'
-  ].join('\n');
+  ].join('\n') + '</details>';
 
   global.ADV_AI_GUIDE = { zh: ZH, en: EN };
 })(window);

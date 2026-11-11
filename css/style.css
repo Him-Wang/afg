@@ -901,3 +901,24 @@ body.is-home .chart-head { display: none; }
 }
 
 
+
+/* 首页 MCP 一键安装命令 */
+.home-mcp-cmd {
+  margin: 10px 0 2px; padding: 10px 12px; border-radius: 8px;
+  background: rgba(11,42,69,.045); border: 1px dashed rgba(11,42,69,.22);
+  font: 11.5px/1.6 var(--font-mono); color: var(--text);
+  white-space: pre-wrap; word-break: break-all; overflow-x: auto;
+  -webkit-user-select: all; user-select: all;
+}
+
+/* AI 指南：快速方式 + 折叠的手动步骤 */
+.guide-fast { border: 1px solid rgba(11,42,69,.16); background: rgba(11,42,69,.03); border-radius: 10px; }
+.guide-manual { margin-top: 12px; }
+.guide-manual > summary {
+  cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--muted);
+  padding: 8px 2px; list-style: none;
+}
+.guide-manual > summary::-webkit-details-marker { display: none; }
+.guide-manual > summary::before { content: '▸ '; }
+.guide-manual[open] > summary::before { content: '▾ '; }
+.guide-manual[open] > summary { margin-bottom: 8px; }

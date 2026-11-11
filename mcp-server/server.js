@@ -4,7 +4,8 @@ import { z } from "zod";
 
 // ADV 部署地址（可用环境变量覆盖）
 const ADV_BASE = (process.env.ADV_BASE_URL || "https://saviorbill.github.io/adv/").replace(/\/?$/, "/");
-const MAX_URL = 7800;   // GitHub Pages / 各家客户端对超长 URL 的容忍度
+const MAX_URL = 7800;     // 超长链接容易被聊天客户端截断
+const MAX_POINTS = 60;    // 单图数据点上限（超过请先降采样）
 
 const TYPES = [
   "line", "area", "bar", "stacked", "stackedBar", "stackedLine", "step", "dual", "waterfall",
@@ -88,6 +89,20 @@ server.tool(
     unit: z.string().optional().describe("单位（rank / kpi 等图表使用），如 '次'、'亿元'、'%'")
   },
   async ({ type, title, labels, series, palette, unit }) => {
+    /* 数据点上限：链接太长会被客户端截断，先限制点数而不是做短链 */
+    const isHeat = type === "heatmap";
+    if (isHeat) {
+      const cells = labels.length * series.length;
+      if (cells > 400) {
+        return { content: [{ type: "text", text:
+          `热力图单元格过多：${labels.length} 列 × ${series.length} 行 = ${cells}，上限 400。请先聚合或减少行列。` }], isError: true };
+      }
+    } else if (labels.length > MAX_POINTS) {
+      return { content: [{ type: "text", text:
+        `数据点过多：${labels.length} 个，上限 ${MAX_POINTS} 个（链接过长会被聊天客户端截断）。` +
+        `请先降采样，例如按周/月聚合，或每 ${Math.ceil(labels.length / MAX_POINTS)} 个点取 1 个。` }], isError: true };
+    }
+
     for (const s of series) {
       if (s.values.length !== labels.length) {
         return {
@@ -102,8 +117,12 @@ server.tool(
     const cfg = buildConfig({ type, title, labels, series, palette, unit });
     const b64 = Buffer.from(JSON.stringify(cfg), "utf8").toString("base64url");
     const url = ADV_BASE + "?chart=" + b64;
-    const longNote = url.length > MAX_URL
-      ? `\n\n⚠️ 这条链接较长（${url.length} 字符），部分聊天客户端可能会截断。建议减少数据点（≤40）或分段展示。`
+    if (url.length > MAX_URL) {
+      return { content: [{ type: "text", text:
+        `链接过长（${url.length} 字符，上限 ${MAX_URL}）。请减少数据点或缩短标题/系列名后重试。` }], isError: true };
+    }
+    const longNote = url.length > 3000
+      ? `\n\n⚠️ 链接 ${url.length} 字符，个别客户端可能截断；建议把数据点压到 30 个以内。`
       : "";
     return {
       content: [{

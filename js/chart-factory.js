@@ -29,7 +29,8 @@
     return {
       axisLine: { lineStyle: { color: theme.axis } },
       axisTick: { show: false },
-      axisLabel: { color: theme.muted, fontSize: 11 },
+      axisLabel: { color: theme.muted, fontSize: 11,
+        formatter: function (v) { return (typeof v === 'number' && isFinite(v)) ? fmt(v) : String(v); } },
       splitLine: { lineStyle: { color: theme.grid } },
       nameTextStyle: { color: theme.muted, fontSize: 11 }
     };

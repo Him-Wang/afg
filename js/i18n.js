@@ -42,7 +42,7 @@
       'home.flow.2': '选制图方式（推荐或自选）',
       'home.flow.3': '导出高清图',
 
-      'home.ai.adv': '进阶用法（配置 MCP / 让 AI 自己装）',
+      'home.ai.adv': 'MCP 配置说明（含手动步骤）',
       'home.ai.title': '🤖 用 WorkBuddy / Kimi 等 AI 画图',
       'home.ai.desc': '复制下面这段话粘给 AI —— 它会自己完成全部配置，你不用懂技术细节。',
       'home.ai.ex1': '「用近 5 年沪深300和中证500做对比折线图」',
@@ -170,7 +170,7 @@
       'home.flow.2': 'Pick how to chart it',
       'home.flow.3': 'Export hi-res image',
 
-      'home.ai.adv': 'Advanced (MCP setup / let the AI install)',
+      'home.ai.adv': 'MCP setup details (with manual steps)',
       'home.ai.title': '🤖 Chart with WorkBuddy / Kimi / Cursor',
       'home.ai.desc': 'Paste the block below to your AI — it configures everything itself. No technical knowledge needed.',
       'home.ai.ex1': '"Compare CSI300 and CSI500 over the last 5 years"',

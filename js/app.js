@@ -1390,53 +1390,61 @@
     var zr = inst.getZr(), dom = inst.getDom();
     var tip = makeHoverTip(dom);
     var rows = data.rows.slice().sort(function (a, b) { return (b.to - b.from) - (a.to - a.from); });
-    var up = (Themes.active().chart.up) || '#1E7A46';
-    var down = (Themes.active().chart.down) || '#C0392B';
+    var chartTheme = Themes.active().chart;
+    var up = chartTheme.up || '#1E7A46';
+    var down = chartTheme.down || '#C0392B';
     var hl = null, lastIdx = -2;
-    function rowIdx(pt) {
-      if (!pt) return -1;
-      var y = pt[1];
-      var opt = inst.getOption();
-      var n = rows.length;
-      var grid0 = opt.grid && opt.grid[0];
-      if (!grid0) return -1;
-      var top = grid0.top || 0, bottom = inst.getHeight() - (grid0.bottom || 0);
-      if (y < top - 6 || y > bottom + 6) return -1;
-      var idx = Math.round((y - top) / ((bottom - top) / Math.max(1, n - 1)));
-      return Math.max(0, Math.min(n - 1, idx));
+
+    /* 类目轴几何：默认第一项在底部，按等分带计算每行位置 */
+    function geom() {
+      var o = inst.getOption();
+      var g = (o.grid && o.grid[0]) || {};
+      var W = inst.getWidth(), H = inst.getHeight();
+      var px = function (v, total, dflt) {
+        if (typeof v === 'number') return v;
+        if (typeof v === 'string' && v.indexOf('%') >= 0) return parseFloat(v) / 100 * total;
+        return dflt;
+      };
+      var left = px(g.left, W, 72), right = px(g.right, W, 64);
+      var top = px(g.top, H, 30), bottom = px(g.bottom, H, 18);
+      var n = rows.length || 1;
+      var plotTop = top, plotBottom = H - bottom;
+      /* 类目轴是否反序（第一项在顶部） */
+      var inv = !!(o.yAxis && o.yAxis[0] && o.yAxis[0].inverse);
+      return { left: left, right: W - right, plotTop: plotTop, plotBottom: plotBottom,
+        bandH: (plotBottom - plotTop) / n, W: W, H: H, inv: inv };
+    }
+    function idxAt(y) {
+      var gg = geom();
+      if (y < gg.plotTop - 2 || y > gg.plotBottom + 2) return -1;
+      var fromTop = Math.floor((y - gg.plotTop) / gg.bandH);
+      var idx = gg.inv ? fromTop : (rows.length - 1 - fromTop);
+      return Math.max(0, Math.min(rows.length - 1, idx));
+    }
+    function hide() {
+      lastIdx = -2;
+      tip.hide();
+      if (hl) { try { zr.remove(hl); } catch (e) {} hl = null; }
     }
     zr.on('mousemove', function (e) {
-      var pt = null;
-      try { pt = inst.convertFromPixel({ yAxisIndex: 0 }, [e.offsetX, e.offsetY]); } catch (err) {}
-      var idx = (pt && isFinite(pt[1])) ? Math.round(pt[1]) : rowIdx([e.offsetX, e.offsetY]);
-      if (idx < 0 || idx >= rows.length || idx !== idx) { hide(); return; }
+      var gg = geom();
+      var idx = idxAt(e.offsetY);
+      if (idx < 0) { hide(); return; }
       var r = rows[idx];
       var dv = r.to - r.from;
       var col = dv >= 0 ? up : down;
       if (idx !== lastIdx) {
         lastIdx = idx;
         try {
-          if (hl) { zr.remove(hl); hl = null; }
-          var opt = inst.getOption();
-          var g = opt.grid && opt.grid[0];
+          if (hl) zr.remove(hl);
+          var fromTop = gg.inv ? idx : (rows.length - 1 - idx);
           hl = new echarts.graphic.Rect({
             silent: true, z: 1,
-            shape: { x: 0, y: 0, width: 0, height: 0 },
-            style: { fill: ChartFactory.hexToRgba((Themes.active().chart.text || '#051C2C'), 0.05), r: 6 }
+            shape: { x: gg.left - 6, y: gg.plotTop + fromTop * gg.bandH + 1,
+              width: Math.max(40, gg.right - gg.left + 12), height: Math.max(8, gg.bandH - 2) },
+            style: { fill: ChartFactory.hexToRgba((chartTheme.text || '#051C2C'), 0.05), r: 5 }
           });
           zr.add(hl);
-        } catch (err) {}
-      }
-      if (hl) {
-        try {
-          var y = inst.convertToPixel({ seriesIndex: 1 }, [r.from, idx]);
-          var p1 = inst.convertToPixel({ seriesIndex: 1 }, [r.from, idx]);
-          var p2 = inst.convertToPixel({ seriesIndex: 1 }, [r.to, idx]);
-          var opt2 = inst.getOption(), g2 = opt2.grid && opt2.grid[0];
-          var left = (g2 && g2.left) || 60, right = inst.getWidth() - ((g2 && g2.right) || 20);
-          var rowGap = 26;
-          hl.setShape({ x: left - 6, y: (p1 ? p1[1] : e.offsetY) - rowGap / 2,
-            width: Math.max(40, right - left + 12), height: rowGap });
         } catch (err) {}
       }
       tip.show('<b>' + r.name + '</b><br/>' +
@@ -1446,11 +1454,6 @@
         e.offsetX, e.offsetY);
     });
     zr.on('globalout', hide);
-    function hide() {
-      lastIdx = -2;
-      tip.hide();
-      if (hl) { try { zr.remove(hl); } catch (e) {} hl = null; }
-    }
   }
 
   /* ---------- 平行坐标：按几何位置找最近的样本线，高亮并显示各维数值 ---------- */
@@ -1889,13 +1892,25 @@
   }
 
   /* 空闲时预取，用户点分类时基本已就绪 */
+  /* 首屏不预取绘图引擎（echarts 331KB + world-map 282KB 会拖慢首页）；
+     改为用户有「要看图」的意图时再加载 */
   function prefetchLibs() {
-    var idle = window.requestIdleCallback || function (cb) { return setTimeout(cb, 1200); };
-    idle(function () {
-      ensureCharts().then(function () {
-        idle(function () { loadLib('worldmap').catch(function () {}); });
-      }).catch(function () {});
-    });
+    var fired = false;
+    var warm = function () {
+      if (fired) return;
+      fired = true;
+      ensureCharts().catch(function () {});
+    };
+    document.addEventListener('mouseover', function (e) {
+      var t = e.target;
+      if (!t) return;
+      if (t.closest && (t.closest('#sidebar .nav-item') || t.closest('.home-goal') ||
+          t.closest('.home-cta') || t.closest('#btn-import'))) warm();
+    }, { passive: true });
+    document.addEventListener('touchstart', function (e) {
+      var t = e.target;
+      if (t && t.closest && (t.closest('#sidebar .nav-item') || t.closest('#btn-import'))) warm();
+    }, { passive: true });
   }
 
   var GEO_TYPES = { choropleth: 1, symbolMap: 1, heatMapGeo: 1, trajectory: 1, migration: 1, flowMap: 1, hexMap: 1, worldMap: 1 };
@@ -1984,7 +1999,9 @@
         '<div class="home-mcp home-mcp-simple">' +
           '<h3>' + T('home.ai.title') + '</h3>' +
           '<p>' + T('home.ai.desc') + '</p>' +
-          '<div class="home-cta-row"><button class="btn primary" id="home-ai-copy">' + T('home.ai.copy') + '</button></div>' +
+          '<div class="home-cta-row"><button class="btn primary" id="home-ai-copy">' + T('home.ai.copy') + '</button>' +
+          '<button class="btn ghost" id="home-ai-cmd-copy">' + (isEn() ? 'Copy install command' : '复制安装命令') + '</button></div>' +
+          '<pre class="home-mcp-cmd" id="home-ai-cmd">bash -c "$(curl -fsSL https://raw.githubusercontent.com/saviorbill/adv/main/mcp-server/install.sh)"</pre>' +
           '<p class="home-ai-hint">' + T('home.ai.hint') + '</p>' +
           '<details class="home-guide-details">' +
             '<summary>' + T('home.ai.adv') + '</summary>' +
@@ -2021,52 +2038,69 @@
     })();
     var demoBtn = h.querySelector('#home-demo');
     if (demoBtn) demoBtn.addEventListener('click', showExampleChart);
+    var cmdBtn = h.querySelector('#home-ai-cmd-copy');
+    if (cmdBtn) cmdBtn.addEventListener('click', function () {
+      var cmd = 'bash -c "$(curl -fsSL https://raw.githubusercontent.com/saviorbill/adv/main/mcp-server/install.sh)"';
+      var done = function () { toast(tr('安装命令已复制，粘贴到终端回车即可', 'Install command copied — paste it into your terminal')); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(cmd).then(done, done);
+      else { var ta = document.createElement('textarea'); ta.value = cmd; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove(); done(); }
+    });
     var copyBtn = h.querySelector('#home-ai-copy');
     if (copyBtn) copyBtn.addEventListener('click', function () {
       var en = (window.I18N && window.I18N.getLang() === 'en');
+      var cmd = 'bash -c "$(curl -fsSL https://raw.githubusercontent.com/saviorbill/adv/main/mcp-server/install.sh)"';
       var prompt = en ? [
-        'Please set up and use ADV (a charting tool) for me. I am not technical — do everything automatically, do not ask me to run commands or edit config files.',
+        'Set up ADV (a charting tool) for me and use it to draw my charts. I am not technical: do everything yourself, do not ask me to run commands.',
         '',
-        'STEP 1 — If you have terminal / file access:',
-        '  a) run `node -v` (if Node.js is missing, tell me the download link and stop)',
-        '  b) git clone https://github.com/saviorbill/adv.git ~/adv',
-        '  c) cd ~/adv/mcp-server && npm install',
-        '  d) add this to YOUR OWN MCP config, then reload:',
-        '     {"mcpServers":{"adv-charts":{"command":"node","args":["<the real absolute path of ~/adv/mcp-server/server.js>"]}}}',
-        '  e) confirm the `make_chart` tool is available',
+        'STEP 1 — Install the MCP server (you run this, not me):',
+        '  ' + cmd,
+        '  The script installs to ~/.adv, runs npm install, and prints a JSON block like:',
+        '  {"mcpServers":{"adv-charts":{"command":"node","args":["<abs path>/server.js"]}}}',
         '',
-        'STEP 2 — If you cannot install anything (chat-only), use links instead:',
-        '  Build https://saviorbill.github.io/adv/?chart=<base64url of JSON>',
-        '  JSON: {"type":"area","title":"...","theme":"paper","labels":["2021","2022"],"series":[{"name":"CSI300","values":[1,2]}]}',
-        '  type: line / area / bar / stacked / stackedBar / radar / scatterMatrix / heatmap / donut / treemap',
-        '  theme: paper (documents) / midnight-gold (pitch decks) / tradingview-dark / emerald / graphite',
+        'STEP 2 — Merge that JSON into YOUR OWN MCP configuration, then reload:',
+        '  Cursor: .cursor/mcp.json or Settings → MCP',
+        '  Claude Code: claude mcp add-json adv-charts \'<the JSON above>\'',
+        '  Other clients: paste under mcpServers',
         '',
-        'STEP 3 — Then draw my chart: I will send data or a request next. Use ADV and give me the link.'
+        'STEP 3 — Verify by calling the make_chart tool:',
+        '  {"type":"line","title":"smoke test","labels":["2021","2022"],"series":[{"name":"test","values":[1,2]}]}',
+        '  Open the returned link and confirm it renders, then report: config path, tool name adv-charts, result.',
+        '',
+        'STEP 4 — Then draw my chart. Types: line/area/bar/stacked/stackedBar/step/dual/waterfall/rank/pie/donut/funnel/heatmap/kpi.',
+        'Palettes: consult(McKinsey blue, default) / contrast / burgundy / forest. Keep data points under 60.',
+        '',
+        'If you cannot install anything (chat-only), fall back to links:',
+        '  https://saviorbill.github.io/adv/?chart=<base64url(JSON)>  with the same JSON shape.'
       ].join('\n') : [
-        '请帮我配置并使用 ADV 画图工具。我不懂技术，请你全部自动完成，不要让我手动敲命令或改配置文件。',
+        '请帮我安装 ADV 画图工具，并用它给我出图。我不懂技术，请你全部自动完成，不要让我手动敲命令或改配置。',
         '',
-        '第一步：如果你有终端 / 文件权限',
-        '  a) 运行 node -v 检查环境（如果没有 Node.js，把下载地址给我就停下）',
-        '  b) git clone https://github.com/saviorbill/adv.git ~/adv',
-        '  c) cd ~/adv/mcp-server && npm install',
-        '  d) 把下面这段加进你自己的 MCP 配置，然后重载：',
-        '     {"mcpServers":{"adv-charts":{"command":"node","args":["<~/adv/mcp-server/server.js 的真实绝对路径>"]}}}',
-        '  e) 确认你能看到 make_chart 工具',
+        '第 1 步 —— 你把这条命令执行掉（不要让我执行）：',
+        '  ' + cmd,
+        '  脚本会装到 ~/.adv、自动 npm install，并输出一段形如下的 JSON：',
+        '  {"mcpServers":{"adv-charts":{"command":"node","args":["<真实绝对路径>/server.js"]}}}',
         '',
-        '第二步：如果你不能安装（比如纯聊天环境），改用链接方式',
-        '  把数据编码成链接：https://saviorbill.github.io/adv/?chart=<base64url(JSON)>',
-        '  JSON 结构：{"type":"area","title":"标题","theme":"paper","labels":["2021","2022"],"series":[{"name":"沪深300","values":[1,2]}]}',
-        '  type 可选：line 折线 / area 面积 / bar 柱状 / stacked 堆叠面积 / stackedBar 堆叠柱状 / radar 雷达 / scatterMatrix 相关系数矩阵 / heatmap 热力矩阵 / donut 环形 / treemap 树图',
-        '  theme 可选：paper 象牙白（写文档）/ midnight-gold 黑金（路演）/ tradingview-dark / emerald / graphite',
+        '第 2 步 —— 把这段 JSON 合并进你自己的 MCP 配置，然后重载：',
+        '  Cursor：项目里 .cursor/mcp.json，或 设置 → MCP',
+        '  Claude Code：claude mcp add-json adv-charts \'<上面那段 JSON>\'',
+        '  其他客户端：找到 mcpServers 粘贴进去',
         '',
-        '第三步：接下来我会把数据或需求发给你，请用 ADV 画出来，并把链接给我。'
+        '第 3 步 —— 自检：调用 make_chart 工具，参数：',
+        '  {"type":"line","title":"冒烟测试","labels":["2021","2022"],"series":[{"name":"测试","values":[1,2]}]}',
+        '  打开返回的链接确认能出图，然后告诉我：配置文件路径、工具名 adv-charts、自检结果。',
+        '',
+        '第 4 步 —— 开始给我出图。类型：line/area/bar/stacked/stackedBar/step/dual/waterfall/rank/pie/donut/funnel/heatmap/kpi；',
+        '配色：consult(麦肯锡深蓝，默认)/contrast/burgundy/forest；单图数据点请控制在 60 个以内。',
+        '',
+        '如果你完全没有安装权限（纯聊天环境），改走链接方式：',
+        '  https://saviorbill.github.io/adv/?chart=<base64url(JSON)>，JSON 结构同上。'
       ].join('\n');
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(prompt).then(function () { toast(T('home.ai.copied')); }, function () { toast('复制失败'); });
+        navigator.clipboard.writeText(prompt).then(function () { toast(tr('已复制，粘贴给你的 AI 即可', 'Copied — paste it to your AI')); });
       } else {
         var ta = document.createElement('textarea'); ta.value = prompt; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); toast(T('home.ai.copied')); } catch (e) {}
+        try { document.execCommand('copy'); } catch (e) {}
         ta.remove();
+        toast(tr('已复制，粘贴给你的 AI 即可', 'Copied — paste it to your AI'));
       }
     });
     var fbBtn = h.querySelector('#home-fb-btn');
@@ -4451,6 +4485,7 @@
   }
 
   function renderUserChart(closeAfter) {
+    if (!window.echarts) { withCharts(function () { renderUserChart(closeAfter); }); return; }
     state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var m = state.mapping;
     var table = state.table;
@@ -4587,9 +4622,46 @@
         state.echartsEl = null;
         syncToolbar();
         return;
+      } else if (type === 'histogram') {
+        /* 单列做分布（多列量纲不同，混在一起会失真），默认取第一列 */
+        var hvCol = yCols[0];
+        var hv = rows.map(function (r) { return vnum(r[hvCol]); }).filter(function (v) { return isFinite(v); });
+        if (hv.length < 5) { toast('直方图至少需要 5 个数值'); return; }
+        data = { values: hv, label: hvCol };
+      } else if (type === 'boxplot' || type === 'ridge' || type === 'violin') {
+        /* 按 X 列分组，每组一个分布 */
+        var groups = [], cats = [];
+        rows.forEach(function (r) {
+          var key = String(r[state.mapping.timeCol]);
+          var gi = cats.indexOf(key);
+          var vals2 = yCols.map(function (c) { return vnum(r[c]); }).filter(function (v) { return isFinite(v); });
+          if (!vals2.length) return;
+          if (gi < 0) { cats.push(key); groups.push(vals2); }
+          else { groups[gi] = groups[gi].concat(vals2); }
+        });
+        if (!groups.length) { toast('没有可分组的数值'); return; }
+        if (type === 'boxplot') {
+          var boxes = groups.map(function (g) {
+            var sv = g.slice().sort(function (a, b) { return a - b; });
+            var q = function (p2) { var k = (sv.length - 1) * p2, f = Math.floor(k), c2 = Math.ceil(k); return sv[f] + (sv[c2] - sv[f]) * (k - f); };
+            return [sv[0], q(0.25), q(0.5), q(0.75), sv[sv.length - 1]];
+          });
+          data = { categories: cats, boxes: boxes };
+        } else {
+          data = { labels: cats, groups: groups };
+        }
+      } else if (type === 'scatter') {
+        if (yCols.length >= 2) {
+          var pts = rows.map(function (r) { return [vnum(r[yCols[0]]), vnum(r[yCols[1]])]; })
+            .filter(function (p2) { return isFinite(p2[0]) && isFinite(p2[1]); });
+          data = { points: pts, xName: yCols[0], yName: yCols[1] };
+        } else {
+          data = { points: rows.map(function (r) { return [vnum(r[state.mapping.timeCol]), vnum(r[yCols[0]])]; })
+            .filter(function (p2) { return isFinite(p2[0]) && isFinite(p2[1]); }), xName: state.mapping.timeCol, yName: yCols[0] };
+        }
       } else if (type === 'rank') {
         var col = yCols[0];
-        data = { categories: labels, values: rows.map(function (r) { return vnum(r[col]); }) };
+        data = { categories: labels, values: rows.map(function (r) { return vnum(r[col]); }), unit: state.det && state.det.unit };
       } else if (type === 'radar') {
         var wide = state.det && state.det.orientation === 'wide';
         if (state.transposed) wide = !wide;

@@ -34,28 +34,43 @@
     return String(Math.round(n * 100) / 100);
   }
 
+  /* 数值轴标签格式化：最多两位小数（大数用千分位/万） */
+  function axisFmt(v) {
+    var n = Number(v);
+    if (!isFinite(n)) return String(v);
+    var a = Math.abs(n);
+    if (a >= 1e4) return (n / 1e4).toFixed(1) + '万';
+    if (a >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    if (a >= 10) return String(Math.round(n * 10) / 10);
+    return String(Math.round(n * 100) / 100);
+  }
+  function mergeAxisLabel(baseLabel, extra) {
+    var out = Object.assign({}, baseLabel, (extra && extra.axisLabel) || {});
+    if (!out.formatter) out.formatter = axisFmt;
+    return out;
+  }
+
   /* 统一的坐标轴：无轴线、极浅横向网格、灰字 */
   function xAxis(t, extra) {
-    return Object.assign({
+    var base = {
       type: 'category', axisLine: { show: false }, axisTick: { show: false },
       axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 10, interval: 0, hideOverlap: true, overflow: 'break', width: 74, lineHeight: 11 },
       splitLine: { show: false }
-    }, extra || {});
+    };
+    var merged = Object.assign(base, extra || {});
+    merged.axisLabel = mergeAxisLabel(base.axisLabel, extra);
+    return merged;
   }
   function yAxis(t, extra) {
-    return Object.assign({
+    var base = {
       type: 'value', axisLine: { show: false }, axisTick: { show: false },
-      axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 8,
-        formatter: function (v) {
-          var a = Math.abs(v);
-          if (a >= 1e4) return (v / 1e4).toFixed(1) + '万';
-          if (a >= 1000) return v.toLocaleString('en-US', { maximumFractionDigits: 0 });
-          if (a >= 10) return String(Math.round(v * 10) / 10);
-          return String(Math.round(v * 100) / 100);
-        } },
+      axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, margin: 8 },
       splitNumber: 4,
       splitLine: { show: true, lineStyle: { color: rule(t), width: 1 } }
-    }, extra || {});
+    };
+    var merged = Object.assign(base, extra || {});
+    merged.axisLabel = mergeAxisLabel(base.axisLabel, extra);
+    return merged;
   }
   function grid(extra) {
     return Object.assign({ left: 6, right: 18, top: 26, bottom: 6, containLabel: true }, extra || {});
@@ -67,7 +82,11 @@
       textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT }
     };
   }
-  function tip(t, extra) { return Object.assign({ confine: true, backgroundColor: '#FFFFFF', borderColor: rgba(ink(t), 0.12), borderWidth: 1, textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT }, extraCssText: 'box-shadow:0 8px 24px rgba(20,20,35,.12);border-radius:8px;' }, extra || {}); }
+  function tip(t, extra) {
+    extra = Object.assign({ valueFormatter: function (v) { return (typeof v === 'number' && isFinite(v)) ? num(v) : v; } }, extra || {});
+    return Object.assign(tipBox(t), { confine: true }, extra || {});
+  }
+  function _tipOld(t, extra) { return Object.assign({ confine: true, backgroundColor: '#FFFFFF', borderColor: rgba(ink(t), 0.12), borderWidth: 1, textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT }, extraCssText: 'box-shadow:0 8px 24px rgba(20,20,35,.12);border-radius:8px;' }, extra || {}); }
   function legend(t, extra) {
     return Object.assign({
       top: 0, left: 0, itemWidth: 8, itemHeight: 8, itemGap: 14,
