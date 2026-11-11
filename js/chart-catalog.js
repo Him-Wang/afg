@@ -311,6 +311,58 @@
           { name: 'CFO', children: [{ name: '财务部' }, { name: '审计部' }] },
           { name: 'COO', children: [{ name: '运营部' }, { name: '供应链' }] }] } }; } },
 
+      { id: 'flowApproval', name: '审批流程图', type: 'flowApproval', desc: 'GitHub 风格流程图：节点+判定+分支，看审批怎么流转',
+        data: function () { return {
+          nodes: [
+            { id: 's', type: 'start', label: '提交申请', x: 150, y: 40 },
+            { id: 'p1', type: 'process', label: '自动校验资料', sub: '系统规则引擎', x: 150, y: 108 },
+            { id: 'd1', type: 'decision', label: '资料完整？', x: 150, y: 196 },
+            { id: 'p2', type: 'warn', label: '退回补充', x: 430, y: 196 },
+            { id: 'p3', type: 'process', label: '风控复核', sub: '人工 + 模型评分', x: 150, y: 284 },
+            { id: 'd2', type: 'decision', label: '额度达标？', x: 150, y: 372 },
+            { id: 'p4', type: 'warn', label: '拒绝', x: 430, y: 372 },
+            { id: 'e', type: 'end', label: '放款完成', x: 150, y: 452 }
+          ],
+          edges: [
+            { from: 's', to: 'p1' },
+            { from: 'p1', to: 'd1' },
+            { from: 'd1', to: 'p3', label: '是', labelDx: 14, labelDy: 0 },
+            { from: 'd1', to: 'p2', label: '否', labelDy: -12 },
+            { from: 'p2', to: 'p1', dirFrom: 'right', dirTo: 'right',
+              via: [[520, 196], [520, 108]], faint: true, dirTo2: 'right' },
+            { from: 'p3', to: 'd2' },
+            { from: 'd2', to: 'e', label: '是', labelDx: 14 },
+            { from: 'd2', to: 'p4', label: '否', labelDy: -12 },
+            { from: 'p4', to: 'e', dirFrom: 'bottom', dirTo: 'right',
+              via: [[430, 452]], dashed: true, faint: true }
+          ]
+        }; } },
+      { id: 'flowRelease', name: '研发发布流程', type: 'flowRelease', desc: 'GitHub PR 流程：分支 → 提交 → CI → 评审 → 合并',
+        data: function () { return {
+          nodes: [
+            { id: 'i', type: 'start', label: '打开 Issue', x: 80, y: 48 },
+            { id: 'b', type: 'process', label: '创建分支', x: 262, y: 48 },
+            { id: 'c', type: 'process', label: '提交代码', x: 444, y: 48 },
+            { id: 'pr', type: 'process', label: '创建 Pull Request', x: 626, y: 48 },
+            { id: 'ci', type: 'decision', label: 'CI 通过？', x: 626, y: 150 },
+            { id: 'fix', type: 'warn', label: '修复问题', x: 852, y: 150 },
+            { id: 'rev', type: 'decision', label: '评审通过？', x: 626, y: 252 },
+            { id: 'm', type: 'end', label: '合并到主干', x: 626, y: 338 }
+          ],
+          edges: [
+            { from: 'i', to: 'b' },
+            { from: 'b', to: 'c' },
+            { from: 'c', to: 'pr' },
+            { from: 'pr', to: 'ci' },
+            { from: 'ci', to: 'rev', label: '是', labelDx: 14 },
+            { from: 'ci', to: 'fix', label: '否', labelDy: -12 },
+            { from: 'fix', to: 'c', dirFrom: 'top', dirTo: 'top',
+              via: [[852, 2], [444, 2]], faint: true },
+            { from: 'rev', to: 'm', label: '是', labelDx: 14 },
+            { from: 'rev', to: 'fix', dirFrom: 'right', dirTo: 'bottom',
+              via: [[852, 252]], dashed: true, faint: true }
+          ]
+        }; } },
       { id: 'swimlane', name: '泳道图', type: 'swimlane', desc: '按责任方分泳道，看跨部门协作流程',
         data: function () { return { lanes: ['客户', '销售', '风控', '财务'],
           tasks: [
@@ -406,7 +458,7 @@
       relation: ['scatter', 'corrMatrix', 'corrNetwork'],
       flow: ['funnel', 'sankey'],
       geo: ['choropleth', 'heatMapGeo'],
-      hierarchy: ['tree', 'swimlane'],
+      hierarchy: ['tree', 'flowApproval', 'flowRelease', 'swimlane'],
       special: ['control', 'streamgraph', 'parallel']
     };
     var next = [];
@@ -558,6 +610,29 @@
 '空间密度热力，找聚集热点': 'Spatial density hotspots',
 '门店密度': 'Store density',
 '层级与流程': 'Hierarchy & Process',
+'审批流程图': 'Approval flow',
+'是': 'Yes',
+'否': 'No',
+'GitHub 风格流程图：节点+判定+分支，看审批怎么流转': 'GitHub-style diagram: nodes, decisions and branches for an approval process',
+'研发发布流程': 'Release pipeline',
+'GitHub PR 流程：分支 → 提交 → CI → 评审 → 合并': 'GitHub PR flow: branch → commit → CI → review → merge',
+'自动校验资料': 'Auto validation',
+'系统规则引擎': 'Rule engine',
+'资料完整？': 'Complete?',
+'退回补充': 'Send back',
+'风控复核': 'Risk review',
+'人工 + 模型评分': 'Manual + model score',
+'额度达标？': 'Within limit?',
+'拒绝': 'Reject',
+'放款完成': 'Disbursed',
+'打开 Issue': 'Open issue',
+'创建分支': 'Create branch',
+'提交代码': 'Commit',
+'创建 Pull Request': 'Open pull request',
+'CI 通过？': 'CI passed?',
+'修复问题': 'Fix issues',
+'评审通过？': 'Review approved?',
+'合并到主干': 'Merge to main',
 '组织/分类的层级结构，任务/审批/协作的先后与责任归属。': 'Organisational hierarchy and the sequence and ownership of tasks and approvals.',
 '树形图': 'Tree',
 '层级结构的展开，看分类归属': 'Expand the hierarchy and see where things belong',

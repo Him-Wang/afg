@@ -455,5 +455,203 @@
     return function () {};
   };
 
+
+  /* ============================================================
+     GitHub Primer 风格流程图
+     参考 GitHub Docs / Primer 的设计语言：
+       节点 = 圆角矩形（#f6f8fa 底 / #d0d7de 边），开始/结束用胶囊，
+       判定用菱形（注意色 #fff8c5 / 边 #d4a72c），
+       连线 = 直角折线 + 小圆角 + 细箭头（#6e7781），
+       分支标注「是／否」用次级灰字，交汇点用小实心圆点。
+     ============================================================ */
+  var PRIMER = {
+    bg: '#FFFFFF',
+    nodeFill: '#F6F8FA',
+    nodeStroke: '#D0D7DE',
+    text: '#1F2328',
+    muted: '#656D76',
+    line: '#6E7781',
+    blue: '#0969DA', blueFill: '#DDF4FF',
+    green: '#1A7F37', greenFill: '#DAFBE1',
+    red: '#CF222E', redFill: '#FFEBE9',
+    amber: '#9A6700', amberFill: '#FFF8C5', amberStroke: '#D4A72C',
+    purple: '#8250DF', purpleFill: '#FBEFFF'
+  };
+
+  /* CJK 按 1 个字宽、拉丁按 0.58 估宽，用于节点自适应宽度 */
+  function textWidth(str) {
+    var w = 0;
+    String(str || '').split('').forEach(function (ch) {
+      w += /[\u4e00-\u9fa5\uff00-\uffef]/.test(ch) ? 12 : 6.6;
+    });
+    return w;
+  }
+  function nodeBox(n) {
+    var type = n.type || 'process';
+    var tw = Math.max(textWidth(n.label), textWidth(n.sub) * 0.85);
+    var minW = (type === 'decision' ? 150 : (type === 'start' || type === 'end' ? 110 : 130));
+    var w = n.w || Math.max(minW, tw + (type === 'decision' ? 44 : 34));
+    var h = n.h || (type === 'decision' ? 86 : (n.sub ? 52 : 38));
+    return { w: w, h: h, type: type };
+  }
+
+  function anchor(n, dir) {
+    var b = nodeBox(n);
+    if (dir === 'top') return [n.x, n.y - b.h / 2];
+    if (dir === 'bottom') return [n.x, n.y + b.h / 2];
+    if (dir === 'left') return [n.x - b.w / 2, n.y];
+    return [n.x + b.w / 2, n.y];
+  }
+
+  /* 折线 → 圆角 path */
+  function roundedPath(pts, r) {
+    if (!pts.length) return '';
+    var d = 'M' + pts[0][0] + ',' + pts[0][1];
+    for (var i = 1; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      var v1 = [p1[0] - p0[0], p1[1] - p0[1]];
+      var v2 = [p2[0] - p1[0], p2[1] - p1[1]];
+      var l1 = Math.hypot(v1[0], v1[1]) || 1, l2 = Math.hypot(v2[0], v2[1]) || 1;
+      var rr = Math.min(r, l1 / 2, l2 / 2);
+      var a = [p1[0] - v1[0] / l1 * rr, p1[1] - v1[1] / l1 * rr];
+      var b = [p1[0] + v2[0] / l2 * rr, p1[1] + v2[1] / l2 * rr];
+      d += 'L' + a[0] + ',' + a[1] + 'Q' + p1[0] + ',' + p1[1] + ' ' + b[0] + ',' + b[1];
+    }
+    var last = pts[pts.length - 1];
+    d += 'L' + last[0] + ',' + last[1];
+    return d;
+  }
+
+  function primerFlow(el, data, theme) {
+    clear(el);
+    var d3 = global.d3;
+    var nodes = data.nodes || [], edges = data.edges || [];
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
+
+    /* 逻辑坐标 → 自适应缩放 */
+    var pad = 16;
+    var xs = nodes.map(function (n) { var b = nodeBox(n); return [n.x - b.w / 2, n.x + b.w / 2]; });
+    var ys = nodes.map(function (n) { var b = nodeBox(n); return [n.y - b.h / 2, n.y + b.h / 2]; });
+    var minX = Math.min.apply(null, xs.map(function (p) { return p[0]; })) - pad;
+    var maxX = Math.max.apply(null, xs.map(function (p) { return p[1]; })) - -pad;
+    var minY = Math.min.apply(null, ys.map(function (p) { return p[0]; })) - pad;
+    var maxY = Math.max.apply(null, ys.map(function (p) { return p[1]; })) + pad;
+    var lw = maxX - minX, lh = maxY - minY;
+    var d = size(el);
+    var scale = Math.min(d.w / lw, d.h / lh) * 0.96;
+    var svg = d3.select(el).append('svg')
+      .attr('width', d.w).attr('height', d.h)
+      .style('display', 'block').style('overflow', 'visible');
+    var g = svg.append('g')
+      .attr('transform', 'translate(' + ((d.w - lw * scale) / 2 - minX * scale) + ',' +
+        ((d.h - lh * scale) / 2 - minY * scale) + ') scale(' + scale + ')');
+
+    /* 箭头 */
+    var defs = svg.append('defs');
+    defs.append('marker').attr('id', 'adv-flow-arrow').attr('viewBox', '0 0 10 10')
+      .attr('refX', 9).attr('refY', 5).attr('markerWidth', 6).attr('markerHeight', 6)
+      .attr('orient', 'auto-start-reverse')
+      .append('path').attr('d', 'M0,0 L10,5 L0,10 z').attr('fill', PRIMER.line);
+
+    /* 连线层 */
+    var gE = g.append('g').attr('class', 'flow-edges');
+    edges.forEach(function (e) {
+      var a = byId[e.from], b = byId[e.to];
+      if (!a || !b) return;
+      var pts = [];
+      var dirA = e.dirFrom || (Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'right' : 'left') : (b.y > a.y ? 'bottom' : 'top'));
+      var dirB = e.dirTo || (dirA === 'right' ? 'left' : dirA === 'left' ? 'right' : dirA === 'bottom' ? 'top' : 'bottom');
+      pts.push(anchor(a, dirA));
+      (e.via || []).forEach(function (p) { pts.push(p); });
+      pts.push(anchor(b, dirB));
+      var path = gE.append('path')
+        .attr('d', roundedPath(pts, 9))
+        .attr('fill', 'none')
+        .attr('stroke', PRIMER.line)
+        .attr('stroke-width', 1.5)
+        .attr('marker-end', 'url(#adv-flow-arrow)')
+        .attr('opacity', e.faint ? 0.55 : 0.95);
+      if (e.dashed) path.attr('stroke-dasharray', '4 4');
+      if (e.label) {
+        var mid = e.labelAt || pts[Math.floor((pts.length - 1) / 2)];
+        var lp = [(mid[0] + (e.labelDx || 0)), (mid[1] + (e.labelDy || 0))];
+        gE.append('text').attr('x', lp[0]).attr('y', lp[1])
+          .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+          .attr('font-family', FONT).attr('font-size', 11).attr('font-weight', 600)
+          .attr('fill', PRIMER.muted)
+          .text(e.label);
+      }
+      e._path = path;
+    });
+
+    /* 节点层 */
+    var gN = g.append('g').attr('class', 'flow-nodes');
+    nodes.forEach(function (n) {
+      var b = nodeBox(n), type = b.type;
+      var ng = gN.append('g').attr('transform', 'translate(' + n.x + ',' + n.y + ')')
+        .style('cursor', 'default');
+      var fill = PRIMER.nodeFill, stroke = PRIMER.nodeStroke, color = PRIMER.text;
+      if (type === 'start') { fill = PRIMER.blueFill; stroke = PRIMER.blue; }
+      if (type === 'end') { fill = PRIMER.greenFill; stroke = PRIMER.green; }
+      if (type === 'warn') { fill = PRIMER.redFill; stroke = PRIMER.red; color = PRIMER.red; }
+      if (type === 'decision') { fill = PRIMER.amberFill; stroke = PRIMER.amberStroke; color = '#7D4E00'; }
+      if (type === 'note') { fill = PRIMER.purpleFill; stroke = PRIMER.purple; }
+
+      if (type === 'decision') {
+        ng.append('path')
+          .attr('d', 'M0,' + (-b.h / 2) + ' L' + (b.w / 2) + ',0 L0,' + (b.h / 2) + ' L' + (-b.w / 2) + ',0 Z')
+          .attr('fill', fill).attr('stroke', stroke).attr('stroke-width', 1.3);
+        ng.append('text').attr('y', n.sub ? -5 : 0).attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+          .attr('font-family', FONT).attr('font-size', 12).attr('font-weight', 600).attr('fill', color)
+          .text(n.label);
+        if (n.sub) ng.append('text').attr('y', 11).attr('text-anchor', 'middle')
+          .attr('font-family', FONT).attr('font-size', 9.5).attr('fill', PRIMER.muted).text(n.sub);
+      } else {
+        var rx = (type === 'start' || type === 'end') ? b.h / 2 : 7;
+        ng.append('rect')
+          .attr('x', -b.w / 2).attr('y', -b.h / 2).attr('width', b.w).attr('height', b.h)
+          .attr('rx', rx).attr('fill', fill).attr('stroke', stroke).attr('stroke-width', 1.2);
+        ng.append('text').attr('y', n.sub ? -7 : 0).attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+          .attr('font-family', FONT).attr('font-size', 12).attr('font-weight', type === 'start' || type === 'end' ? 700 : 500)
+          .attr('fill', color).text(n.label);
+        if (n.sub) ng.append('text').attr('y', 11).attr('text-anchor', 'middle')
+          .attr('font-family', FONT).attr('font-size', 9.5).attr('fill', PRIMER.muted).text(n.sub);
+      }
+      n._dom = ng;
+      n._edges = edges.filter(function (e) { return e.from === n.id || e.to === n.id; });
+
+      ng.on('mouseenter', function () {
+        gN.selectAll('g').transition().duration(120).style('opacity', function (d, i) { return 0.35; });
+        ng.transition().duration(120).style('opacity', 1);
+        gE.selectAll('path').transition().duration(120).attr('opacity', function () { return 0.2; });
+        n._edges.forEach(function (e) { if (e._path) e._path.transition().duration(120).attr('opacity', 0.95); });
+      });
+      ng.on('mouseleave', function () {
+        gN.selectAll('g').transition().duration(160).style('opacity', 1);
+        gE.selectAll('path').transition().duration(160).attr('opacity', function (d, i) {
+          return edges[i] && edges[i].faint ? 0.55 : 0.95;
+        });
+      });
+    });
+
+    /* 可选：分组框（虚线区域） */
+    (data.groups || []).forEach(function (grp) {
+      var gg = g.insert('g', ':first-child');
+      gg.append('rect')
+        .attr('x', grp.x).attr('y', grp.y).attr('width', grp.w).attr('height', grp.h)
+        .attr('rx', 10).attr('fill', 'none')
+        .attr('stroke', PRIMER.nodeStroke).attr('stroke-dasharray', '5 5').attr('stroke-width', 1);
+      gg.append('text').attr('x', grp.x + 10).attr('y', grp.y + 15)
+        .attr('font-family', FONT).attr('font-size', 10).attr('font-weight', 600)
+        .attr('fill', PRIMER.muted).text(grp.label);
+    });
+
+    return function () {};
+  }
+
+  S.flowApproval = primerFlow;
+  S.flowRelease = primerFlow;
+
   global.ADV_SHOWCASE = S;
 })(window);

@@ -922,3 +922,9 @@ body.is-home .chart-head { display: none; }
 .guide-manual > summary::before { content: '▸ '; }
 .guide-manual[open] > summary::before { content: '▾ '; }
 .guide-manual[open] > summary { margin-bottom: 8px; }
+
+/* 流程图示例：更高的画布，让节点与连线更舒展 */
+.chart-stage .chart-canvas.cat-single.flow-tall { height: 540px; }
+@media (max-width: 900px) {
+  .chart-stage .chart-canvas.cat-single.flow-tall { height: 460px; }
+}
