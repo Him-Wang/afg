@@ -12,6 +12,8 @@
 }
 
 :root {
+  /* 只支持浅色：手机浏览器开「深色模式 / 自动深色」时不要反色 */
+  color-scheme: only light;
   /* 默认即「象牙白」：即使 JS 没来得及跑，也不会闪黑金 */
   --bg: #FAFAF7;
   --bg-elevated: #FFFFFF;

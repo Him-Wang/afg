@@ -1,7 +1,7 @@
-/* ADV 静态资源缓存：二次打开秒开（stale-while-revalidate）
-   部署更新后，缓存会在下一次访问后台刷新；如需强制刷新，改 VERSION 即可。 */
-const VERSION = 'adv-2026-11-11-e';
-const PRECACHE = ['./', './index.html', './css/style.css', './js/app.js'];
+/* ADV 静态资源缓存：二次打开秒开；HTML/JS/CSS 走「网络优先」，保证更新立刻生效
+   离线时回退到缓存。改 VERSION 可强制清空旧缓存。 */
+const VERSION = 'adv-2026-11-11-f';
+const PRECACHE = ['./', './index.html', './css/style.css'];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -16,20 +16,40 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+/* 网络优先：先拿最新，失败再用缓存（避免旧页面/旧样式长期驻留） */
+async function networkFirst(req) {
+  const cache = await caches.open(VERSION);
+  try {
+    const res = await fetch(req);
+    if (res && res.ok) cache.put(req, res.clone());
+    return res;
+  } catch (e) {
+    const hit = await cache.match(req);
+    if (hit) return hit;
+    throw e;
+  }
+}
+
+/* 缓存优先 + 后台更新：字体/图片等不变资源 */
+async function cacheFirst(req) {
+  const cache = await caches.open(VERSION);
+  const hit = await cache.match(req);
+  const net = fetch(req).then((res) => {
+    if (res && res.ok) cache.put(req, res.clone());
+    return res;
+  }).catch(() => hit);
+  return hit || net;
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  e.respondWith((async () => {
-    const cache = await caches.open(VERSION);
-    const cached = await cache.match(req, { ignoreSearch: false });
-    const network = fetch(req).then((res) => {
-      if (res && res.ok) cache.put(req, res.clone());
-      return res;
-    }).catch(() => cached);
-    /* 有缓存先给缓存（秒开），同时后台更新 */
-    return cached || network;
-  })());
+  if (req.mode === 'navigate' || /\.(html|js|css)$/.test(url.pathname) || url.pathname.endsWith('/')) {
+    e.respondWith(networkFirst(req));
+  } else {
+    e.respondWith(cacheFirst(req));
+  }
 });
