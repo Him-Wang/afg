@@ -1880,7 +1880,7 @@
   function ensureXLSX() { return loadLib('xlsx'); }
   function ensureLightweight() { return loadLib('lightweight'); }
   function ensureD3() { return loadLib('d3'); }
-  var SHOWCASE_TYPES = { scForce: 1, scChord: 1, scRadialTree: 1, scHexbin: 1, scGlowLine: 1, scWaterfall: 1, flowApproval: 1, flowRelease: 1 };
+  var SHOWCASE_TYPES = { scForce: 1, scChord: 1, scRadialTree: 1, scHexbin: 1, scGlowLine: 1, scWaterfall: 1, archDiagram: 1 };
 
   function withCharts(fn) {
     if (window.echarts) { fn(); return; }
@@ -2665,7 +2665,7 @@
     },
     chart: {
       groupedBar: 'Grouped Bar', tornado: 'Tornado / Diverging Bar', lollipop: 'Lollipop', bullet: 'Bullet',
-      flowApproval: 'Approval flow', flowRelease: 'Release pipeline',
+      archDiagram: 'System architecture',
       wordcloud: 'Word Cloud', radar: 'Radar', line: 'Line', area: 'Area', stacked: 'Stacked Area',
       waterfall: 'Waterfall', heatmap: 'Heatmap', pie: 'Pie', donut: 'Donut', stackedBar: 'Stacked Bar',
       percentBar: '100% Stacked Bar', treemap: 'Treemap', sunburst: 'Sunburst', histogram: 'Histogram',
@@ -2685,8 +2685,7 @@
     },
     chartDesc: {
       groupedBar: 'Side-by-side bars for multi-group comparison', tornado: 'Mirrored bars to compare two sides at once',
-      flowApproval: 'GitHub-style diagram: nodes, decisions and branches for an approval process',
-      flowRelease: 'GitHub PR flow: branch → commit → CI → review → merge',
+      archDiagram: 'Grouped zones with orthogonal connectors and inline labels — palette only changes borders and lines',
       lollipop: 'Ranked comparison, lighter than bars', bullet: 'Actual vs target within qualitative ranges',
       wordcloud: 'Text sized by frequency to surface themes', radar: 'Multi-dimensional profile across axes',
       line: 'The default time-series view: trend and turning points', area: 'Emphasizes accumulated magnitude',
@@ -2877,7 +2876,7 @@
     el('chart-stage').appendChild(pal2);
 
     var c = document.createElement('div');
-    c.className = 'chart-canvas cat-single' + (SHOWCASE_TYPES[ch.type] && /^flow/.test(ch.type) ? ' flow-tall' : '');
+    c.className = 'chart-canvas cat-single' + (ch.type === 'archDiagram' ? ' flow-tall' : '');
     el('chart-stage').appendChild(c);
     var theme = getChartTheme(); theme._noZoom = true;
     try {
@@ -2892,8 +2891,8 @@
 
     var note = document.createElement('div');
     note.className = 'cat-note';
-    note.textContent = (/^flow/.test(ch.type))
-      ? tr('说明：示例数据，展示「节点 + 判定 + 分支」的画法与流向。', 'Note: sample data showing nodes, decisions, branches and flow direction.')
+    note.textContent = (ch.type === 'archDiagram')
+      ? tr('说明：示例数据，展示分区、节点与连线；切换配色只改变边框与连线颜色。', 'Note: sample zones, nodes and connectors — switching palettes only recolours borders and lines.')
       : tr('说明：本页数据为随机生成，仅用于演示该图表的形态与用途。', 'Note: data on this page is generated to demonstrate the chart form and use case.');
     el('chart-stage').appendChild(note);
     syncToolbar();
