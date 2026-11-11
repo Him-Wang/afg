@@ -353,11 +353,11 @@
     ];
     return base(t, {
       tooltip: tip(t, { trigger: 'item' }),
-      grid: { left: narrow ? 54 : 72, right: narrow ? 52 : 64, top: 30, bottom: 18 },
+      grid: { left: narrow ? 44 : 72, right: narrow ? 36 : 64, top: 30, bottom: 18 },
       xAxis: yAxis(t, { type: 'value', min: lo - pad * 0.6, max: hi + pad * 2.3,
         splitLine: { show: true, lineStyle: { color: rule(t) } },
         axisLabel: { color: muted(t), fontSize: 9.5, fontFamily: FONT, showMinLabel: false, showMaxLabel: false } }),
-      yAxis: xAxis(t, { data: names, axisLabel: { color: ink(t), fontSize: narrow ? 9 : 10.5, fontFamily: FONT, width: narrow ? 50 : 68, overflow: 'truncate' } }),
+      yAxis: xAxis(t, { data: names, axisLabel: { color: ink(t), fontSize: narrow ? 8.5 : 10.5, fontFamily: FONT, width: narrow ? 42 : 68, overflow: 'truncate' } }),
       series: series,
       graphic: [
         { type: 'text', left: narrow ? 56 : 74, top: 6, style: { text: '● ' + d.toLabel, fill: ink(t), font: '700 9.5px ' + FONT } },
@@ -901,6 +901,7 @@
 
   /* 分布条带图：P10–P90 全距 + IQR 实心 + 中位刻度（custom 系列，随尺寸自适应） */
   B.boxplot = function (el, d, t) {
+    var W2 = (el && el.clientWidth) || 600;
     var cats = d.categories || [];
     var boxes = d.boxes || [];          // [min, Q1, median, Q3, max]
     var all = [];
@@ -914,13 +915,14 @@
         return '<b>' + cats[p.dataIndex] + '</b><br/>最大 ' + num(b[4]) + ' · Q3 ' + num(b[3]) +
           '<br/><b>中位 ' + num(b[2]) + '</b><br/>Q1 ' + num(b[1]) + ' · 最小 ' + num(b[0]);
       } }),
-      grid: { left: 96, right: 54, top: 24, bottom: 26 },
+      grid: { left: (W2 < 480 ? 74 : 96), right: (W2 < 480 ? 26 : 54), top: 24, bottom: 26 },
       xAxis: { type: 'value', min: vmin, max: vmax, axisLine: { show: false }, axisTick: { show: false },
         axisLabel: { color: muted(t), fontSize: 9, fontFamily: FONT },
         splitLine: { lineStyle: { color: rule(t) } } },
       yAxis: { type: 'category', data: cats, inverse: true,
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: ink(t), fontSize: 9.5, fontFamily: FONT, fontWeight: 700 } },
+        axisLabel: { color: ink(t), fontSize: (W2 < 480 ? 8.5 : 9.5), fontFamily: FONT, fontWeight: 700,
+          width: (W2 < 480 ? 64 : undefined), overflow: 'truncate' } },
       series: [{
         type: 'custom',
         renderItem: function (params, api) {
@@ -1125,6 +1127,7 @@
   /* ================= 5. 关系与相关 ================= */
   B.scatter = function (el, d, t) {
     var pts = d.points || [];
+    var _narrowGrid = ((el && el.clientWidth) || 600) < 480;
     var series = [{
       type: 'scatter', data: pts, symbolSize: 7,
       itemStyle: { color: rgba(seriesColor(t, 0), 0.55), borderColor: rgba(seriesColor(t, 0), 0.95), borderWidth: 0.6 },
@@ -1147,10 +1150,14 @@
           endLabel: { show: false }
         });
         var r2 = r * r;
-        fitEls.push({ type: 'text', right: 14, top: 6, z: 10,
+        var _sw = (el && el.clientWidth) || 600;
+        var _narrowS = _sw < 480;
+        fitEls.push({ type: 'text',
+          right: _narrowS ? undefined : 14, left: _narrowS ? 10 : undefined,
+          bottom: _narrowS ? 2 : undefined, top: _narrowS ? undefined : 6, z: 10,
           style: { text: 'y = ' + k.toFixed(2) + 'x ' + (b >= 0 ? '+ ' : '− ') + Math.abs(b).toFixed(1) +
             '　R² = ' + r2.toFixed(3) + '　r = ' + r.toFixed(2),
-            fill: accentOf(t), font: '800 10px ' + FONT,
+            fill: accentOf(t), font: (_narrowGrid ? '700 9px ' : '800 10px ') + FONT,
             backgroundColor: (t && t._dark) ? 'rgba(22,24,30,.9)' : 'rgba(255,255,255,.86)', padding: [4, 8], borderRadius: 4 } });
       }
     }
@@ -1160,7 +1167,7 @@
         return d.xName + ' ' + num(p.value[0]) + '<br/>' + d.yName + ' ' + num(p.value[1]);
       } }),
       graphic: fitEls,
-      grid: grid({ left: 6, right: 24, top: 30, bottom: 26 }),
+      grid: grid({ left: 6, right: 24, top: (_narrowGrid ? 20 : 30), bottom: (_narrowGrid ? 34 : 26) }),
       xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
         name: d.xName, nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
       yAxis: yAxis(t, { type: 'value', scale: true, name: d.yName, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
@@ -1237,18 +1244,36 @@
       tooltip: tip(t, { formatter: function (p) {
         return '<b>' + names[p.value[1]] + ' × ' + names[p.value[0]] + '</b><br/>相关系数 ' + p.value[2].toFixed(2);
       } }),
-      grid: { left: narrow ? 74 : 92, right: narrow ? 40 : 62, top: narrow ? 54 : 58, bottom: 10 },
+      grid: { left: narrow ? 58 : 92, right: narrow ? 14 : 62, top: narrow ? 74 : 58, bottom: narrow ? 26 : 10 },
       xAxis: { type: 'category', data: names, position: 'top', splitArea: { show: false },
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: muted(t), fontSize: narrow ? 7 : 7.5, fontFamily: FONT, rotate: 0,
-          margin: 7, interval: 0, width: narrow ? 40 : 52, overflow: 'break', lineHeight: 9 } },
+        axisLabel: { color: muted(t), fontSize: narrow ? 7.5 : 7.5, fontFamily: FONT,
+          rotate: narrow ? 42 : 0, margin: narrow ? 6 : 7, interval: 0,
+          width: narrow ? undefined : 52, overflow: narrow ? 'truncate' : 'break', lineHeight: 9,
+          formatter: function (v) {
+            var str = String(v);
+            if (!narrow) return str;
+            return str.length > 6 ? str.slice(0, 5) + '…' : str;
+          } } },
       yAxis: { type: 'category', data: names, inverse: true,
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT,
-          interval: 0, width: 74, overflow: 'truncate' } },
+        axisLabel: { color: muted(t), fontSize: narrow ? 7.5 : 9, fontFamily: FONT,
+          interval: 0, width: narrow ? 56 : 74, overflow: 'truncate',
+          formatter: function (v) {
+            var str = String(v);
+            if (narrow && str.length > 6) return str.slice(0, 5) + '…';
+            return str;
+          } } },
       visualMap: {
-        min: -1, max: 1, orient: 'vertical', right: 4, top: 'center', itemWidth: 10, itemHeight: narrow ? 80 : 120,
-        calculable: false, text: ['+1', '-1'], textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT },
+        min: -1, max: 1,
+        orient: narrow ? 'horizontal' : 'vertical',
+        right: narrow ? undefined : 4,
+        left: narrow ? 'center' : undefined,
+        bottom: narrow ? 2 : undefined,
+        top: narrow ? undefined : 'center',
+        itemWidth: narrow ? 90 : 10, itemHeight: narrow ? 8 : 120,
+        calculable: false, text: narrow ? ['', ''] : ['+1', '-1'],
+        textStyle: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT },
         inRange: { color: divergingOf(t) }
       },
       series: [{
@@ -1625,7 +1650,7 @@
       itemStyle: { areaColor: '#EFEDE7', borderColor: 'rgba(255,255,255,0.55)', borderWidth: 0.5 },
       emphasis: { itemStyle: { areaColor: rgba(accent(t), 0.28) },
         label: { show: true, color: ink(t), fontSize: 10, fontFamily: FONT } },
-      label: { show: true, color: ink(t), fontSize: 9, fontFamily: FONT, fontWeight: 700,
+      label: { show: !narrow, color: ink(t), fontSize: 9, fontFamily: FONT, fontWeight: 700,
         formatter: function (p) { return topNames[p.name] || ''; } },
       data: mapData
     }]);
@@ -1640,10 +1665,13 @@
         rp[1] || '#1D5B7C', rp[0] || '#0B2A45'] }
     };
     opt.title = [
-      { text: d.metric || tr('区域指标', 'Regional metric'), left: 14, top: 8,
-        textStyle: { color: ink(t), fontSize: 11.5, fontFamily: FONT, fontWeight: 700 } },
-      { text: '前 5 名 · ' + top.map(function (x) { return (x.cn || x.name) + ' ' + num(x.value); }).join('　') + (useLog ? '　· 对数色阶' : ''),
-        left: 14, top: 26, textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT } }
+      { text: d.metric || tr('区域指标', 'Regional metric'), left: 14, top: narrow ? 6 : 8,
+        textStyle: { color: ink(t), fontSize: narrow ? 10.5 : 11.5, fontFamily: FONT, fontWeight: 700 } },
+      { text: narrow
+          ? '前 5 名 · ' + top.slice(0, 3).map(function (x) { return (x.cn || x.name) + ' ' + num(x.value); }).join('　')
+          : '前 5 名 · ' + top.map(function (x) { return (x.cn || x.name) + ' ' + num(x.value); }).join('　') + (useLog ? '　· 对数色阶' : ''),
+        left: 14, top: narrow ? 22 : 26,
+        textStyle: { color: muted(t), fontSize: narrow ? 8.5 : 9, fontFamily: FONT } }
     ];
     return opt;
   };
@@ -2001,6 +2029,7 @@
   /* ================= 5. 关系与相关 ================= */
   B.scatter = function (el, d, t) {
     var pts = d.points || [];
+    var _narrowGrid = ((el && el.clientWidth) || 600) < 480;
     var series = [{
       type: 'scatter', data: pts, symbolSize: 7,
       itemStyle: { color: rgba(seriesColor(t, 0), 0.55), borderColor: rgba(seriesColor(t, 0), 0.95), borderWidth: 0.6 },
@@ -2023,10 +2052,12 @@
           endLabel: { show: false }
         });
         var r2 = r * r;
-        fitEls.push({ type: 'text', right: 14, top: 6, z: 10,
+        fitEls.push({ type: 'text',
+          right: _narrowGrid ? undefined : 14, left: _narrowGrid ? 10 : undefined,
+          bottom: _narrowGrid ? 2 : undefined, top: _narrowGrid ? undefined : 6, z: 10,
           style: { text: 'y = ' + k.toFixed(2) + 'x ' + (b >= 0 ? '+ ' : '− ') + Math.abs(b).toFixed(1) +
             '　R² = ' + r2.toFixed(3) + '　r = ' + r.toFixed(2),
-            fill: accentOf(t), font: '800 10px ' + FONT,
+            fill: accentOf(t), font: (_narrowGrid ? '700 9px ' : '800 10px ') + FONT,
             backgroundColor: (t && t._dark) ? 'rgba(22,24,30,.9)' : 'rgba(255,255,255,.86)', padding: [4, 8], borderRadius: 4 } });
       }
     }
@@ -2036,7 +2067,7 @@
         return d.xName + ' ' + num(p.value[0]) + '<br/>' + d.yName + ' ' + num(p.value[1]);
       } }),
       graphic: fitEls,
-      grid: grid({ left: 6, right: 24, top: 30, bottom: 26 }),
+      grid: grid({ left: 6, right: 24, top: (_narrowGrid ? 20 : 30), bottom: (_narrowGrid ? 34 : 26) }),
       xAxis: yAxis(t, { type: 'value', scale: true, splitLine: { show: false },
         name: d.xName, nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
       yAxis: yAxis(t, { type: 'value', scale: true, name: d.yName, nameTextStyle: { color: muted(t), fontSize: 10, fontFamily: FONT } }),
@@ -2113,18 +2144,31 @@
       tooltip: tip(t, { formatter: function (p) {
         return '<b>' + names[p.value[1]] + ' × ' + names[p.value[0]] + '</b><br/>相关系数 ' + p.value[2].toFixed(2);
       } }),
-      grid: { left: narrow ? 74 : 92, right: narrow ? 40 : 62, top: narrow ? 54 : 58, bottom: 10 },
+      grid: { left: narrow ? 58 : 92, right: narrow ? 34 : 62, top: narrow ? 84 : 58, bottom: narrow ? 14 : 10 },
       xAxis: { type: 'category', data: names, position: 'top', splitArea: { show: false },
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: muted(t), fontSize: narrow ? 7 : 7.5, fontFamily: FONT, rotate: 0,
-          margin: 7, interval: 0, width: narrow ? 40 : 52, overflow: 'break', lineHeight: 9 } },
+        axisLabel: { color: muted(t), fontSize: 7.5, fontFamily: FONT,
+          rotate: narrow ? 42 : 0, margin: narrow ? 6 : 7, interval: 0,
+          width: narrow ? undefined : 52, overflow: narrow ? 'truncate' : 'break', lineHeight: 9,
+          formatter: function (v) {
+            var str = String(v);
+            return (narrow && str.length > 6) ? str.slice(0, 5) + '…' : str;
+          } } },
       yAxis: { type: 'category', data: names, inverse: true,
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT,
-          interval: 0, width: 74, overflow: 'truncate' } },
+        axisLabel: { color: muted(t), fontSize: narrow ? 7.5 : 9, fontFamily: FONT,
+          interval: 0, width: narrow ? 56 : 74, overflow: 'truncate',
+          formatter: function (v) {
+            var str = String(v);
+            return (narrow && str.length > 6) ? str.slice(0, 5) + '…' : str;
+          } } },
       visualMap: {
-        min: -1, max: 1, orient: 'vertical', right: 4, top: 'center', itemWidth: 10, itemHeight: narrow ? 80 : 120,
-        calculable: false, text: ['+1', '-1'], textStyle: { color: muted(t), fontSize: 9, fontFamily: FONT },
+        min: -1, max: 1,
+        orient: 'vertical',
+        right: narrow ? 16 : 4, top: 'center',
+        itemWidth: narrow ? 8 : 10, itemHeight: narrow ? 74 : 120,
+        calculable: false, text: narrow ? ['', ''] : ['+1', '-1'],
+        textStyle: { color: muted(t), fontSize: narrow ? 8 : 9, fontFamily: FONT },
         inRange: { color: divergingOf(t) }
       },
       series: [{

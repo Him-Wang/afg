@@ -12,19 +12,20 @@
 }
 
 :root {
-  --bg: #0E0F12;
-  --bg-elevated: #16181E;
-  --panel: #121318;
-  --sidebar-bg: #101116;
-  --border: rgba(255,255,255,0.08);
-  --text: #F2EFE6;
-  --muted: #8A8578;
+  /* 默认即「象牙白」：即使 JS 没来得及跑，也不会闪黑金 */
+  --bg: #FAFAF7;
+  --bg-elevated: #FFFFFF;
+  --panel: #FFFFFF;
+  --sidebar-bg: #F3F2EE;
+  --border: rgba(0,0,0,0.08);
+  --text: #1A1A1A;
+  --muted: #6B6B6B;
   --accent: #C9A96A;
-  --accent-soft: rgba(201,169,106,0.16);
-  --up: #E6C88A;
-  --down: #6E6A60;
-  --input-bg: #0B0C10;
-  --shadow: 0 10px 34px rgba(0,0,0,0.55);
+  --accent-soft: rgba(201,169,106,0.22);
+  --up: #1E7A46;
+  --down: #C0392B;
+  --input-bg: #FFFFFF;
+  --shadow: 0 8px 24px rgba(0,0,0,0.08);
 
   --header-h: 56px;
   --sidebar-w: 244px;
@@ -38,6 +39,7 @@
 
 html, body {
   margin: 0;
+  background: var(--bg);
   padding: 0;
   height: 100%;
   background: var(--bg);
@@ -499,9 +501,14 @@ textarea.csv-area {
   }
   .sidebar-backdrop.show { display: block; }
 
-  /* 功能栏横向滚动 */
-  .chart-toolbar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding: 8px 14px; }
+  /* 功能栏横向滚动；不允许 flex 压缩高度（否则按钮会被裁切） */
+  .chart-toolbar {
+    overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; -webkit-overflow-scrolling: touch;
+    padding: 8px 14px; flex: 0 0 auto; min-height: 48px; align-items: center;
+  }
   .chart-toolbar .tb-spacer { display: none; }
+  .chart-head { flex: 0 0 auto; }
+  .chart-canvas, .chart-stage .chart-canvas { width: 100% !important; max-width: 100%; }
   .stat-badge { display: none !important; }
 
   /* 图表自适应高度 */
@@ -638,14 +645,15 @@ body.is-home .chart-head { display: none; }
   #back-btn { flex: none; }
 
   /* --- 工具栏：横向滚动，隐藏小标签节省空间 --- */
-  .chart-toolbar { gap: 6px; padding: 7px 10px; }
+  .chart-toolbar { gap: 6px; padding: 7px 10px; min-height: 46px; flex: 0 0 auto; }
   .chart-toolbar .tb-label { display: none; }
-  .chart-toolbar .btn, .chart-toolbar select { flex: none; height: 32px; font-size: 12px; padding: 0 10px; }
+  .chart-toolbar .btn, .chart-toolbar select { flex: none; height: 32px; font-size: 12px; padding: 0 10px; white-space: nowrap; }
+  .chart-toolbar .btn { display: inline-flex; align-items: center; gap: 4px; }
   .chart-toolbar::-webkit-scrollbar { height: 3px; }
 
   /* --- 图表区域 --- */
   .chart-stage { margin: 0 8px 8px; }
-  .chart-canvas, .chart-stage .chart-canvas { height: 260px; }
+  .chart-canvas, .chart-stage .chart-canvas { height: 300px; }
   .chart-stage .kpi-grid { padding: 10px 4px; }
 
   /* --- 看板卡片：单列、紧凑 --- */

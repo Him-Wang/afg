@@ -151,8 +151,9 @@
     /* 构建矩阵（含对角为 0） */
     var matrix = m.map(function (row) { return row.slice(); });
 
-    var outer = Math.min(r.w, r.h) / 2 - 26;
-    var inner = outer - 14;
+    var _narrowC = r.w < 520;
+    var outer = Math.min(r.w, r.h) / 2 - (_narrowC ? 10 : 26);
+    var inner = outer - (_narrowC ? 9 : 14);
     var g = r.svg.append('g').attr('transform', 'translate(' + (r.w / 2) + ',' + (r.h / 2) + ')');
 
     var chord = d3.chord().padAngle(0.035).sortSubgroups(d3.descending)(matrix);
@@ -217,7 +218,7 @@
     if (!global.d3) return;
     var d3 = global.d3;
     var r = svgRoot(el, theme);
-    var radius = Math.min(r.w * 0.47, r.h * 0.50);
+    var radius = Math.min(r.w * (r.w < 520 ? 0.46 : 0.47), r.h * (r.w < 520 ? 0.58 : 0.50));
     var g = r.svg.append('g').attr('transform', 'translate(' + (r.w / 2) + ',' + (r.h / 2) + ')');
 
     var root = d3.hierarchy(data.tree);
