@@ -621,7 +621,7 @@
       tooltip: tip(t, { trigger: 'item', formatter: function (p) { return (yLabels[p.value[1]] || '') + ' · ' + (xLabels[p.value[0]] || '') + '<br/>' + num(p.value[2]); } }),
       grid: { left: 6, right: 16, top: 14, bottom: 18, containLabel: true },
       xAxis: xAxis(t, { data: xLabels, splitArea: { show: false } }),
-      yAxis: xAxis(t, { data: yLabels, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
+      yAxis: xAxis(t, { data: yLabels, inverse: true, axisLabel: { color: ink(t), fontSize: 10.5, fontFamily: FONT } }),
       visualMap: {
         min: Math.min.apply(null, vals), max: Math.max.apply(null, vals), show: false,
         inRange: { color: [rgba(ink(t), 0.05), rgba(accent(t), 0.45), accent(t)] }

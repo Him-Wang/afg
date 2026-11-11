@@ -293,6 +293,7 @@ textarea.csv-area {
   opacity: 0; transition: all .25s ease; pointer-events: none; box-shadow: var(--shadow);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.toast-error { border-color: var(--down); color: var(--down); }
 
 .empty-state { min-height: 560px; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
 

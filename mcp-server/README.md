@@ -138,11 +138,32 @@ AI 会返回 `https://saviorbill.github.io/adv/?chart=...` 链接，点开就是
 
 | 参数 | 说明 |
 |---|---|
-| `type` | `line` / `area` / `bar` / `stacked` / `stackedBar` / `radar` |
+| `type` | 15 种类型，见下表 |
 | `title` | 图表标题 |
-| `labels` | 横轴标签数组，如 `["2020","2021","2022"]` |
-| `series` | `[{name, values}]`，每条 values 与 labels 等长 |
+| `labels` | 横轴标签 / 分类名数组，如 `["2020","2021","2022"]` |
+| `series` | `[{name, values}]`，每条 values 与 labels 等长（工具会校验，不等长直接报错） |
 | `palette` | `consult`(默认·麦肯锡深蓝) / `contrast`(编辑多彩) / `burgundy`(投行酒红) / `forest`(期刊墨绿) |
+| `unit` | 单位，`rank` / `kpi` 等图表使用，如 `"次"`、`"亿元"` |
+
+### 支持的类型
+
+| 类型 | 说明 | 数据怎么给 |
+|---|---|---|
+| `line` | 折线 | labels + series |
+| `area` | 面积（推荐） | labels + series |
+| `bar` | 柱状 | labels + series |
+| `stacked` | 堆叠面积 | labels + series |
+| `stackedBar` | 堆叠柱状 | labels + series |
+| `stackedLine` | 堆叠折线 | labels + series |
+| `step` | 阶梯线 | labels + series |
+| `dual` | 双轴对比 | labels + 两条 series |
+| `waterfall` | 瀑布图 | labels + 一条 series（首条即增减量） |
+| `rank` | 横向排名 | labels + 一条 series + `unit` |
+| `pie` | 饼图 | labels + 一条 series（值=各类占比或绝对量） |
+| `donut` | 环形图 | 同上 |
+| `funnel` | 漏斗 | labels + 一条 series（按环节顺序） |
+| `heatmap` | 热力图 | labels=列名，series 每项是一行（name=行名） |
+| `kpi` | KPI 卡片 | labels=时间点，series 每项一张卡（值取末值+环比） |
 
 ### 输出链接格式
 

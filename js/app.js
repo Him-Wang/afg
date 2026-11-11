@@ -734,17 +734,20 @@
     funnel: '漏斗图', sankey: '桑基图',
     choropleth: '分级统计图', heatMapGeo: '热点地图', symbolMap: '标记地图',
     tree: '树形图', orgChart: '组织架构', icicle: '冰柱图', swimlane: '泳道图',
-    control: '控制图', parallel: '平行坐标'
+    kpi: 'KPI 卡片', control: '控制图', parallel: '平行坐标'
   };
 
   /* ---------- 通用 ---------- */
   var toastTimer = null;
-  function toast(msg) {
+  function toast(msg, isError) {
     var t = el('toast');
     t.textContent = msg;
     t.classList.add('show');
+    t.classList.toggle('toast-error', !!isError);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+    /* 错误提示停留更久，方便截图/排查 */
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, isError ? 5200 : 2200);
+    if (isError && window.console && console.warn) console.warn('[ADV]', msg);
   }
 
   function toggleSidebar() {
@@ -3924,7 +3927,7 @@
     { name: '流向', types: [['funnel', '漏斗图'], ['sankey', '桑基图']] },
     { name: '地理', types: [['choropleth', '分级统计图'], ['heatMapGeo', '热点地图'], ['symbolMap', '标记地图']] },
     { name: '层级', types: [['tree', '树形图'], ['orgChart', '组织架构'], ['icicle', '冰柱图'], ['swimlane', '泳道图']] },
-    { name: '特殊', types: [['control', '控制图'], ['parallel', '平行坐标']] }
+    { name: '特殊', types: [['kpi', 'KPI 卡片'], ['control', '控制图'], ['parallel', '平行坐标']] }
   ];
   var PICK_DESC = {
     line: '看趋势与拐点', area: '强调累计量', stacked: '总量与结构', step: '阶跃变化',
@@ -3939,7 +3942,7 @@
     funnel: '逐级转化', sankey: '多级分流',
     choropleth: '按地区着色', heatMapGeo: '热点聚集', symbolMap: '按点标记',
     tree: '层级结构', orgChart: '组织架构', icicle: '层级占比横条', swimlane: '跨部门流程',
-    control: '过程监控', parallel: '多维比较'
+    kpi: '关键指标一屏概览', control: '过程监控', parallel: '多维比较'
   };
 
 
@@ -4544,6 +4547,46 @@
       } else if (type === 'combo') {
         var sers = yCols.map(function (c) { return { name: c, values: rows.map(function (r) { return vnum(r[c]); }) }; });
         data = { labels: labels, series: sers };
+      } else if (type === 'kpi') {
+        clearStage();
+        /* 时间序列：末值 + 环比；横截面（如各国/各公司对比）：合计 + 均值 */
+        var isTSk = !!(state.det && state.det.isTimeSeries);
+        var cards = yCols.map(function (c) {
+          var vals = rows.map(function (r) { return vnum(r[c]); }).filter(function (v) { return isFinite(v); });
+          var spark = vals.slice(-12);
+          if (!isTSk) {
+            var sum = vals.reduce(function (a, b) { return a + b; }, 0);
+            var avg = vals.length ? sum / vals.length : 0;
+            return {
+              label: c,
+              value: sum === 0 ? '—' : (Math.abs(sum) >= 1000
+                ? sum.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(Math.round(sum * 100) / 100)),
+              delta: vals.length ? ('合计 · 均值 ' + (Math.abs(avg) >= 1000
+                ? avg.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(Math.round(avg * 100) / 100))) : '',
+              dir: '',
+              spark: spark
+            };
+          }
+          var lastV = vals.length ? vals[vals.length - 1] : null;
+          var prevV = vals.length > 1 ? vals[vals.length - 2] : null;
+          var dlt = (lastV !== null && prevV !== null && prevV !== 0) ? ((lastV - prevV) / Math.abs(prevV) * 100) : null;
+          return {
+            label: c,
+            value: lastV === null ? '—' : (Math.abs(lastV) >= 1000
+              ? lastV.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(Math.round(lastV * 100) / 100)),
+            delta: dlt === null ? '' : (dlt >= 0 ? '+' : '') + dlt.toFixed(1) + '%',
+            dir: (dlt !== null && dlt < 0) ? 'neg' : 'pos',
+            spark: spark
+          };
+        });
+        var kTitle = state.customTitles[state.viewKey] || ('用户数据 · KPI 卡片');
+        state.chartConfig = { type: 'kpi', title: kTitle, data: { cards: cards } };
+        state.lastChart = state.chartConfig;
+        renderKpi({ cards: cards });
+        setHead({ title: kTitle, subtitle: '', unit: '', source: '' });
+        state.echartsEl = null;
+        syncToolbar();
+        return;
       } else if (type === 'rank') {
         var col = yCols[0];
         data = { categories: labels, values: rows.map(function (r) { return vnum(r[col]); }) };
@@ -5457,7 +5500,10 @@
       if (okPal) state.palette = cfg.palette;
     }
     var data = {};
-    if (cfg.data) data = cfg.data;
+    if (cfg.steps) data = { steps: cfg.steps };                                  // 漏斗
+    else if (cfg.cards) data = { cards: cfg.cards };                            // KPI
+    else if (cfg.data && cfg.data.data) data = cfg.data;                        // 饼/环/树等自描述数据
+    else if (cfg.data) data = cfg.data;
     else if (cfg.xLabels !== undefined && cfg.values !== undefined) data = { xLabels: cfg.xLabels, yLabels: cfg.yLabels || [], values: cfg.values };   // 热力图
     else if (cfg.values !== undefined && cfg.labels !== undefined) data = { labels: cfg.labels, values: cfg.values };   // 瀑布图等 {labels, values}
     else if (type === 'rank' && cfg.labels !== undefined && cfg.series !== undefined) {
@@ -6189,9 +6235,9 @@
         for (var ti = 0; ti < tries.length && cfg === null; ti++) {
           try { cfg = JSON.parse(b64Decode(tries[ti])); } catch (e) { /* 尝试下一种 */ }
         }
-        if (cfg === null) { toast(tr('图表链接无效（数据解析失败）', 'Invalid chart link (cannot parse)')); return; }
+        if (cfg === null) { toast(tr('图表链接无效（数据解析失败）', 'Invalid chart link (cannot parse)'), true); return; }
         try { applyChartConfig(cfg); }
-        catch (e) { toast(tr('图表渲染失败：', 'Render failed: ') + (e && e.message ? e.message : '')); }
+        catch (e) { toast(tr('图表渲染失败：', 'Render failed: ') + (e && e.message ? e.message : ''), true); if (window.console) console.error(e); }
       };
       if (window.echarts) renderFromLink();
       else withCharts(renderFromLink);
