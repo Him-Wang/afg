@@ -505,6 +505,14 @@
   S.archDiagram = function (el, data, theme) {
     clear(el);
     var d3 = global.d3;
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    var tip = document.createElement('div');
+    tip.className = 'arch-tip';
+    tip.style.cssText = 'position:absolute;pointer-events:none;opacity:0;transition:opacity .12s;' +
+      'background:#fff;border:1px solid rgba(20,20,25,.12);border-radius:7px;padding:7px 10px;' +
+      'font:11.5px/1.6 "Inter","PingFang SC",sans-serif;color:#2B2B2E;' +
+      'box-shadow:0 8px 22px rgba(20,20,35,.13);z-index:20;white-space:nowrap;';
+    el.appendChild(tip);
     var groups = data.groups || [], nodes = data.nodes || [], edges = data.edges || [];
     var byId = {};
     nodes.forEach(function (n) { byId[n.id] = n; });
@@ -562,14 +570,50 @@
         var len = Math.hypot(dx, dy) || 1;
         pts[pts.length - 1] = [p2[0] - dx / len * 4, p2[1] - dy / len * 4];
       }
+      var dPath = roundedPoly(pts, 10);
       var path = g.append('path')
-        .attr('d', roundedPoly(pts, 10))
+        .attr('class', 'arch-edge')
+        .attr('d', dPath)
         .attr('fill', 'none')
         .attr('stroke', color)
         .attr('stroke-width', e.weight || 1.7)
         .attr('marker-end', 'url(#' + arrowId(markColor) + ')')
         .attr('opacity', e.dashed ? 0.75 : 1);
       if (e.dashed) path.attr('stroke-dasharray', '5 5');
+
+      /* 透明加粗命中区，方便鼠标悬浮 */
+      var hit = g.append('path')
+        .attr('d', dPath).attr('fill', 'none')
+        .attr('stroke', 'transparent').attr('stroke-width', 18)
+        .attr('pointer-events', 'stroke').style('cursor', 'pointer');
+      var fromLabel = (byId[e.from] && byId[e.from].label) || e.from;
+      var toLabel = (byId[e.to] && byId[e.to].label) || e.to;
+      hit.on('mouseenter', function (ev) {
+        g.selectAll('.arch-edge').attr('opacity', 0.16);
+        path.attr('opacity', 1).attr('stroke-width', (e.weight || 1.7) + 1.1);
+        var txt = '<b>' + fromLabel + ' → ' + toLabel + '</b>';
+        if (e.label) txt += '<br/><span style="color:#8E8E93;letter-spacing:.1em">' + e.label + '</span>';
+        if (e.dashed) txt += '<br/><span style="color:#A6A6AA;font-size:10.5px">异步 / 非阻塞</span>';
+        tip.innerHTML = txt;
+        tip.style.opacity = 1;
+      });
+      hit.on('mousemove', function (ev) {
+        var rect = el.getBoundingClientRect();
+        var mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+        var w = tip.offsetWidth, h = tip.offsetHeight;
+        var lx = mx + 14, ly = my - h - 12;
+        if (lx + w > rect.width - 6) lx = mx - w - 14;
+        if (ly < 4) ly = my + 16;
+        tip.style.left = Math.max(4, lx) + 'px';
+        tip.style.top = Math.min(rect.height - h - 4, Math.max(4, ly)) + 'px';
+      });
+      hit.on('mouseleave', function () {
+        g.selectAll('.arch-edge').attr('opacity', function () {
+          return this.getAttribute('stroke-dasharray') ? 0.75 : 1;
+        });
+        path.attr('stroke-width', e.weight || 1.7);
+        tip.style.opacity = 0;
+      });
       if (e.label) {
         var at = e.labelAt || pts[Math.floor(pts.length / 2)];
         var tw = archTextW(e.label, 10, true) + 12;

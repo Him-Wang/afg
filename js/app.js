@@ -734,7 +734,7 @@
     funnel: '漏斗图', sankey: '桑基图',
     choropleth: '分级统计图', heatMapGeo: '热点地图', symbolMap: '标记地图',
     tree: '树形图', orgChart: '组织架构', icicle: '冰柱图', swimlane: '泳道图',
-    kpi: 'KPI 卡片', control: '控制图', parallel: '平行坐标'
+    kpi: 'KPI 卡片', archDiagram: '系统架构图', control: '控制图', parallel: '平行坐标'
   };
 
   /* ---------- 通用 ---------- */
@@ -1745,6 +1745,8 @@
 
   function attachExtremeLabels(inst) {
     if (!inst) return;
+    /* D3 定制渲染返回的是 shim，没有 zrender 相关方法 */
+    if (typeof inst.getZr !== 'function') return;
     applyExtremeLabels(inst);
     applyLastValueTag(inst);
     layoutChartLabels(inst);
@@ -1886,8 +1888,9 @@
     if (window.echarts) { fn(); return; }
     var stage = el('chart-stage');
     if (stage) stage.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载绘图引擎…', 'Loading chart engine…') + '</span></div>';
-    ensureCharts().then(fn).catch(function () {
-      if (stage) stage.innerHTML = '<div class="stage-loading"><span>' + tr('绘图引擎加载失败，请刷新重试', 'Failed to load chart engine. Please refresh.') + '</span></div>';
+    ensureCharts().then(fn).catch(function (err) {
+      if (window.console && console.error) console.error('[ADV] chart render failed', err);
+      if (stage) stage.innerHTML = '<div class="stage-loading"><span>' + tr('图表渲染失败，请刷新重试', 'Chart failed to render. Please refresh.') + '</span></div>';
     });
   }
 
@@ -3964,7 +3967,7 @@
     { name: '关系', types: [['scatter', '散点图'], ['bubble', '气泡图'], ['scatterMatrix', '矩阵散点'], ['heatmap', '热力图'], ['corrMatrix', '相关性矩阵']] },
     { name: '流向', types: [['funnel', '漏斗图'], ['sankey', '桑基图']] },
     { name: '地理', types: [['choropleth', '分级统计图'], ['heatMapGeo', '热点地图'], ['symbolMap', '标记地图']] },
-    { name: '层级', types: [['tree', '树形图'], ['orgChart', '组织架构'], ['icicle', '冰柱图'], ['swimlane', '泳道图']] },
+    { name: '层级', types: [['tree', '树形图'], ['archDiagram', '系统架构图'], ['orgChart', '组织架构'], ['icicle', '冰柱图'], ['swimlane', '泳道图']] },
     { name: '特殊', types: [['kpi', 'KPI 卡片'], ['control', '控制图'], ['parallel', '平行坐标']] }
   ];
   var PICK_DESC = {
@@ -3979,7 +3982,7 @@
     corrMatrix: '相关性矩阵',
     funnel: '逐级转化', sankey: '多级分流',
     choropleth: '按地区着色', heatMapGeo: '热点聚集', symbolMap: '按点标记',
-    tree: '层级结构', orgChart: '组织架构', icicle: '层级占比横条', swimlane: '跨部门流程',
+    tree: '层级结构', archDiagram: '系统/链路拓扑', orgChart: '组织架构', icicle: '层级占比横条', swimlane: '跨部门流程',
     kpi: '关键指标一屏概览', control: '过程监控', parallel: '多维比较'
   };
 
@@ -4488,8 +4491,136 @@
     };
   }
 
+
+  /* 从导入表格构造系统架构图：
+     ① 有两个文本列（如 上游/下游、调用方/被调方）→ 当作边表，按最长路径分层
+     ② 只有一个文本列 → 生成单列节点卡片（无连线）
+     数值列作为节点副标题或连线标注 */
+  function buildArchFromTable(rows, table, yCols) {
+    var cols = (table && table.columns) || [];
+    var textCols = cols.filter(function (c) {
+      return !rows.some(function (r) { return isFinite(vnum(r[c])) && String(r[c] || '').trim() !== ''; }) ||
+        rows.filter(function (r) { var v = String(r[c] || '').trim(); return v && isNaN(Number(v)); }).length > rows.length * 0.6;
+    });
+    var fromCol = null, toCol = null;
+    cols.forEach(function (c) {
+      if (!fromCol && /源|from|上游|调用方|父|依赖方/i.test(c)) fromCol = c;
+      if (!toCol && /目标|to|下游|被调|子级|依赖对象/i.test(c)) toCol = c;
+    });
+    if (!fromCol && textCols.length >= 2) { fromCol = textCols[0]; toCol = textCols[1]; }
+    if (fromCol && toCol && fromCol === toCol) toCol = null;
+
+    var labelCol = fromCol || textCols[0] || state.mapping.timeCol;
+    var valCol = yCols[0] || null;
+    var nameOf = function (r) {
+      var v = String(r[labelCol] === undefined ? '' : r[labelCol]).trim();
+      return v.length > 16 ? v.slice(0, 15) + '…' : v;
+    };
+    var fmtVal = function (r) {
+      if (!valCol) return '';
+      var v = vnum(r[valCol]);
+      if (!isFinite(v)) return '';
+      return String(Math.round(v * 100) / 100);
+    };
+
+    var groups = [], nodes = [], edges = [];
+    if (fromCol && toCol) {
+      /* 边表 → 分层布局 */
+      var adj = {}, order = [];
+      rows.forEach(function (r) {
+        var a = String(r[fromCol] === undefined ? '' : r[fromCol]).trim();
+        var b = String(r[toCol] === undefined ? '' : r[toCol]).trim();
+        if (!a || !b || a === b) return;
+        if (!adj[a]) { adj[a] = []; order.push(a); }
+        if (!adj[b]) { adj[b] = []; order.push(b); }
+        adj[a].push({ to: b, row: r });
+      });
+      if (order.length < 2) return null;
+      var depth = {};
+      order.forEach(function (n) { depth[n] = 0; });
+      for (var it = 0; it < 12; it++) {
+        var changed = false;
+        order.forEach(function (n) {
+          (adj[n] || []).forEach(function (e2) {
+            if (depth[e2.to] < depth[n] + 1) { depth[e2.to] = depth[n] + 1; changed = true; }
+          });
+        });
+        if (!changed) break;
+      }
+      var maxDepth = 0;
+      order.forEach(function (n) { maxDepth = Math.max(maxDepth, depth[n]); });
+      maxDepth = Math.min(maxDepth, 5);
+      var layers = [];
+      for (var li = 0; li <= maxDepth; li++) layers.push([]);
+      order.forEach(function (n) { layers[Math.min(maxDepth, depth[n])].push(n); });
+      var nz = layers.length;
+      var W = 1220, zoneGap = 18, zoneW = Math.min(300, (W - 40 - (nz - 1) * zoneGap) / nz);
+      var maxNodes = 1;
+      layers.forEach(function (l) { maxNodes = Math.max(maxNodes, l.length); });
+      var nodeH = 58, nodeGap = 18;
+      var H = 84 + maxNodes * (nodeH + nodeGap) + 20;
+      var zoneLabel = function (i) { return nz <= 1 ? '全部' : (i === 0 ? '入口层' : (i === nz - 1 ? '终端层' : '第 ' + (i + 1) + ' 层')); };
+      var pos = {};
+      layers.forEach(function (layer, zi) {
+        var zx = 20 + zi * (zoneW + zoneGap);
+        var zh = H - 40;
+        groups.push({ label: zoneLabel(zi), x: zx, y: 20, w: zoneW, h: zh });
+        var startY = 20 + (zh - (layer.length * nodeH + (layer.length - 1) * nodeGap)) / 2;
+        layer.forEach(function (nm, ni) {
+          var ny = startY + ni * (nodeH + nodeGap) + nodeH / 2;
+          var r0 = rows.filter(function (r) { return String(r[fromCol]).trim() === nm || String(r[toCol]).trim() === nm; })[0];
+          nodes.push({ id: nm, label: nm.length > 16 ? nm.slice(0, 15) + '…' : nm, sub: r0 ? fmtVal(r0) : '', x: zx + zoneW / 2, y: ny, w: zoneW - 44, h: nodeH });
+          pos[nm] = { x: zx + zoneW / 2, y: ny, w: zoneW - 44, h: nodeH };
+        });
+      });
+      rows.forEach(function (r) {
+        var a = String(r[fromCol] === undefined ? '' : r[fromCol]).trim();
+        var b = String(r[toCol] === undefined ? '' : r[toCol]).trim();
+        if (!a || !b || a === b || !pos[a] || !pos[b]) return;
+        var pa = pos[a], pb = pos[b];
+        var sx = pa.x + pa.w / 2, ex = pb.x - pb.w / 2;
+        var mx = sx + Math.max(18, (ex - sx) / 2);
+        var labY = Math.abs(pb.y - pa.y) > 26 ? (pa.y + pb.y) / 2 : pa.y - 12;
+        edges.push({ from: a, to: b, label: fmtVal(r) || '', labelAt: [mx + (labY === pa.y - 12 ? 0 : 14), labY],
+          pts: [[sx, pa.y], [mx, pa.y], [mx, pb.y], [ex, pb.y]] });
+      });
+      return { groups: groups, nodes: nodes, edges: edges };
+    }
+
+    /* 单列：一行一个节点，三列铺排 */
+    var names = [];
+    rows.forEach(function (r) {
+      var nm = nameOf(r);
+      if (nm) names.push({ name: nm, sub: fmtVal(r) });
+    });
+    if (!names.length) return null;
+    names = names.slice(0, 18);
+    var perRow = 3, gapX = 24, gapY = 22, cw = 250, ch = 64;
+    var zRows = Math.ceil(names.length / perRow);
+    var W2 = 1020, H2 = 80 + zRows * (ch + gapY) + 20;
+    groups.push({ label: '系统 / 模块', x: 20, y: 20, w: W2 - 40, h: H2 - 40 });
+    names.forEach(function (it, i) {
+      var ci = i % perRow, ri = Math.floor(i / perRow);
+      var x = 20 + 30 + ci * (cw + gapX) + cw / 2;
+      var y = 60 + ri * (ch + gapY) + ch / 2;
+      nodes.push({ id: 'n' + i, label: it.name, sub: it.sub, x: x, y: y, w: cw, h: ch });
+    });
+    return { groups: groups, nodes: nodes, edges: edges };
+  }
+
   function renderUserChart(closeAfter) {
     if (!window.echarts) { withCharts(function () { renderUserChart(closeAfter); }); return; }
+    /* 部分类型（架构图等）走 D3 渲染，先确保 D3 就绪 */
+    var _ut = state.mapping && state.mapping.chartType;
+    if (SHOWCASE_TYPES[_ut] && !window.d3) {
+      var stU = el('chart-stage');
+      if (stU) stU.innerHTML = '<div class="stage-loading"><span class="stage-spinner"></span><span>' + tr('正在加载高级绘图引擎…', 'Loading advanced engine…') + '</span></div>';
+      ensureD3().then(function () { renderUserChart(closeAfter); }).catch(function (err) {
+        if (window.console && console.error) console.error('[ADV] d3 render failed', err);
+        toast(tr('图表渲染失败', 'Chart failed to render') + (err && err.message ? '：' + err.message : ''), true);
+      });
+      return;
+    }
     state.macroItem = null; state.finItem = null; state.intlItem = null; state.chartConfig = null; state.macroTypeOverride = null;
     var m = state.mapping;
     var table = state.table;
@@ -4663,6 +4794,10 @@
           data = { points: rows.map(function (r) { return [vnum(r[state.mapping.timeCol]), vnum(r[yCols[0]])]; })
             .filter(function (p2) { return isFinite(p2[0]) && isFinite(p2[1]); }), xName: state.mapping.timeCol, yName: yCols[0] };
         }
+      } else if (type === 'archDiagram') {
+        var arch = buildArchFromTable(rows, table, yCols);
+        if (!arch) { toast('数据不足以绘制架构图：需要两个文本列（如 上游/下游）或一列系统名称'); return; }
+        data = arch;
       } else if (type === 'rank') {
         var col = yCols[0];
         data = { categories: labels, values: rows.map(function (r) { return vnum(r[col]); }), unit: state.det && state.det.unit };
@@ -4700,8 +4835,12 @@
       if (type === 'dumbbell') attachDumbbellHover(uinst, data);
       if (type === 'parallel') attachParallelHover(uinst, data);
       attachAnnotationHandler(uinst);
-      attachExtremeLabels(uinst);
+      if (!SHOWCASE_TYPES[type]) attachExtremeLabels(uinst);
       state.echartsEl = c;
+      /* 容器高度在插入 DOM 后才确定，补一次 resize 让 D3/ECharts 自适应 */
+      requestAnimationFrame(function () {
+        try { if (uinst && uinst.resize) uinst.resize(); } catch (e) {}
+      });
       setHead({ title: '用户数据 · ' + (TYPE_LABELS[type] || type), subtitle: '', unit: '', source: '' });
       // 价格型多指标：图表下方加对比指标表（随缩放区间更新）
       if (state.isPriceData && yCols.length >= 2 && !_skipPerf) {

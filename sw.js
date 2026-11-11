@@ -1,6 +1,6 @@
 /* ADV 静态资源缓存：二次打开秒开（stale-while-revalidate）
    部署更新后，缓存会在下一次访问后台刷新；如需强制刷新，改 VERSION 即可。 */
-const VERSION = 'adv-2026-11-11-b';
+const VERSION = 'adv-2026-11-11-c';
 const PRECACHE = ['./', './index.html', './css/style.css', './js/app.js'];
 
 self.addEventListener('install', (e) => {
