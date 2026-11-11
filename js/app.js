@@ -6328,4 +6328,11 @@
   }
 
   document.addEventListener('DOMContentLoaded', init);
+
+  /* 二次访问加速：注册 Service Worker 缓存静态资源（仅 http/https 生效） */
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
+    window.addEventListener('load', function () {
+      try { navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
+    });
+  }
 })();
