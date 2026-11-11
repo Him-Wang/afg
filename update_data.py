@@ -146,10 +146,67 @@ def fetch_ak_bond_10y(days=90):
     return dates, vals
 
 
+
+# ---------- 金融数据：从拆分文件还原（供增量更新使用） ----------
+import datetime as _dt
+
+
+def _fin_decode_labels(item):
+    """把 ds/dt/labels 三种编码还原成 YYYY-MM-DD 数组"""
+    if "labels" in item and isinstance(item["labels"], list):
+        raw = item["labels"]
+    elif "dt" in item:
+        raw = [item["dt"][i:i + 6] for i in range(0, len(item["dt"]) - 5, 6)]
+    elif "ds" in item:
+        t = item["ds"][:6]
+        d = _dt.date(2000 + int(t[:2]), int(t[2:4]), int(t[4:6]))
+        raw = ["20" + t[:2] + "-" + t[2:4] + "-" + t[4:6]]
+        for ch in item["ds"][6:]:
+            d = d + _dt.timedelta(days=int(ch, 36))
+            raw.append(d.isoformat())
+        return raw
+    else:
+        return []
+    return ["20" + x[:2] + "-" + x[2:4] + "-" + x[4:6] if len(str(x)) == 6 and str(x).isdigit() else x for x in raw]
+
+
+def read_finance_sections():
+    """读取 finance-index.js + finance-<key>.js，拼回 {updated, sections}"""
+    idx_path = os.path.join(ROOT, "js", "finance-index.js")
+    if not os.path.exists(idx_path):
+        return read_js_var("finance-data.js", "FINANCE_DATA")   # 兼容旧的单文件
+    txt = open(idx_path, encoding="utf-8").read()
+    m = re.search(r"window\.FINANCE_INDEX\s*=\s*(\{.*\});?\s*$", txt, re.S)
+    if not m:
+        return None
+    idx = json.loads(m.group(1))
+    out = {"updated": idx.get("updated", ""), "sections": []}
+    for meta in idx.get("sections", []):
+        path = os.path.join(ROOT, meta["file"])
+        if not os.path.exists(path):
+            continue
+        stxt = open(path, encoding="utf-8").read()
+        sm = re.search(r"=(\{.*\});\}\)\(\);", stxt, re.S)
+        if not sm:
+            continue
+        sec = json.loads(sm.group(1))
+        items = []
+        for it in sec.get("items", []):
+            series = []
+            for sr in it.get("series", []):
+                series.append({"name": sr.get("name") or it.get("title", ""),
+                               "values": sr.get("values") or []})
+            items.append({"title": it.get("title", ""), "unit": it.get("unit", ""),
+                          "type": it.get("type", "line"),
+                          "labels": _fin_decode_labels(it), "series": series})
+        out["sections"].append({"name": sec.get("name", meta.get("name", "")), "items": items})
+    return out
+
+
 def update_finance():
-    fin = read_js_var("finance-data.js", "FINANCE_DATA")
+    fin = read_finance_sections()
     if not fin:
-        print("未找到 finance-data.js，跳过")
+        print("未找到金融数据（finance-index.js / finance-data.js），跳过")
         return
     updated = 0
     for sec in fin["sections"]:
@@ -187,6 +244,12 @@ def update_finance():
                     maxd = d
     fin["updated"] = maxd
     write_js_var("finance-data.js", "FINANCE_DATA", fin, "金融数据一览（自动更新）")
+    # 写入后立即拆分/瘦身，并把大文件删掉（页面按板块懒加载）
+    try:
+        import subprocess, sys as _sys
+        subprocess.run([_sys.executable, os.path.join(ROOT, "tools", "split_finance.py")], check=False)
+    except Exception as e:
+        print("拆分金融数据失败：", e)
     print("金融数据更新完成：新增 %d 个指标，最新日期 %s" % (updated, maxd))
 
 

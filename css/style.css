@@ -936,3 +936,24 @@ body.is-home .chart-head { display: none; }
 @media (max-width: 900px) {
   .chart-stage .chart-canvas.cat-single.flow-tall { height: 460px; }
 }
+
+/* 金融数据：板块切换条 */
+.fin-dash { padding-top: 4px; }
+.fin-tabs {
+  display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px 4px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.fin-tabs::-webkit-scrollbar { display: none; }
+.fin-tab {
+  appearance: none; flex: 0 0 auto; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg-elevated);
+  color: var(--muted); font: 600 12.5px/1 var(--font-sans);
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+  white-space: nowrap;
+}
+.fin-tab i { font-style: normal; font-size: 11px; opacity: .6; }
+.fin-tab:hover { border-color: var(--accent); color: var(--text); }
+.fin-tab.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text); font-weight: 700; }
+.fin-body { padding: 0 0 6px; }
