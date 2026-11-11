@@ -10,6 +10,12 @@
   function isEnLang() { return !!(window.I18N && window.I18N.getLang() === 'en'); }
   function DTi(s) { return (window.DATA_I18N && window.DATA_I18N.t) ? window.DATA_I18N.t(s) : s; }
 
+  // tooltip / label 以 HTML 注入：系列名、数据点名字、轴名都来自用户数据（含分享链接），必须转义
+  var ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function ex(v) {
+    return String(v === undefined || v === null ? '' : v).replace(/[&<>"']/g, function (c) { return ESC_MAP[c]; });
+  }
+
   function hexToRgba(hex, alpha) {
     if (hex[0] === '#') hex = hex.slice(1);
     if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
@@ -308,7 +314,7 @@
     var isPct = unit === '%';
     var option = {
       backgroundColor: theme.bg,
-      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) { return p.name + (isEnLang() ? ': ' : '：') + fmtNumJs(p.value) + unit; } }),
+      tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) { return ex(p.name) + (isEnLang() ? ': ' : '：') + fmtNumJs(p.value) + ex(unit); } }),
       grid: { top: 12, left: 12, right: 52, bottom: 12, containLabel: true },
       xAxis: [Object.assign({ type: 'value', splitLine: { lineStyle: { color: theme.grid } } }, axisCommon(theme))],
       yAxis: [Object.assign({
@@ -344,8 +350,8 @@
         trigger: 'item',
         formatter: function (p) {
           var d = p.data;
-          return '<b>' + d.name + '</b><br/>' + data.xName + '：' + d.value[0] + '%<br/>' +
-                 data.yName + '：' + d.value[1] + '%<br/>' + data.sizeName + '：' + d.value[2] + ' 万亿元';
+          return '<b>' + ex(d.name) + '</b><br/>' + ex(data.xName) + '：' + d.value[0] + '%<br/>' +
+                 ex(data.yName) + '：' + d.value[1] + '%<br/>' + ex(data.sizeName) + '：' + d.value[2] + ' 万亿元';
         }
       }),
       grid: gridTop(),
@@ -373,7 +379,7 @@
       tooltip: Object.assign({}, tooltip(theme), {
         trigger: 'item',
         formatter: function (p) {
-          return isEnLang() ? (p.name + ': CNY ' + p.value + 'tn (' + ((p.value / total) * 100).toFixed(1) + '% of total)') : (p.name + '：' + p.value + ' 万亿元（' + ((p.value / total) * 100).toFixed(1) + '%）');
+          return isEnLang() ? (ex(p.name) + ': CNY ' + p.value + 'tn (' + ((p.value / total) * 100).toFixed(1) + '% of total)') : (ex(p.name) + '：' + p.value + ' 万亿元（' + ((p.value / total) * 100).toFixed(1) + '%）');
         }
       }),
       series: [{
@@ -544,11 +550,11 @@
     var option = {
       backgroundColor: theme.bg,
       tooltip: Object.assign({}, tooltip(theme), { trigger: 'item', formatter: function (p) {
-        if (isPct) return p.name + (isEnLang() ? ': ' : '：') + p.value + '%';
+        if (isPct) return ex(p.name) + (isEnLang() ? ': ' : '：') + p.value + '%';
         var u = DTi(data.unit || '');
         return isEnLang()
-          ? (p.name + '<br/>' + u + ' ' + fmt(p.value) + ' (' + pctOf(p.value).toFixed(1) + '% of total)')
-          : (p.name + '<br/>' + (data.unit || '') + ' ' + fmt(p.value) + '（占 ' + pctOf(p.value).toFixed(1) + '%）');
+          ? (ex(p.name) + '<br/>' + ex(u) + ' ' + fmt(p.value) + ' (' + pctOf(p.value).toFixed(1) + '% of total)')
+          : (ex(p.name) + '<br/>' + ex(data.unit || '') + ' ' + fmt(p.value) + '（占 ' + pctOf(p.value).toFixed(1) + '%）');
       } }),
       legend: narrow
         ? Object.assign(legend(theme), { orient: 'horizontal', left: 'center', bottom: 2,
@@ -685,7 +691,7 @@
           }
           var d = p.data;
           var pp = total && d.value ? (d.value / total * 100).toFixed(1) + '%' : '';
-          return '<b>' + (d.icon ? d.icon + ' ' : '') + d.name + '</b><br/>' +
+          return '<b>' + (d.icon ? ex(d.icon) + ' ' : '') + ex(d.name) + '</b><br/>' +
             (d.value ? fmt(d.value) + ' 十亿美元' + (pp ? '（' + pp + '）' : '') : '');
         }
       },
@@ -1041,7 +1047,7 @@
         trigger: 'item',
         formatter: function (p) {
           if (!p.data.name) return '聚类中心';
-          return p.data.name + '<br/>' + (data.xName || 'X') + '：' + p.value[0] + '<br/>' + (data.yName || 'Y') + '：' + p.value[1];
+          return ex(p.data.name) + '<br/>' + ex(data.xName || 'X') + '：' + p.value[0] + '<br/>' + ex(data.yName || 'Y') + '：' + p.value[1];
         }
       }),
       grid: gridTop(),
@@ -1197,7 +1203,7 @@
       backgroundColor: theme.bg,
       tooltip: Object.assign({}, tooltip(theme), {
         trigger: 'item',
-        formatter: function (p) { return p.name + '：' + (p.value !== undefined && !isNaN(p.value) ? p.value : '无数据'); }
+        formatter: function (p) { return ex(p.name) + '：' + (p.value !== undefined && !isNaN(p.value) ? p.value : '无数据'); }
       }),
       visualMap: {
         min: Math.min(min, -1), max: Math.max(max, 1), calculable: false, orient: 'vertical', right: 8, top: 'middle',
