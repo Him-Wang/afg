@@ -18,6 +18,11 @@ ADV 数据自动更新脚本 v2（免登录，akshare + yfinance）
 
 依赖：
     pip install akshare yfinance requests
+
+注意：如果环境装不上 akshare / yfinance（例如没有原生扩展权限），
+可以直接用纯 HTTP 版更新脚本（无需任何第三方依赖）：
+    python3 tools/update_http.py            # 金融 + 宏观
+    python3 tools/update_http.py --finance  # 只金融
 """
 import json
 import os

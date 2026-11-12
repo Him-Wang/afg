@@ -1,6 +1,6 @@
 /* ADV 静态资源缓存：二次打开秒开；HTML/JS/CSS 走「网络优先」，保证更新立刻生效
    离线时回退到缓存。改 VERSION 可强制清空旧缓存。 */
-const VERSION = 'adv-2026-11-11-f';
+const VERSION = 'adv-2026-11-12-a';
 const PRECACHE = ['./', './index.html', './css/style.css'];
 
 self.addEventListener('install', (e) => {
