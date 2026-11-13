@@ -137,6 +137,12 @@
     return (window.DATA_I18N && window.DATA_I18N.t) ? window.DATA_I18N.t(zh) : zh;
   }
 
+  /* 拼 innerHTML 时用：事件标注、系列名、指标名都来自用户数据（含分享链接），必须转义 */
+  var ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function escHtml(v) {
+    return String(v === undefined || v === null ? '' : v).replace(/[&<>"']/g, function (c) { return ESC_MAP[c]; });
+  }
+
   var state = {
     theme: 'paper',
     currentTemplate: 'macro-gdp-area',
@@ -1611,7 +1617,7 @@
           ((Themes.active().chart.series || [])[si % 3] || '#051C2C') + ';margin-right:5px"></span>' +
           sr.name + ' <b style="float:right;margin-left:14px">' + (sr.values[idx] == null ? '—' : Number(sr.values[idx]).toFixed(1)) + '</b>';
       }).join('<br/>');
-      tip.innerHTML = '<div style="font-weight:800;margin-bottom:4px;color:#B5484B">' + name + '</div>' + rows;
+      tip.innerHTML = '<div style="font-weight:800;margin-bottom:4px;color:#B5484B">' + escHtml(name) + '</div>' + rows;
       tip.style.opacity = 1;
       var w = tip.offsetWidth, h = tip.offsetHeight;
       var lx = mx + 16, ly = my - h / 2;
@@ -2332,7 +2338,7 @@
       panel.style.cursor = 'pointer';
       panel.addEventListener('click', function () { openSheirongSeasonItem(item, sr); });
       var last = sr.values[sr.values.length - 1];
-      panel.innerHTML = '<div class="season-hd"><span class="season-name">' + DT(sr.name) + '</span>' +
+      panel.innerHTML = '<div class="season-hd"><span class="season-name">' + escHtml(DT(sr.name)) + '</span>' +
         '<span class="season-val">' + fmtNum(last) + '</span></div>';
       var box = document.createElement('div');
       box.className = 'season-box';
@@ -3221,14 +3227,14 @@
     var needNo = events.every(function (e) { return !e.no; }) && events.length > 1;
     var html = '<div class="en-title">' + DT('事件标注') + '</div>';
     events.forEach(function (e, idx) {
-      var no = e.no ? '<span class="en-no">' + e.no + '</span>'
+      var no = e.no ? '<span class="en-no">' + escHtml(e.no) + '</span>'
                     : (needNo ? '<span class="en-no">' + (NUMS[idx] || (idx + 1)) + '</span>' : '<span class="en-dot"></span>');
       var s = (e.start !== undefined) ? e.start : e.x;
       var en = e.end;
       var time = en ? (shortDate(s) + ' ~ ' + shortDate(en)) : shortDate(s);
-      html += '<div class="en-item">' + no + '<b>' + DT(e.label) + '</b>' +
-        '<span class="en-time">' + time + '</span>' +
-        '<span class="en-desc">' + DT(e.desc || '') + '</span></div>';
+      html += '<div class="en-item">' + no + '<b>' + escHtml(DT(e.label)) + '</b>' +
+        '<span class="en-time">' + escHtml(time) + '</span>' +
+        '<span class="en-desc">' + escHtml(DT(e.desc || '')) + '</span></div>';
     });
     box.innerHTML = html;
   }
@@ -3292,7 +3298,7 @@
   }
 
   function anRow(r, fmtV, fmtD) {
-    return '<div class="an-row"><span class="an-name">' + DT(r.name) + '</span>' +
+    return '<div class="an-row"><span class="an-name">' + escHtml(DT(r.name)) + '</span>' +
       '<span class="an-last">' + fmtV(r.last) + '</span>' +
       '<span class="an-delta">' + DT('环比') + ' ' + fmtD(r.mom) + '</span>' +
       '<span class="an-delta">' + DT('同比') + ' ' + fmtD(r.yoy) + '</span></div>';
@@ -3614,7 +3620,7 @@
         '<span class="an-sub">' + (labels2.length && labels2.length < labels.length
           ? tr('· 已按当前缩放区间计算', '· computed on the zoomed range') : '') + '</span></div>';
       html += '<div style="overflow:auto"><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
-      series2.forEach(function (x) { html += '<th>' + DT(x.name) + '</th>'; });
+      series2.forEach(function (x) { html += '<th>' + escHtml(DT(x.name)) + '</th>'; });
       html += '</tr></thead><tbody>';
       rows.forEach(function (r) {
         html += '<tr><td>' + r[1] + '</td>';
@@ -3673,7 +3679,7 @@
     }
     var metrics = navs.map(metricsOf);
     var html = '<div class="an-head">' + tr('业绩指标（基于所选价格/净值列）','Performance (based on selected price / NAV columns)') + '</div><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
-    navs.forEach(function (x) { html += '<th>' + DT(x.name) + '</th>'; });
+    navs.forEach(function (x) { html += '<th>' + escHtml(DT(x.name)) + '</th>'; });
     html += '</tr></thead><tbody>';
     rows.forEach(function (k) {
       html += '<tr><td>' + labels2[k] + '</td>';
@@ -3715,7 +3721,7 @@
     function pct(v) { return (v * 100).toFixed(2) + '%'; }
     var metrics = navs.map(function (x) { var nav = slice ? slice(x.nav) : x.nav; return ML.perfMetrics(nav.map(function (p) { return p.value; }), null, nav.map(function (p) { return p.date; })); });
     var html = '<div class="an-head">' + tr('业绩指标（基于所选价格/净值列）','Performance (based on selected price / NAV columns)') + '</div><table class="preview-table"><thead><tr><th>' + DT('指标') + '</th>';
-    navs.forEach(function (x) { html += '<th>' + DT(x.name) + '</th>'; });
+    navs.forEach(function (x) { html += '<th>' + escHtml(DT(x.name)) + '</th>'; });
     html += '</tr></thead><tbody>';
     rows.forEach(function (k) {
       html += '<tr><td>' + labels2[k] + '</td>';
@@ -5611,7 +5617,7 @@
       var delta = (last === null || prev === null || isNaN(prev) || isNaN(last)) ? null : (last - prev);
       var dCls = delta === null ? '' : (delta >= 0 ? 'up' : 'down');
       var dTxt = delta === null ? '' : ((delta >= 0 ? '▲ ' : '▼ ') + fmtNum(Math.abs(delta)));
-      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + DT(col) + '</span>' +
+      panel.innerHTML = '<div class="dash-panel-head"><span class="dash-panel-title">' + escHtml(DT(col)) + '</span>' +
         '<span class="dash-panel-val">' + fmtNum(last) + '</span>' +
         '<span class="dash-panel-delta ' + dCls + '">' + dTxt + '</span></div>' +
         '<div class="dash-panel-body"></div>';
