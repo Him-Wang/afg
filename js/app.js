@@ -145,6 +145,9 @@
 
   var state = {
     theme: 'paper',
+    /* 外观三态：light / dark / system；themeByMode 记住每一档上次用的配色 */
+    appearance: 'system',
+    themeByMode: { light: 'paper', dark: 'obsidian' },
     currentTemplate: 'macro-gdp-area',
     mode: 'template',
     isImported: false,
@@ -280,6 +283,7 @@
     c.paletteId = pid;
     var dark = themeIsDark(t);
     c._dark = dark;
+    c.isDark = dark;
     if (ps) {
       var lift = function (arr) { return (arr || []).map(function (x) { return dark ? liftForDark(x, 58) : x; }); };
       c.series = lift(ps.colors);
@@ -290,6 +294,13 @@
       if (!dark && ps.ink) c.text = ps.ink;
     }
     return c;
+  }
+
+  /* 配色芯片预览：深色主题下用提亮后的色块，否则深蓝芯片在深底上看不见 */
+  function paletteChipColors(pp) {
+    var arr = (pp && pp.colors) || [];
+    var dark = themeIsDark(Themes.active());
+    return dark ? arr.map(function (c) { return liftForDark(c, 58); }) : arr;
   }
 
   function currentSeriesNames() {
@@ -2935,7 +2946,7 @@
       var chip = document.createElement('button');
       chip.className = 'pal-chip' + ((state.palette || 'consult') === pp.id ? ' on' : '');
       chip.title = isEn() ? pp.nameEn : pp.name;
-      chip.innerHTML = pp.colors.slice(0, 4).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
+      chip.innerHTML = paletteChipColors(pp).slice(0, 4).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
       chip.addEventListener('click', function () {
         state.palette = pp.id;
         renderCategoryDash(catId);
@@ -3019,7 +3030,7 @@
       var chip = document.createElement('button');
       chip.className = 'pal-chip' + ((state.palette || 'consult') === pp.id ? ' on' : '');
       chip.title = isEn() ? pp.nameEn : pp.name;
-      chip.innerHTML = pp.colors.slice(0, 4).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
+      chip.innerHTML = paletteChipColors(pp).slice(0, 4).map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('');
       chip.addEventListener('click', function () { state.palette = pp.id; openCatalogChart(catId, chartId); });
       pal2.appendChild(chip);
     });
@@ -3899,6 +3910,132 @@
       var color = data.cards[i].dir === 'neg' ? theme.chart.down : theme.chart.accent;
       ChartFactory.renderKpiSpark(sparkEl, data.cards[i].spark, theme.chart, color);
     });
+  }
+
+  /* ---------- 外观：白天 / 暗夜 / 跟随系统 ---------- */
+  var APPEARANCE_KEY = 'afgAppearance';
+  var MODE_THEME_KEY = 'afgThemeByMode';
+
+  function systemPrefersDark() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+    catch (e) { return false; }
+  }
+
+  function readAppearance() {
+    try {
+      var a = localStorage.getItem(APPEARANCE_KEY);
+      if (a === 'light' || a === 'dark' || a === 'system') state.appearance = a;
+      var map = JSON.parse(localStorage.getItem(MODE_THEME_KEY) || '{}');
+      if (map && typeof map === 'object') {
+        if (map.light && Themes.getTheme(map.light) && Themes.modeOf(map.light) === 'light') state.themeByMode.light = map.light;
+        if (map.dark && Themes.getTheme(map.dark) && Themes.modeOf(map.dark) === 'dark') state.themeByMode.dark = map.dark;
+      }
+    } catch (e) {}
+  }
+
+  function saveAppearance() {
+    try {
+      localStorage.setItem(APPEARANCE_KEY, state.appearance);
+      localStorage.setItem(MODE_THEME_KEY, JSON.stringify(state.themeByMode || {}));
+    } catch (e) {}
+  }
+
+  /* system → 按操作系统当前的深浅色取实际档位 */
+  function resolvedAppearance() {
+    if (state.appearance === 'light' || state.appearance === 'dark') return state.appearance;
+    return systemPrefersDark() ? 'dark' : 'light';
+  }
+
+  function themeForAppearance(mode) {
+    var id = (state.themeByMode || {})[mode];
+    if (id && Themes.getTheme(id) && Themes.modeOf(id) === mode) return id;
+    return Themes.defaultForMode(mode);
+  }
+
+  function appearanceLabel(mode) {
+    var en = isEn();
+    if (mode === 'light') return en ? 'Light' : '白天';
+    if (mode === 'dark') return en ? 'Dark' : '暗夜';
+    return en ? 'Follow system' : '跟随系统';
+  }
+
+  function appearanceToast(mode, resolved) {
+    var en = isEn();
+    var base = (en ? 'Appearance: ' : '外观：') + appearanceLabel(mode);
+    if (mode === 'system') {
+      base += en ? (resolved === 'dark' ? ' (dark now)' : ' (light now)')
+                 : (resolved === 'dark' ? '（当前深色）' : '（当前浅色）');
+    }
+    return base;
+  }
+
+  function refreshAppearanceUI() {
+    var wrap = el('appearance-switch');
+    if (!wrap) return;
+    var mode = state.appearance;
+    var en = isEn();
+    var labels = {
+      light: en ? 'Light' : '白天 · 浅色',
+      dark: en ? 'Dark' : '暗夜 · 深色',
+      system: en ? 'Follow system' : '跟随系统'
+    };
+    Array.prototype.forEach.call(wrap.querySelectorAll('[data-appearance]'), function (b) {
+      var v = b.getAttribute('data-appearance');
+      var on = v === mode;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.title = labels[v] || v;
+      b.setAttribute('aria-label', labels[v] || v);
+    });
+  }
+
+  /* mode 省略时沿用当前设置；silent 用于首屏恢复，不弹提示也不重绘 */
+  function applyAppearance(mode, opt) {
+    opt = opt || {};
+    if (mode !== 'light' && mode !== 'dark' && mode !== 'system') mode = 'system';
+    state.appearance = mode;
+    var resolved = resolvedAppearance();
+    var tid = themeForAppearance(resolved);
+    state.theme = tid;
+    Themes.applyTheme(tid);
+    state.themeByMode[resolved] = tid;
+    var sel = el('theme-select');
+    if (sel) sel.value = tid;
+    // 配色芯片是按当前明暗生成的，换档后清掉让菜单重建
+    var pm = el('tb-palette-menu');
+    if (pm) pm.innerHTML = '';
+    refreshAppearanceUI();
+    saveAppearance();
+    if (!opt.silent) {
+      rerender();
+      toast(appearanceToast(mode, resolved));
+    }
+    return resolved;
+  }
+
+  function buildAppearanceSwitch() {
+    var wrap = el('appearance-switch');
+    if (!wrap) return;
+    refreshAppearanceUI();
+    wrap.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('[data-appearance]') : null;
+      if (!b || !wrap.contains(b)) return;
+      applyAppearance(b.getAttribute('data-appearance'));
+    });
+  }
+
+  /* 跟随系统时，用户切换系统深/浅色要立刻跟上 */
+  function watchSystemAppearance() {
+    if (!window.matchMedia) return;
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onChange = function () {
+      if (state.appearance !== 'system') return;
+      applyAppearance('system', { silent: true });
+      try { rerender(); } catch (e) {}
+      toast(appearanceToast('system', resolvedAppearance()));
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
   }
 
   function buildThemeSelect() {
@@ -5022,6 +5159,7 @@
         else if (state.mode === 'catalogChart' && state.catId) openCatalogChart(state.catId, state.catChartId);
         else { try { rerender(); } catch (e) { if (window.I18N) window.I18N.apply(); } }
         if (window.I18N) window.I18N.apply();
+        refreshAppearanceUI();
         refreshFooter();
         toast(next === 'en' ? 'Switched to English' : '已切换为中文');
       });
@@ -5843,12 +5981,22 @@
     if (!ChartFactory.BUILDERS[type] || type === 'candlestick') { toast('不支持的图表类型: ' + type); return; }
     state.chartConfig = cfg;
     if (cfg && cfg.labels && cfg.series) state.lastChart = cfg;
-    // 应用主题（链接可携带；现已只有象牙白一套）
-    if (cfg.theme && Themes.getTheme(cfg.theme)) {
-      state.theme = cfg.theme;
-      Themes.applyTheme(cfg.theme);
+    // 应用主题（链接可携带；目前是象牙白 / 暗夜两套）
+    function applyThemeFromConfig(themeId) {
+      if (!Themes.getTheme(themeId)) return;
+      state.theme = themeId;
+      Themes.applyTheme(themeId);
       var ts = el('theme-select');
-      if (ts) ts.value = cfg.theme;
+      if (ts) ts.value = themeId;
+      // 分享链接里带了具体主题：让外观开关跟着切到对应档位
+      var m = Themes.modeOf(themeId);
+      state.appearance = m;
+      state.themeByMode[m] = themeId;
+      refreshAppearanceUI();
+      saveAppearance();
+    }
+    if (cfg.theme && Themes.getTheme(cfg.theme)) {
+      applyThemeFromConfig(cfg.theme);
     }
     /* 链接可携带配色模板：consult / contrast / burgundy / forest */
     if (cfg.palette) {
@@ -6566,14 +6714,21 @@
       var initLang = q.lang || (function () { try { return localStorage.getItem('adv_lang'); } catch (e) { return null; } })();
       window.I18N.setLang(initLang === 'en' ? 'en' : 'zh');
     }
-    state.theme = 'paper';
-    try { localStorage.removeItem('adv-theme'); } catch (e) {}
+    // 外观：本地存储 > URL ?theme= > 跟随系统；首屏静默套用，不弹提示
+    readAppearance();
+    if (q.theme && Themes.getTheme(q.theme)) {
+      var qm = Themes.modeOf(q.theme);
+      state.appearance = qm;
+      state.themeByMode[qm] = q.theme;
+    }
     if (q.tpl && DataLoader.SAMPLES[q.tpl]) state.currentTemplate = q.tpl;
-    Themes.applyTheme(state.theme);
+    applyAppearance(state.appearance, { silent: true });
     if (window.WORLD_GEOJSON && window.echarts) { try { echarts.registerMap('world', window.WORLD_GEOJSON); } catch (e) {} }
     /* 数据改为按需加载，启动时不再预解析 */
     prefetchLibs();
     buildThemeSelect();
+    buildAppearanceSwitch();
+    watchSystemAppearance();
     buildSidebar();
     buildTabs();
     buildSampleTab();
